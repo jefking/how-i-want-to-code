@@ -1,0 +1,72 @@
+package workspace
+
+import (
+	"errors"
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestSelectBasePrefersDevShm(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{PathExists: func(path string) bool { return path == "/dev/shm" }}
+	if got := m.SelectBase(); got != "/dev/shm" {
+		t.Fatalf("SelectBase() = %q", got)
+	}
+}
+
+func TestSelectBaseFallsBackToTmp(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{PathExists: func(string) bool { return false }}
+	if got := m.SelectBase(); got != "/tmp" {
+		t.Fatalf("SelectBase() = %q", got)
+	}
+}
+
+func TestCreateRunDirUsesGUIDSubfolder(t *testing.T) {
+	t.Parallel()
+
+	var createdPath string
+	m := Manager{
+		PathExists: func(path string) bool { return path == "/dev/shm" },
+		NewGUID:    func() string { return "abc123" },
+		MkdirAll: func(path string, _ os.FileMode) error {
+			createdPath = path
+			return nil
+		},
+	}
+
+	runDir, guid, err := m.CreateRunDir()
+	if err != nil {
+		t.Fatalf("CreateRunDir() error = %v", err)
+	}
+	if guid != "abc123" {
+		t.Fatalf("guid = %q", guid)
+	}
+	want := filepath.Join("/dev/shm", "abc123")
+	if runDir != want {
+		t.Fatalf("runDir = %q, want %q", runDir, want)
+	}
+	if createdPath != want {
+		t.Fatalf("created path = %q, want %q", createdPath, want)
+	}
+}
+
+func TestCreateRunDirMkdirFailure(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		PathExists: func(string) bool { return false },
+		NewGUID:    func() string { return "abc123" },
+		MkdirAll: func(string, os.FileMode) error {
+			return errors.New("boom")
+		},
+	}
+
+	_, _, err := m.CreateRunDir()
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+}
