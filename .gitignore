@@ -1,3 +1,4 @@
 /templates/
 !/templates/*.example.json
 .*
+bin/*

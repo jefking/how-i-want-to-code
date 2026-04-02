@@ -47,7 +47,7 @@ func TestLoadInitDefaults(t *testing.T) {
 	}
 }
 
-func TestLoadInitRejectsMissingTokens(t *testing.T) {
+func TestLoadInitAllowsMissingTokensForRuntimeConfigFallback(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -59,12 +59,15 @@ func TestLoadInitRejectsMissingTokens(t *testing.T) {
 		t.Fatalf("write init: %v", err)
 	}
 
-	_, err := LoadInit(path)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	cfg, err := LoadInit(path)
+	if err != nil {
+		t.Fatalf("LoadInit() error = %v", err)
 	}
-	if !strings.Contains(err.Error(), "bind_token or agent_token is required") {
-		t.Fatalf("unexpected error: %v", err)
+	if cfg.BindToken != "" {
+		t.Fatalf("BindToken = %q", cfg.BindToken)
+	}
+	if cfg.AgentToken != "" {
+		t.Fatalf("AgentToken = %q", cfg.AgentToken)
 	}
 }
 

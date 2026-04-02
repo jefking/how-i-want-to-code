@@ -127,9 +127,6 @@ func (c InitConfig) Validate() error {
 	if u.Scheme != "http" && u.Scheme != "https" {
 		return fmt.Errorf("base_url must use http or https")
 	}
-	if strings.TrimSpace(c.BindToken) == "" && strings.TrimSpace(c.AgentToken) == "" {
-		return fmt.Errorf("bind_token or agent_token is required")
-	}
 	if strings.TrimSpace(c.Skill.Name) == "" {
 		return fmt.Errorf("skill.name is required")
 	}
