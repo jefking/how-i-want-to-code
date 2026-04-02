@@ -65,6 +65,7 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	if h.Runner == nil {
 		return h.fail(ExitUsage, "usage", fmt.Errorf("runner is required"), "")
 	}
+	cfg.ApplyDefaults()
 	if err := cfg.Validate(); err != nil {
 		return h.fail(ExitConfig, "config", err, "")
 	}
@@ -178,7 +179,7 @@ func resolveTargetDir(repoDir, targetSubdir string) (string, error) {
 	if err != nil {
 		return "", fmt.Errorf("resolve target subdir: %w", err)
 	}
-	if strings.HasPrefix(rel, "..") || rel == "." {
+	if strings.HasPrefix(rel, "..") {
 		return "", fmt.Errorf("target_subdir escapes repository")
 	}
 	return targetDir, nil

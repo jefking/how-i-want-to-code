@@ -38,19 +38,21 @@ Use the template at [`templates/run.example.json`](templates/run.example.json):
 
 ## Config (v1)
 
+Config supports JSON with `//` comments (JSONC-style) and reads the first JSON object in the file.
+
 Required fields:
 
-- `version` (must be `v1`)
-- `repo_url`
-- `base_branch`
-- `target_subdir` (non-root relative path)
 - `prompt`
-- `commit_message`
-- `pr_title`
-- `pr_body`
+- `repo` or `repo_url`
 
-Optional fields:
+Optional fields (with defaults):
 
+- `version` (default: `v1`)
+- `base_branch` (default: `main`)
+- `target_subdir` (default: `.` for repo root)
+- `commit_message` (default: auto-generated from prompt)
+- `pr_title` (default: auto-generated from prompt)
+- `pr_body` (default: auto-generated with prompt summary)
 - `labels` (`[]string`)
 - `reviewers` (`[]string`)
 
