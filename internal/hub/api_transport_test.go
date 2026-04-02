@@ -100,6 +100,31 @@ func TestPullOpenClawMessageParsesNestedDeliveryAndPrefersOpenClawEnvelope(t *te
 	}
 }
 
+func TestExtractInboundOpenClawMessageForWebsocketEnvelope(t *testing.T) {
+	t.Parallel()
+
+	root := map[string]any{
+		"status": "received",
+		"openclaw_message": map[string]any{
+			"kind":       "skill_request",
+			"skill_name": "code_for_me",
+			"request_id": "req-ws",
+			"input": map[string]any{
+				"repo":   "git@github.com:acme/repo.git",
+				"prompt": "x",
+			},
+		},
+	}
+
+	got := extractInboundOpenClawMessage(root)
+	if got.DeliveryID != "" {
+		t.Fatalf("DeliveryID = %q, want empty", got.DeliveryID)
+	}
+	if skill := got.Message["skill_name"]; skill != "code_for_me" {
+		t.Fatalf("message.skill_name = %#v", skill)
+	}
+}
+
 func TestPullOpenClawMessageNoContent(t *testing.T) {
 	t.Parallel()
 
