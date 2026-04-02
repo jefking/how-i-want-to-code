@@ -219,7 +219,7 @@ func TestCommandBuilders(t *testing.T) {
 	}
 
 	codex := codexCommand(targetDir, prompt)
-	if codex.Name != "codex" || codex.Dir != targetDir || !reflect.DeepEqual(codex.Args, []string{prompt}) {
+	if codex.Name != "codex" || codex.Dir != targetDir || !reflect.DeepEqual(codex.Args, []string{"exec", "--sandbox", "workspace-write", prompt}) {
 		t.Fatalf("codex command unexpected: %+v", codex)
 	}
 

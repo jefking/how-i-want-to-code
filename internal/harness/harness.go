@@ -231,7 +231,7 @@ func codexCommand(targetDir, prompt string) execx.Command {
 	return execx.Command{
 		Dir:  targetDir,
 		Name: "codex",
-		Args: []string{prompt},
+		Args: []string{"exec", "--sandbox", "workspace-write", prompt},
 	}
 }
 
