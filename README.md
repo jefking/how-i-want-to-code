@@ -69,7 +69,7 @@ Per-session logs are emitted to stderr with `session=<id>` prefixes, and a final
 
 Required fields:
 
-- `bind_token` or `agent_token`
+- none (for first-time bind, provide `bind_token` or `agent_token`)
 
 Optional fields (with defaults):
 
@@ -91,6 +91,7 @@ Optional fields (with defaults):
 `harness hub` uses a hard-coded startup flow:
 
 1. Resolve an agent token:
+   - load `./.moltenhub/config.json` token first (if present), else
    - verify `agent_token` (if present), else
    - attempt bind exchange against `/v1/agents/bind-tokens` and `/v1/agents/bind` using `bind_token`.
 2. Sync profile:

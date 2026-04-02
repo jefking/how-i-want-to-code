@@ -42,7 +42,7 @@ func (c APIClient) ResolveAgentToken(ctx context.Context, cfg InitConfig) (strin
 		if c.verifyToken(ctx, cfg.AgentToken) {
 			return cfg.AgentToken, nil
 		}
-		c.logf("hub.auth token=agent_token status=invalid")
+		c.logf("hub.auth source=agent_config status=invalid")
 	}
 
 	if strings.TrimSpace(cfg.BindToken) == "" {
@@ -90,18 +90,18 @@ func (c APIClient) bindTokenFlow(ctx context.Context, bindToken string) (string,
 
 		if status/100 == 2 {
 			if token := extractTokenFromJSON(body); token != "" {
-				c.logf("hub.auth attempt=%s status=ok token=exchanged", attempt.name)
+				c.logf("hub.auth attempt=%s status=ok credential=exchanged", attempt.name)
 				return token, nil
 			}
 			if c.verifyToken(ctx, bindToken) {
-				c.logf("hub.auth attempt=%s status=ok token=bind_token", attempt.name)
+				c.logf("hub.auth attempt=%s status=ok credential=reused_bind", attempt.name)
 				return bindToken, nil
 			}
 			failures = append(failures, fmt.Sprintf("%s succeeded but no token in response", attempt.name))
 			continue
 		}
 
-		failures = append(failures, fmt.Sprintf("%s status=%d body=%s", attempt.name, status, truncateBody(body)))
+		failures = append(failures, fmt.Sprintf("%s status=%d", attempt.name, status))
 	}
 
 	return "", fmt.Errorf("bind flow failed: %s", strings.Join(failures, "; "))
@@ -261,7 +261,7 @@ func (c APIClient) tryAny(ctx context.Context, token string, attempts []apiAttem
 	}
 	var traces []string
 	for _, attempt := range attempts {
-		status, body, err := c.doJSON(ctx, attempt.Method, attempt.Path, token, attempt.Body)
+		status, _, err := c.doJSON(ctx, attempt.Method, attempt.Path, token, attempt.Body)
 		if err != nil {
 			traces = append(traces, fmt.Sprintf("%s %s network=%v", attempt.Method, attempt.Path, err))
 			continue
@@ -269,7 +269,7 @@ func (c APIClient) tryAny(ctx context.Context, token string, attempts []apiAttem
 		if status/100 == 2 {
 			return true, fmt.Sprintf("%s %s", attempt.Method, attempt.Path)
 		}
-		traces = append(traces, fmt.Sprintf("%s %s status=%d body=%s", attempt.Method, attempt.Path, status, truncateBody(body)))
+		traces = append(traces, fmt.Sprintf("%s %s status=%d", attempt.Method, attempt.Path, status))
 	}
 	return false, strings.Join(traces, "; ")
 }
@@ -278,7 +278,7 @@ func (c APIClient) logf(format string, args ...any) {
 	if c.Logf == nil {
 		return
 	}
-	c.Logf(format, args...)
+	c.Logf("%s", redactSensitiveLogText(fmt.Sprintf(format, args...)))
 }
 
 func extractTokenFromJSON(body []byte) string {

@@ -263,7 +263,7 @@ func (d Daemon) logf(format string, args ...any) {
 	if d.Logf == nil {
 		return
 	}
-	d.Logf(format, args...)
+	d.Logf("%s", redactSensitiveLogText(fmt.Sprintf(format, args...)))
 }
 
 func applyStoredRuntimeConfig(cfg *InitConfig, stored RuntimeConfig) bool {
