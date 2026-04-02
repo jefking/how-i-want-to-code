@@ -113,67 +113,24 @@ func (c APIClient) SyncProfile(ctx context.Context, token string, cfg InitConfig
 		return fmt.Errorf("profile sync requires token")
 	}
 
-	if cfg.Handle != "" {
-		handleBody := map[string]any{"handle": cfg.Handle}
+	if handle := strings.TrimSpace(cfg.Handle); handle != "" {
+		handleBody := map[string]any{"handle": handle}
 		ok, trace := c.tryAny(ctx, token, []apiAttempt{
-			{Method: http.MethodPost, Path: "/agents/me/handle/finalize", Body: handleBody},
-			{Method: http.MethodPatch, Path: "/agents/me/handle/finalize", Body: handleBody},
+			{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: handleBody},
 			{Method: http.MethodPatch, Path: "/agents/me", Body: handleBody},
-			{Method: http.MethodPut, Path: "/agents/me", Body: handleBody},
 		})
 		if !ok {
 			return fmt.Errorf("set handle failed: %s", trace)
 		}
 	}
 
-	profilePatch := map[string]any{}
-	if cfg.Profile.DisplayName != "" {
-		profilePatch["display_name"] = cfg.Profile.DisplayName
-		profilePatch["name"] = cfg.Profile.DisplayName
-	}
-	if cfg.Profile.Emoji != "" {
-		profilePatch["emoji"] = cfg.Profile.Emoji
-	}
-	if cfg.Profile.Bio != "" {
-		profilePatch["bio"] = cfg.Profile.Bio
-	}
-	if len(profilePatch) > 0 {
-		ok, trace := c.tryAny(ctx, token, []apiAttempt{
-			{Method: http.MethodPatch, Path: "/agents/me", Body: profilePatch},
-			{Method: http.MethodPut, Path: "/agents/me", Body: profilePatch},
-		})
-		if !ok {
-			return fmt.Errorf("set profile failed: %s", trace)
-		}
-	}
-
-	metadata := map[string]any{}
-	for k, v := range cfg.Profile.Metadata {
-		metadata[k] = v
-	}
-	if _, ok := metadata["agent_type"]; !ok {
-		metadata["agent_type"] = "codex-harness"
-	}
-	if _, ok := metadata["runtime"]; !ok {
-		metadata["runtime"] = "codex-harness"
-	}
-	if _, ok := metadata["skills"]; !ok {
-		metadata["skills"] = []map[string]any{{
-			"name":          cfg.Skill.Name,
-			"dispatch_type": cfg.Skill.DispatchType,
-			"result_type":   cfg.Skill.ResultType,
-		}}
-	}
-	if len(metadata) > 0 {
-		ok, trace := c.tryAny(ctx, token, []apiAttempt{
-			{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: metadata},
-			{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: map[string]any{"metadata": metadata}},
-			{Method: http.MethodPatch, Path: "/agents/me", Body: map[string]any{"metadata": metadata}},
-			{Method: http.MethodPut, Path: "/agents/me", Body: map[string]any{"metadata": metadata}},
-		})
-		if !ok {
-			return fmt.Errorf("set metadata failed: %s", trace)
-		}
+	metadata := buildAgentMetadata(cfg)
+	ok, trace := c.tryAny(ctx, token, []apiAttempt{
+		{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: map[string]any{"metadata": metadata}},
+		{Method: http.MethodPatch, Path: "/agents/me", Body: map[string]any{"metadata": metadata}},
+	})
+	if !ok {
+		return fmt.Errorf("set metadata failed: %s", trace)
 	}
 
 	return nil
@@ -373,4 +330,210 @@ func truncateBody(body []byte) string {
 		return trimmed
 	}
 	return trimmed[:200] + "..."
+}
+
+func buildAgentMetadata(cfg InitConfig) map[string]any {
+	metadata := map[string]any{}
+	for k, v := range cfg.Profile.Metadata {
+		metadata[k] = v
+	}
+
+	metadata["agent_type"] = normalizeAgentType(metadata["agent_type"])
+	if _, ok := metadata["runtime"]; !ok {
+		metadata["runtime"] = "codex-harness"
+	}
+	if _, ok := metadata["harness"]; !ok {
+		metadata["harness"] = "codex-harness@v1"
+	}
+
+	if _, ok := metadata["display_name"]; !ok && strings.TrimSpace(cfg.Profile.DisplayName) != "" {
+		metadata["display_name"] = strings.TrimSpace(cfg.Profile.DisplayName)
+	}
+	if _, ok := metadata["emoji"]; !ok && strings.TrimSpace(cfg.Profile.Emoji) != "" {
+		metadata["emoji"] = strings.TrimSpace(cfg.Profile.Emoji)
+	}
+	if _, ok := metadata["bio"]; !ok && strings.TrimSpace(cfg.Profile.Bio) != "" {
+		metadata["bio"] = strings.TrimSpace(cfg.Profile.Bio)
+	}
+	if _, ok := metadata["profile_markdown"]; !ok {
+		if markdown := buildProfileMarkdown(cfg.Profile.DisplayName, cfg.Profile.Emoji, cfg.Profile.Bio); markdown != "" {
+			metadata["profile_markdown"] = markdown
+		}
+	}
+
+	fallbackName := normalizeSkillName(cfg.Skill.Name)
+	fallbackDescription := skillDescription(cfg.Skill)
+	metadata["skills"] = normalizeSkillsMetadata(metadata["skills"], fallbackName, fallbackDescription)
+
+	return metadata
+}
+
+func normalizeAgentType(raw any) string {
+	s, _ := raw.(string)
+	return normalizeIdentifier(s, "codex-harness")
+}
+
+func normalizeSkillsMetadata(raw any, fallbackName, fallbackDescription string) []map[string]any {
+	fallbackName = normalizeSkillName(fallbackName)
+	fallbackDescription = normalizeDescription(fallbackDescription, "Executes Codex harness tasks.")
+
+	out := make([]map[string]any, 0, 1)
+	seen := map[string]struct{}{}
+	appendSkill := func(name, description string) {
+		normalizedName := normalizeSkillName(name)
+		if normalizedName == "" {
+			normalizedName = fallbackName
+		}
+		if _, exists := seen[normalizedName]; exists {
+			return
+		}
+		seen[normalizedName] = struct{}{}
+		out = append(out, map[string]any{
+			"name":        normalizedName,
+			"description": normalizeDescription(description, fallbackDescription),
+		})
+	}
+
+	switch typed := raw.(type) {
+	case []any:
+		for _, entry := range typed {
+			switch v := entry.(type) {
+			case map[string]any:
+				appendSkill(firstString(v["name"], v["skill"], v["id"]), firstString(v["description"], v["summary"], v["bio"]))
+			case string:
+				appendSkill(v, "")
+			}
+		}
+	case []map[string]any:
+		for _, entry := range typed {
+			appendSkill(firstString(entry["name"], entry["skill"], entry["id"]), firstString(entry["description"], entry["summary"], entry["bio"]))
+		}
+	case map[string]any:
+		appendSkill(firstString(typed["name"], typed["skill"], typed["id"]), firstString(typed["description"], typed["summary"], typed["bio"]))
+	case string:
+		appendSkill(typed, "")
+	}
+
+	if len(out) == 0 {
+		appendSkill(fallbackName, fallbackDescription)
+	}
+	return out
+}
+
+func normalizeSkillName(name string) string {
+	return normalizeIdentifier(name, "codex_harness_run")
+}
+
+func normalizeIdentifier(value, fallback string) string {
+	normalized := sanitizeIdentifier(value)
+	if normalized != "" {
+		return normalized
+	}
+	normalized = sanitizeIdentifier(fallback)
+	if normalized != "" {
+		return normalized
+	}
+	return "unknown"
+}
+
+func sanitizeIdentifier(value string) string {
+	value = strings.ToLower(strings.TrimSpace(value))
+	if value == "" {
+		return ""
+	}
+
+	var b strings.Builder
+	b.Grow(len(value))
+	needsSeparator := false
+	for _, r := range value {
+		if (r >= 'a' && r <= 'z') || (r >= '0' && r <= '9') || r == '.' || r == '_' || r == '-' {
+			if needsSeparator && b.Len() > 0 {
+				b.WriteByte('-')
+			}
+			needsSeparator = false
+			b.WriteRune(r)
+			continue
+		}
+		needsSeparator = true
+	}
+
+	out := strings.Trim(b.String(), "-._")
+	if len(out) > 64 {
+		out = strings.Trim(out[:64], "-._")
+	}
+	if len(out) < 2 {
+		return ""
+	}
+	return out
+}
+
+func skillDescription(cfg SkillConfig) string {
+	dispatchType := strings.TrimSpace(cfg.DispatchType)
+	resultType := strings.TrimSpace(cfg.ResultType)
+	switch {
+	case dispatchType != "" && resultType != "":
+		return normalizeDescription(
+			fmt.Sprintf("Handles %s requests and returns %s responses.", dispatchType, resultType),
+			"Executes Codex harness tasks.",
+		)
+	case dispatchType != "":
+		return normalizeDescription(
+			fmt.Sprintf("Handles %s requests.", dispatchType),
+			"Executes Codex harness tasks.",
+		)
+	case resultType != "":
+		return normalizeDescription(
+			fmt.Sprintf("Returns %s responses.", resultType),
+			"Executes Codex harness tasks.",
+		)
+	default:
+		return "Executes Codex harness tasks."
+	}
+}
+
+func normalizeDescription(value, fallback string) string {
+	value = strings.Join(strings.Fields(strings.TrimSpace(value)), " ")
+	if value == "" {
+		value = strings.Join(strings.Fields(strings.TrimSpace(fallback)), " ")
+	}
+	if value == "" {
+		value = "Executes Codex harness tasks."
+	}
+	if len(value) > 240 {
+		value = strings.TrimSpace(value[:240])
+	}
+	if value == "" {
+		value = "Executes Codex harness tasks."
+	}
+	return value
+}
+
+func firstString(values ...any) string {
+	for _, value := range values {
+		s, ok := value.(string)
+		if !ok {
+			continue
+		}
+		s = strings.TrimSpace(s)
+		if s != "" {
+			return s
+		}
+	}
+	return ""
+}
+
+func buildProfileMarkdown(displayName, emoji, bio string) string {
+	displayName = strings.TrimSpace(displayName)
+	emoji = strings.TrimSpace(emoji)
+	bio = strings.TrimSpace(bio)
+
+	header := strings.TrimSpace(strings.Join([]string{emoji, displayName}, " "))
+	switch {
+	case header != "" && bio != "":
+		return "# " + header + "\n\n" + bio
+	case header != "":
+		return "# " + header
+	default:
+		return bio
+	}
 }

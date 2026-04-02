@@ -9,7 +9,7 @@ import (
 )
 
 const (
-	defaultRuntimeConfigPath = "./moltenhub/config.json"
+	defaultRuntimeConfigPath = "./.moltenhub/config.json"
 	runtimeTimeoutMs         = 20000
 )
 

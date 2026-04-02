@@ -48,7 +48,7 @@ Use the template at [`templates/init.example.json`](templates/init.example.json)
 ```
 
 This mode keeps one local process running, listens on hub websocket events, and spins worker harness sessions as matching skill requests arrive.
-After successful auth, it saves `./moltenhub/config.json` with `{baseUrl, token, sessionKey, timeoutMs}` and reuses that saved token on subsequent starts (so a fresh bind token is not required every run).
+After successful auth, it saves `./.moltenhub/config.json` with `{baseUrl, token, sessionKey, timeoutMs}` and reuses that saved token on subsequent starts (so a fresh bind token is not required every run).
 
 ## Multiplex Run
 
@@ -94,9 +94,9 @@ Optional fields (with defaults):
    - verify `agent_token` (if present), else
    - attempt bind exchange against `/v1/agents/bind-tokens` and `/v1/agents/bind` using `bind_token`.
 2. Sync profile:
-   - handle finalize/update attempts
-   - profile patch (`display_name`, `emoji`, `bio`)
-   - metadata patch (includes runtime + skill metadata)
+   - one-time handle update via `/v1/agents/me/metadata` / `/v1/agents/me`
+   - metadata patch only, with OpenAPI-compatible `metadata.skills` entries (`name` + `description`)
+   - profile values are embedded in metadata (`display_name`, `emoji`, `bio`, `profile_markdown`)
 3. Register runtime at `/v1/openclaw/messages/register-plugin` (non-fatal warning on failure).
 4. Connect websocket at `/v1/openclaw/messages/ws`.
 5. For each matching skill dispatch, parse run config JSON and execute a harness run in a worker goroutine.

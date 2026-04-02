@@ -68,9 +68,10 @@ func (d Daemon) Run(ctx context.Context, cfg InitConfig) error {
 	d.logf("hub.runtime_config status=saved path=%s", defaultRuntimeConfigPath)
 
 	if err := api.SyncProfile(ctx, token, cfg); err != nil {
-		return fmt.Errorf("hub profile: %w", err)
+		d.logf("hub.profile status=warn err=%q", err)
+	} else {
+		d.logf("hub.profile status=ok")
 	}
-	d.logf("hub.profile status=ok")
 
 	if err := api.RegisterRuntime(ctx, token, cfg); err != nil {
 		d.logf("hub.register status=warn err=%q", err)
