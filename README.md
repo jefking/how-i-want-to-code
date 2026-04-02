@@ -3,7 +3,7 @@
 Minimal Go harness for repeatable Codex dispatch against a single directory in a target repository.
 
 Also supports multiplexed execution across many task configs in parallel.
-Also supports a persistent Hub listener mode that binds to MoltenHub and launches harness runs from pull-transport skill dispatches.
+Also supports a persistent Hub listener mode that binds to MoltenHub and launches harness runs from websocket skill dispatches (with pull fallback).
 
 ## What It Does
 
@@ -47,7 +47,7 @@ Use the template at [`templates/init.example.json`](templates/init.example.json)
 ./bin/harness hub --init templates/init.example.json
 ```
 
-This mode keeps one local process running, long-polls hub OpenClaw pull transport, and spins worker harness sessions as matching skill requests arrive.
+This mode keeps one local process running, listens on hub OpenClaw websocket transport, and falls back to HTTP pull transport if websocket has an issue.
 After successful auth, it saves `./.moltenhub/config.json` with `{baseUrl, token, sessionKey, timeoutMs}` and reuses that saved token on subsequent starts (so a fresh bind token is not required every run).
 
 ## Multiplex Run
@@ -98,10 +98,11 @@ Optional fields (with defaults):
    - one-time handle update via `/v1/agents/me/metadata` / `/v1/agents/me`
    - metadata patch only, with OpenAPI-compatible `metadata.skills` entries (`name` + `description`)
    - profile values are embedded in metadata (`display_name`, `emoji`, `bio`, `profile_markdown`)
-3. Start OpenClaw pull transport loop via `/v1/openclaw/messages/pull` (`timeout_ms` long-poll).
-4. For each pulled message lease, parse run config JSON and execute a harness run in a worker goroutine.
-5. Publish `skill_result` via `/v1/openclaw/messages/publish`.
-6. Ack/Nack leases via `/v1/openclaw/messages/ack` and `/v1/openclaw/messages/nack`.
+3. Start OpenClaw websocket transport via `/v1/openclaw/messages/ws` (primary).
+4. If websocket fails, temporarily fall back to OpenClaw pull transport via `/v1/openclaw/messages/pull` (`timeout_ms` long-poll), then retry websocket.
+5. For each inbound message, parse run config JSON and execute a harness run in a worker goroutine.
+6. Publish `skill_result` via `/v1/openclaw/messages/publish`.
+7. When delivery leases are present (pull transport), Ack/Nack via `/v1/openclaw/messages/ack` and `/v1/openclaw/messages/nack`.
 
 ## Hub Skill Payload
 
