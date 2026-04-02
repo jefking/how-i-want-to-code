@@ -763,7 +763,7 @@ func normalizeSkillsMetadata(raw any, fallbackName, fallbackDescription string) 
 }
 
 func normalizeSkillName(name string) string {
-	return normalizeIdentifier(name, "codex_harness_run")
+	return normalizeIdentifier(name, "code_for_me")
 }
 
 func normalizeIdentifier(value, fallback string) string {

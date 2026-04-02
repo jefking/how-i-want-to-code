@@ -171,6 +171,40 @@ func TestParseSkillDispatchAcceptsJSONStringInputAndSourceRouting(t *testing.T) 
 	}
 }
 
+func TestParseSkillDispatchMatchesLegacyAndCurrentSkillAliases(t *testing.T) {
+	t.Parallel()
+
+	msgCurrent := map[string]any{
+		"type":  "skill_request",
+		"skill": "code_for_me",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "x",
+		},
+	}
+
+	if _, matched, err := ParseSkillDispatch(msgCurrent, "skill_request", "codex_harness_run"); err != nil {
+		t.Fatalf("ParseSkillDispatch() current->legacy error = %v", err)
+	} else if !matched {
+		t.Fatal("matched = false for current->legacy alias")
+	}
+
+	msgLegacy := map[string]any{
+		"type":  "skill_request",
+		"skill": "codex_harness_run",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "x",
+		},
+	}
+
+	if _, matched, err := ParseSkillDispatch(msgLegacy, "skill_request", "code_for_me"); err != nil {
+		t.Fatalf("ParseSkillDispatch() legacy->current error = %v", err)
+	} else if !matched {
+		t.Fatal("matched = false for legacy->current alias")
+	}
+}
+
 func TestParseSkillDispatchRejectsUnknownConfigFields(t *testing.T) {
 	t.Parallel()
 

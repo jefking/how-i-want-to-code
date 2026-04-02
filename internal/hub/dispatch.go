@@ -49,7 +49,7 @@ func ParseSkillDispatch(msg map[string]any, expectedType, expectedSkill string) 
 		if skillName == "" {
 			return SkillDispatch{}, false, nil
 		}
-		if !strings.EqualFold(skillName, expectedSkill) {
+		if !skillNamesEqual(skillName, expectedSkill) {
 			return SkillDispatch{}, false, nil
 		}
 	}
@@ -328,4 +328,19 @@ func firstNonEmpty(values ...string) string {
 		}
 	}
 	return ""
+}
+
+func skillNamesEqual(a, b string) bool {
+	return normalizeSkillMatcherName(a) == normalizeSkillMatcherName(b)
+}
+
+func normalizeSkillMatcherName(value string) string {
+	normalized := strings.ToLower(strings.TrimSpace(value))
+	normalized = strings.ReplaceAll(normalized, "-", "_")
+	switch normalized {
+	case "codex_harness_run", "code_for_me":
+		return "code_for_me"
+	default:
+		return normalized
+	}
 }
