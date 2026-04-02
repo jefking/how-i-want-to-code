@@ -60,16 +60,6 @@ func TestRunMultiplexUsageMissingConfigFlag(t *testing.T) {
 	}
 }
 
-func TestRunHubUsageMissingInitFlag(t *testing.T) {
-	orig := os.Args
-	t.Cleanup(func() { os.Args = orig })
-	os.Args = []string{"harness", "hub"}
-
-	if code := run(); code != 2 {
-		t.Fatalf("run() = %d, want 2", code)
-	}
-}
-
 func TestCollectConfigPathsFilesAndDirs(t *testing.T) {
 	t.Parallel()
 
@@ -99,5 +89,108 @@ func TestCollectConfigPathsFilesAndDirs(t *testing.T) {
 	slices.Sort(want)
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("collectConfigPaths() = %v, want %v", got, want)
+	}
+}
+
+func TestResolveHubInitConfigExplicitPath(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "init.json")
+	if err := os.WriteFile(path, []byte(`{"bind_token":"bind_123"}`), 0o644); err != nil {
+		t.Fatalf("write init: %v", err)
+	}
+
+	cfg, err := resolveHubInitConfig(path)
+	if err != nil {
+		t.Fatalf("resolveHubInitConfig() error = %v", err)
+	}
+	if cfg.BindToken != "bind_123" {
+		t.Fatalf("BindToken = %q", cfg.BindToken)
+	}
+}
+
+func TestResolveHubInitConfigPrefersTemplatesInitJSON(t *testing.T) {
+	root := t.TempDir()
+	templatesDir := filepath.Join(root, "templates")
+	if err := os.MkdirAll(templatesDir, 0o755); err != nil {
+		t.Fatalf("mkdir templates: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "init.json"), []byte(`{"bind_token":"bind_primary"}`), 0o644); err != nil {
+		t.Fatalf("write init.json: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "init.example.json"), []byte(`{"bind_token":"bind_example"}`), 0o644); err != nil {
+		t.Fatalf("write init.example.json: %v", err)
+	}
+
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("chdir root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origWD) })
+
+	cfg, err := resolveHubInitConfig("")
+	if err != nil {
+		t.Fatalf("resolveHubInitConfig() error = %v", err)
+	}
+	if cfg.BindToken != "bind_primary" {
+		t.Fatalf("BindToken = %q", cfg.BindToken)
+	}
+}
+
+func TestResolveHubInitConfigFallsBackToExample(t *testing.T) {
+	root := t.TempDir()
+	templatesDir := filepath.Join(root, "templates")
+	if err := os.MkdirAll(templatesDir, 0o755); err != nil {
+		t.Fatalf("mkdir templates: %v", err)
+	}
+	if err := os.WriteFile(filepath.Join(templatesDir, "init.example.json"), []byte(`{"bind_token":"bind_example"}`), 0o644); err != nil {
+		t.Fatalf("write init.example.json: %v", err)
+	}
+
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("chdir root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origWD) })
+
+	cfg, err := resolveHubInitConfig("")
+	if err != nil {
+		t.Fatalf("resolveHubInitConfig() error = %v", err)
+	}
+	if cfg.BindToken != "bind_example" {
+		t.Fatalf("BindToken = %q", cfg.BindToken)
+	}
+}
+
+func TestResolveHubInitConfigUsesDefaultsWithoutTemplates(t *testing.T) {
+	root := t.TempDir()
+	origWD, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	if err := os.Chdir(root); err != nil {
+		t.Fatalf("chdir root: %v", err)
+	}
+	t.Cleanup(func() { _ = os.Chdir(origWD) })
+
+	cfg, err := resolveHubInitConfig("")
+	if err != nil {
+		t.Fatalf("resolveHubInitConfig() error = %v", err)
+	}
+	if cfg.BaseURL != "https://na.hub.molten.bot/v1" {
+		t.Fatalf("BaseURL = %q", cfg.BaseURL)
+	}
+	if cfg.SessionKey != "main" {
+		t.Fatalf("SessionKey = %q", cfg.SessionKey)
+	}
+	if cfg.BindToken != "" || cfg.AgentToken != "" {
+		t.Fatalf("expected empty tokens, got bind=%q agent=%q", cfg.BindToken, cfg.AgentToken)
 	}
 }

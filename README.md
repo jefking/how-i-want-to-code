@@ -44,11 +44,12 @@ Use the template at [`templates/run.example.json`](templates/run.example.json):
 Use the template at [`templates/init.example.json`](templates/init.example.json):
 
 ```bash
-./bin/harness hub --init templates/init.example.json
+./bin/harness hub
 ```
 
 This mode keeps one local process running, listens on hub websocket events, and spins worker harness sessions as matching skill requests arrive.
 After successful auth, it saves `./.moltenhub/config.json` with `{baseUrl, token, sessionKey, timeoutMs}` and reuses that saved token on subsequent starts (so a fresh bind token is not required every run).
+By default, hub init config resolves in this order: `templates/init.json`, then `templates/init.example.json`, then built-in defaults. You can still override with `--init <path>`.
 
 ## Multiplex Run
 
@@ -81,7 +82,7 @@ Optional fields (with defaults):
 - `profile.emoji`
 - `profile.bio`
 - `profile.metadata` (merged into agent metadata patch)
-- `skill.name` (default: `codex_harness_run`)
+- `skill.name` (default: `code_for_me`; only supported value)
 - `skill.dispatch_type` (default: `skill_request`)
 - `skill.result_type` (default: `skill_result`)
 - `dispatcher.max_parallel` (default: `2`)
@@ -110,9 +111,18 @@ Inbound dispatch must match the configured skill and include run config JSON. Su
 - top-level `config` or `input`
 - `payload.config` or `payload.input`
 - `data.config` or `data.input`
-- `config_path` (path to a run config file)
 
-Run config schema is the same as standard harness `run` config (`repo`/`repo_url`, `prompt`, and optional branch/subdir/PR metadata).
+Run config is validated strictly against the harness run schema:
+
+- Required: `prompt` and one of `repo` or `repo_url`
+- Optional: `version`, `base_branch`, `target_subdir`, `commit_message`, `pr_title`, `pr_body`, `labels`, `reviewers`
+- Additional/unknown fields are rejected
+
+If a matching `code_for_me` request fails validation, the daemon responds to the caller with:
+
+- `status=error`
+- validation error details
+- `result.required_schema` containing the exact schema contract required to start a session
 
 ## Config (v1)
 

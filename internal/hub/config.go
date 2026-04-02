@@ -42,6 +42,8 @@ type DispatcherConfig struct {
 	MaxParallel int `json:"max_parallel"`
 }
 
+const defaultSkillName = "code_for_me"
+
 // LoadInit reads and validates JSON/JSONC init config.
 func LoadInit(path string) (InitConfig, error) {
 	data, err := os.ReadFile(path)
@@ -93,7 +95,7 @@ func (c *InitConfig) ApplyDefaults() {
 
 	c.Skill.Name = strings.TrimSpace(c.Skill.Name)
 	if c.Skill.Name == "" {
-		c.Skill.Name = "codex_harness_run"
+		c.Skill.Name = defaultSkillName
 	}
 	c.Skill.DispatchType = strings.TrimSpace(c.Skill.DispatchType)
 	if c.Skill.DispatchType == "" {
@@ -129,6 +131,9 @@ func (c InitConfig) Validate() error {
 	}
 	if strings.TrimSpace(c.Skill.Name) == "" {
 		return fmt.Errorf("skill.name is required")
+	}
+	if !strings.EqualFold(strings.TrimSpace(c.Skill.Name), defaultSkillName) {
+		return fmt.Errorf("skill.name must be %q", defaultSkillName)
 	}
 	if strings.TrimSpace(c.Skill.DispatchType) == "" {
 		return fmt.Errorf("skill.dispatch_type is required")

@@ -45,7 +45,7 @@ func run() int {
 func printUsage() {
 	fmt.Fprintln(os.Stderr, "usage: harness run --config <path-to-json>")
 	fmt.Fprintln(os.Stderr, "   or: harness multiplex --config <path-or-dir> [--config <path-or-dir> ...] [--parallel <n>]")
-	fmt.Fprintln(os.Stderr, "   or: harness hub --init <path-to-init-json> [--parallel <n>]")
+	fmt.Fprintln(os.Stderr, "   or: harness hub [--init <path-to-init-json>] [--parallel <n>]")
 }
 
 func runSingle(args []string) int {
@@ -163,18 +163,14 @@ func runHub(args []string) int {
 	fs := flag.NewFlagSet("hub", flag.ContinueOnError)
 	fs.SetOutput(os.Stderr)
 
-	initPath := fs.String("init", "", "Path to hub init JSON")
+	initPath := fs.String("init", "", "Optional path to hub init JSON")
 	parallel := fs.Int("parallel", 0, "Optional override for dispatcher max parallel workers")
 
 	if err := fs.Parse(args); err != nil {
 		return harness.ExitUsage
 	}
-	if *initPath == "" {
-		fmt.Fprintln(os.Stderr, "missing required --init flag")
-		return harness.ExitUsage
-	}
 
-	cfg, err := hub.LoadInit(*initPath)
+	cfg, err := resolveHubInitConfig(*initPath)
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "init config error: %v\n", err)
 		return harness.ExitConfig
@@ -195,6 +191,31 @@ func runHub(args []string) int {
 		return hubExitCode(err)
 	}
 	return harness.ExitSuccess
+}
+
+func resolveHubInitConfig(path string) (hub.InitConfig, error) {
+	path = strings.TrimSpace(path)
+	if path != "" {
+		return hub.LoadInit(path)
+	}
+
+	for _, candidate := range []string{
+		filepath.Join("templates", "init.json"),
+		filepath.Join("templates", "init.example.json"),
+	} {
+		info, err := os.Stat(candidate)
+		if err != nil {
+			continue
+		}
+		if info.IsDir() {
+			continue
+		}
+		return hub.LoadInit(candidate)
+	}
+
+	var cfg hub.InitConfig
+	cfg.ApplyDefaults()
+	return cfg, nil
 }
 
 func hubExitCode(err error) int {

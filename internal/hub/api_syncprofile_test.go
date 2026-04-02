@@ -48,7 +48,7 @@ func TestSyncProfileUsesOpenAPICompatiblePayloads(t *testing.T) {
 			Bio:         "Automation worker",
 		},
 		Skill: SkillConfig{
-			Name:         "codex_harness_run",
+			Name:         defaultSkillName,
 			DispatchType: "skill_request",
 			ResultType:   "skill_result",
 		},
@@ -110,7 +110,7 @@ func TestSyncProfileUsesOpenAPICompatiblePayloads(t *testing.T) {
 	if !ok {
 		t.Fatalf("skill has wrong type: %#v", skills[0])
 	}
-	if skill["name"] != "codex_harness_run" {
+	if skill["name"] != defaultSkillName {
 		t.Fatalf("skill name = %#v", skill["name"])
 	}
 	if _, ok := skill["description"]; !ok {
@@ -166,7 +166,7 @@ func TestSyncProfileSanitizesLegacyMetadataSkills(t *testing.T) {
 			},
 		},
 		Skill: SkillConfig{
-			Name:         "codex_harness_run",
+			Name:         defaultSkillName,
 			DispatchType: "skill_request",
 			ResultType:   "skill_result",
 		},
@@ -218,7 +218,7 @@ func TestNormalizeSkillName(t *testing.T) {
 	if got := normalizeSkillName("CODEx Harness RUN!!"); got != "codex-harness-run" {
 		t.Fatalf("normalizeSkillName() = %q", got)
 	}
-	if got := normalizeSkillName("@"); got != "codex_harness_run" {
+	if got := normalizeSkillName("@"); got != defaultSkillName {
 		t.Fatalf("normalizeSkillName() fallback = %q", got)
 	}
 }

@@ -32,7 +32,7 @@ func TestLoadInitDefaults(t *testing.T) {
 	if cfg.SessionKey != "main" {
 		t.Fatalf("SessionKey = %q", cfg.SessionKey)
 	}
-	if cfg.Skill.Name != "codex_harness_run" {
+	if cfg.Skill.Name != defaultSkillName {
 		t.Fatalf("Skill.Name = %q", cfg.Skill.Name)
 	}
 	if cfg.Skill.DispatchType != "skill_request" {
@@ -79,7 +79,7 @@ func TestValidateRejectsUnsupportedBaseURLScheme(t *testing.T) {
 		BindToken:  "token",
 		SessionKey: "main",
 		Skill: SkillConfig{
-			Name:         "codex_harness_run",
+			Name:         defaultSkillName,
 			DispatchType: "skill_request",
 			ResultType:   "skill_result",
 		},
@@ -98,7 +98,7 @@ func TestLoadInitAllowsAgentTokenWithoutBindToken(t *testing.T) {
 	data := `{
   "agent_token": "agent_live_token",
   "skill": {
-    "name": "codex_harness_run"
+    "name": "code_for_me"
   },
   "dispatcher": {
     "max_parallel": 4
@@ -117,5 +117,23 @@ func TestLoadInitAllowsAgentTokenWithoutBindToken(t *testing.T) {
 	}
 	if cfg.Dispatcher.MaxParallel != 4 {
 		t.Fatalf("Dispatcher.MaxParallel = %d", cfg.Dispatcher.MaxParallel)
+	}
+}
+
+func TestValidateRejectsUnexpectedSkillName(t *testing.T) {
+	t.Parallel()
+
+	cfg := InitConfig{
+		Version: "v1",
+		BaseURL: "https://na.hub.molten.bot/v1",
+		Skill: SkillConfig{
+			Name:         "some_other_skill",
+			DispatchType: "skill_request",
+			ResultType:   "skill_result",
+		},
+		Dispatcher: DispatcherConfig{MaxParallel: 1},
+	}
+	if err := cfg.Validate(); err == nil {
+		t.Fatal("expected error, got nil")
 	}
 }

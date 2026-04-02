@@ -1,8 +1,7 @@
 package hub
 
 import (
-	"os"
-	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -11,7 +10,7 @@ func TestParseSkillDispatchFromPayloadConfig(t *testing.T) {
 
 	msg := map[string]any{
 		"type":  "skill_request",
-		"skill": "codex_harness_run",
+		"skill": defaultSkillName,
 		"id":    "req-1",
 		"from":  "agent-alpha",
 		"payload": map[string]any{
@@ -24,7 +23,7 @@ func TestParseSkillDispatchFromPayloadConfig(t *testing.T) {
 		},
 	}
 
-	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", "codex_harness_run")
+	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", defaultSkillName)
 	if err != nil {
 		t.Fatalf("ParseSkillDispatch() error = %v", err)
 	}
@@ -57,7 +56,7 @@ func TestParseSkillDispatchIgnoresDifferentSkill(t *testing.T) {
 		},
 	}
 
-	_, matched, err := ParseSkillDispatch(msg, "skill_request", "codex_harness_run")
+	_, matched, err := ParseSkillDispatch(msg, "skill_request", defaultSkillName)
 	if err != nil {
 		t.Fatalf("ParseSkillDispatch() error = %v", err)
 	}
@@ -66,35 +65,99 @@ func TestParseSkillDispatchIgnoresDifferentSkill(t *testing.T) {
 	}
 }
 
-func TestParseSkillDispatchLoadsConfigFromPath(t *testing.T) {
+func TestParseSkillDispatchRequiresInlineConfigObject(t *testing.T) {
 	t.Parallel()
-
-	dir := t.TempDir()
-	configPath := filepath.Join(dir, "run.json")
-	content := `{
-  "repo": "git@github.com:acme/repo.git",
-  "prompt": "make change"
-}`
-	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
-		t.Fatalf("write run config: %v", err)
-	}
 
 	msg := map[string]any{
 		"type":  "skill_request",
-		"skill": "codex_harness_run",
+		"skill": defaultSkillName,
 		"config": map[string]any{
-			"config_path": configPath,
+			"path": "/tmp/run.json",
 		},
 	}
 
-	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", "codex_harness_run")
-	if err != nil {
-		t.Fatalf("ParseSkillDispatch() error = %v", err)
-	}
+	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", defaultSkillName)
 	if !matched {
 		t.Fatal("matched = false, want true")
 	}
-	if dispatch.Config.Prompt != "make change" {
-		t.Fatalf("Prompt = %q", dispatch.Config.Prompt)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if dispatch.RequestID != "" {
+		t.Fatalf("RequestID = %q", dispatch.RequestID)
+	}
+}
+
+func TestParseSkillDispatchRejectsUnknownConfigFields(t *testing.T) {
+	t.Parallel()
+
+	msg := map[string]any{
+		"type":  "skill_request",
+		"skill": defaultSkillName,
+		"config": map[string]any{
+			"repo":        "git@github.com:acme/repo.git",
+			"prompt":      "make change",
+			"unknown_key": true,
+		},
+	}
+
+	_, matched, err := ParseSkillDispatch(msg, "skill_request", defaultSkillName)
+	if !matched {
+		t.Fatal("matched = false, want true")
+	}
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestParseSkillDispatchMissingPayloadIsValidationError(t *testing.T) {
+	t.Parallel()
+
+	msg := map[string]any{
+		"type":  "skill_request",
+		"skill": defaultSkillName,
+		"id":    "req-2",
+	}
+
+	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", defaultSkillName)
+	if !matched {
+		t.Fatal("matched = false, want true")
+	}
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if dispatch.RequestID != "req-2" {
+		t.Fatalf("RequestID = %q", dispatch.RequestID)
+	}
+}
+
+func TestParseSkillDispatchWrongTypeIsValidationError(t *testing.T) {
+	t.Parallel()
+
+	msg := map[string]any{
+		"type":  "not_skill_request",
+		"skill": defaultSkillName,
+		"id":    "req-3",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "x",
+		},
+	}
+
+	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", defaultSkillName)
+	if !matched {
+		t.Fatal("matched = false, want true")
+	}
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "unexpected dispatch type") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if dispatch.RequestID != "req-3" {
+		t.Fatalf("RequestID = %q", dispatch.RequestID)
 	}
 }

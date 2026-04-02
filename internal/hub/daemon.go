@@ -137,14 +137,12 @@ func (d Daemon) readLoop(
 
 		dispatch, matched, parseErr := ParseSkillDispatch(msg, cfg.Skill.DispatchType, cfg.Skill.Name)
 		if !matched {
+			d.logf("dispatch status=ignored skill=%s", incomingSkillName(msg))
 			continue
 		}
 		if parseErr != nil {
 			d.logf("dispatch status=invalid request_id=%s err=%q", dispatch.RequestID, parseErr)
-			payload := dispatchResultPayload(cfg, dispatch, harness.Result{
-				ExitCode: harness.ExitConfig,
-				Err:      fmt.Errorf("dispatch parse: %w", parseErr),
-			})
+			payload := dispatchParseErrorPayload(cfg, dispatch, parseErr)
 			if err := d.publishResult(ctx, ws, api, token, payload); err != nil {
 				d.logf("dispatch status=publish_error request_id=%s err=%q", dispatch.RequestID, err)
 			}
@@ -238,6 +236,20 @@ func dispatchResultPayload(cfg InitConfig, dispatch SkillDispatch, res harness.R
 	return payload
 }
 
+func dispatchParseErrorPayload(cfg InitConfig, dispatch SkillDispatch, parseErr error) map[string]any {
+	payload := dispatchResultPayload(cfg, dispatch, harness.Result{
+		ExitCode: harness.ExitConfig,
+		Err:      fmt.Errorf("dispatch parse: %w", parseErr),
+	})
+	result, _ := payload["result"].(map[string]any)
+	if result == nil {
+		result = map[string]any{}
+	}
+	result["required_schema"] = requiredSkillPayloadSchema()
+	payload["result"] = result
+	return payload
+}
+
 func (d Daemon) publishResult(ctx context.Context, ws *WSClient, api APIClient, token string, payload map[string]any) error {
 	if err := ws.WriteJSON(payload); err == nil {
 		return nil
@@ -290,4 +302,22 @@ func applyStoredRuntimeConfig(cfg *InitConfig, stored RuntimeConfig) bool {
 	}
 
 	return true
+}
+
+func incomingSkillName(msg map[string]any) string {
+	skill := firstNonEmpty(
+		stringAt(msg, "skill"),
+		stringAt(msg, "skill_name"),
+		stringAt(msg, "name"),
+		stringAtPath(msg, "payload", "skill"),
+		stringAtPath(msg, "payload", "skill_name"),
+		stringAtPath(msg, "payload", "name"),
+		stringAtPath(msg, "data", "skill"),
+		stringAtPath(msg, "data", "skill_name"),
+		stringAtPath(msg, "data", "name"),
+	)
+	if skill == "" {
+		return "unknown"
+	}
+	return skill
 }
