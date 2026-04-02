@@ -43,6 +43,63 @@ func TestPullOpenClawMessageParsesResult(t *testing.T) {
 	}
 }
 
+func TestPullOpenClawMessageParsesNestedDeliveryAndPrefersOpenClawEnvelope(t *testing.T) {
+	t.Parallel()
+
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/openclaw/messages/pull" {
+			t.Fatalf("path = %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		_, _ = w.Write([]byte(`{
+			"ok": true,
+			"result": {
+				"status": "leased",
+				"delivery": {
+					"delivery_id": "d-nested",
+					"message_id": "m-nested"
+				},
+				"message": {
+					"message_id": "raw-1",
+					"content_type": "application/json",
+					"payload": "{\"foo\":\"bar\"}"
+				},
+				"openclaw_message": {
+					"kind": "skill_request",
+					"skill_name": "code_for_me",
+					"request_id": "req-9",
+					"input": {
+						"repo": "git@github.com:acme/repo.git",
+						"prompt": "x"
+					}
+				}
+			}
+		}`))
+	}))
+	defer ts.Close()
+
+	client := NewAPIClient(ts.URL + "/v1")
+	pulled, found, err := client.PullOpenClawMessage(context.Background(), "token", 20000)
+	if err != nil {
+		t.Fatalf("PullOpenClawMessage() error = %v", err)
+	}
+	if !found {
+		t.Fatal("found = false, want true")
+	}
+	if pulled.DeliveryID != "d-nested" {
+		t.Fatalf("DeliveryID = %q", pulled.DeliveryID)
+	}
+	if pulled.MessageID != "m-nested" {
+		t.Fatalf("MessageID = %q", pulled.MessageID)
+	}
+	if got := pulled.Message["skill_name"]; got != "code_for_me" {
+		t.Fatalf("message.skill_name = %#v", got)
+	}
+	if _, hasRaw := pulled.Message["content_type"]; hasRaw {
+		t.Fatalf("expected parsed message to prefer openclaw envelope over raw message transport map")
+	}
+}
+
 func TestPullOpenClawMessageNoContent(t *testing.T) {
 	t.Parallel()
 

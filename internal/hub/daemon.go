@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -20,6 +21,8 @@ type Daemon struct {
 	ReconnectDelay time.Duration
 }
 
+const wsFallbackWindow = 30 * time.Second
+
 // NewDaemon returns a hub daemon with defaults.
 func NewDaemon(runner execx.Runner) Daemon {
 	return Daemon{
@@ -29,7 +32,7 @@ func NewDaemon(runner execx.Runner) Daemon {
 	}
 }
 
-// Run binds/auths, syncs profile, then consumes pull transport and dispatches skill runs.
+// Run binds/auths, syncs profile, then consumes websocket transport (with pull fallback) for skill runs.
 func (d Daemon) Run(ctx context.Context, cfg InitConfig) error {
 	if d.Runner == nil {
 		d.Runner = execx.OSRunner{}
@@ -75,67 +78,190 @@ func (d Daemon) Run(ctx context.Context, cfg InitConfig) error {
 		d.logf("hub.profile status=ok")
 	}
 
-	d.logf("hub.transport mode=openclaw_pull")
+	d.logf("hub.transport primary=openclaw_ws fallback=openclaw_pull")
 
 	workerSem := make(chan struct{}, cfg.Dispatcher.MaxParallel)
 	var workers sync.WaitGroup
 	defer workers.Wait()
+
+	wsURL, wsURLErr := WebsocketURL(cfg.BaseURL, cfg.SessionKey)
+	if wsURLErr != nil {
+		d.logf("hub.ws status=disabled err=%q", wsURLErr)
+		d.logf("hub.transport mode=openclaw_pull")
+		return d.runPullLoop(ctx, api, token, cfg, workerSem, &workers)
+	}
 
 	for {
 		if ctx.Err() != nil {
 			return nil
 		}
 
-		pulled, found, err := api.PullOpenClawMessage(ctx, token, runtimeTimeoutMs)
-		if err != nil {
+		if err := d.runWebsocketLoop(ctx, wsURL, api, token, cfg, workerSem, &workers); err == nil {
+			return nil
+		} else if ctx.Err() == nil {
+			d.logf("hub.ws status=error err=%q", err)
+		}
+
+		if ctx.Err() != nil {
+			return nil
+		}
+
+		d.logf("hub.transport mode=openclaw_pull")
+		fallbackUntil := time.Now().Add(wsFallbackWindow)
+		for time.Now().Before(fallbackUntil) {
+			if ctx.Err() != nil {
+				return nil
+			}
+			if err := d.pullOnce(ctx, api, token, cfg, workerSem, &workers); err != nil {
+				d.logf("hub.pull status=error err=%q", err)
+				if !sleepWithContext(ctx, d.ReconnectDelay) {
+					return nil
+				}
+			}
+		}
+	}
+}
+
+func (d Daemon) runPullLoop(
+	ctx context.Context,
+	api APIClient,
+	token string,
+	cfg InitConfig,
+	workerSem chan struct{},
+	workers *sync.WaitGroup,
+) error {
+	for {
+		if ctx.Err() != nil {
+			return nil
+		}
+		if err := d.pullOnce(ctx, api, token, cfg, workerSem, workers); err != nil {
 			d.logf("hub.pull status=error err=%q", err)
 			if !sleepWithContext(ctx, d.ReconnectDelay) {
 				return nil
 			}
-			continue
 		}
-		if !found {
-			continue
-		}
+	}
+}
 
-		msg := pulled.Message
-		dispatch, matched, parseErr := ParseSkillDispatch(msg, cfg.Skill.DispatchType, cfg.Skill.Name)
-		if !matched {
-			d.logf("dispatch status=ignored skill=%s", incomingSkillName(msg))
-			if err := api.AckOpenClawDelivery(ctx, token, pulled.DeliveryID); err != nil {
-				d.logf("dispatch status=ack_error delivery_id=%s err=%q", pulled.DeliveryID, err)
-			}
-			continue
-		}
-		if parseErr != nil {
-			d.logf("dispatch status=invalid request_id=%s err=%q", dispatch.RequestID, parseErr)
-			payload := dispatchParseErrorPayload(cfg, dispatch, parseErr)
-			if err := api.PublishResult(ctx, token, payload); err != nil {
-				d.logf("dispatch status=publish_error request_id=%s err=%q", dispatch.RequestID, err)
-				if nackErr := api.NackOpenClawDelivery(ctx, token, pulled.DeliveryID); nackErr != nil {
-					d.logf("dispatch status=nack_error delivery_id=%s err=%q", pulled.DeliveryID, nackErr)
-				}
-				continue
-			}
-			if err := api.AckOpenClawDelivery(ctx, token, pulled.DeliveryID); err != nil {
-				d.logf("dispatch status=ack_error delivery_id=%s err=%q", pulled.DeliveryID, err)
-			}
-			continue
-		}
+func (d Daemon) pullOnce(
+	ctx context.Context,
+	api APIClient,
+	token string,
+	cfg InitConfig,
+	workerSem chan struct{},
+	workers *sync.WaitGroup,
+) error {
+	pulled, found, err := api.PullOpenClawMessage(ctx, token, runtimeTimeoutMs)
+	if err != nil {
+		return err
+	}
+	if !found {
+		return nil
+	}
+	d.processInboundMessage(ctx, api, token, cfg, pulled.Message, pulled.DeliveryID, workerSem, workers)
+	return nil
+}
 
+func (d Daemon) runWebsocketLoop(
+	ctx context.Context,
+	wsURL string,
+	api APIClient,
+	token string,
+	cfg InitConfig,
+	workerSem chan struct{},
+	workers *sync.WaitGroup,
+) error {
+	ws, err := DialWebsocket(ctx, wsURL, token)
+	if err != nil {
+		return err
+	}
+	defer ws.Close()
+
+	d.logf("hub.ws status=connected")
+
+	done := make(chan struct{})
+	defer close(done)
+	go func() {
 		select {
-		case workerSem <- struct{}{}:
 		case <-ctx.Done():
+			_ = ws.Close()
+		case <-done:
+		}
+	}()
+
+	for {
+		if ctx.Err() != nil {
 			return nil
 		}
 
-		workers.Add(1)
-		go func(dispatch SkillDispatch, deliveryID string) {
-			defer workers.Done()
-			defer func() { <-workerSem }()
-			d.handleDispatch(ctx, api, token, cfg, dispatch, deliveryID)
-		}(dispatch, pulled.DeliveryID)
+		var raw map[string]any
+		if err := ws.ReadJSON(&raw); err != nil {
+			if errors.Is(err, io.EOF) && ctx.Err() != nil {
+				return nil
+			}
+			return err
+		}
+
+		inbound := extractInboundOpenClawMessage(raw)
+		if len(inbound.Message) == 0 {
+			continue
+		}
+		d.processInboundMessage(ctx, api, token, cfg, inbound.Message, inbound.DeliveryID, workerSem, workers)
 	}
+}
+
+func (d Daemon) processInboundMessage(
+	ctx context.Context,
+	api APIClient,
+	token string,
+	cfg InitConfig,
+	msg map[string]any,
+	deliveryID string,
+	workerSem chan struct{},
+	workers *sync.WaitGroup,
+) {
+	dispatch, matched, parseErr := ParseSkillDispatch(msg, cfg.Skill.DispatchType, cfg.Skill.Name)
+	if !matched {
+		d.logf("dispatch status=ignored skill=%s", incomingSkillName(msg))
+		if strings.TrimSpace(deliveryID) != "" {
+			if err := api.AckOpenClawDelivery(ctx, token, deliveryID); err != nil {
+				d.logf("dispatch status=ack_error delivery_id=%s err=%q", deliveryID, err)
+			}
+		}
+		return
+	}
+	if parseErr != nil {
+		d.logf("dispatch status=invalid request_id=%s err=%q", dispatch.RequestID, parseErr)
+		payload := dispatchParseErrorPayload(cfg, dispatch, parseErr)
+		if err := api.PublishResult(ctx, token, payload); err != nil {
+			d.logf("dispatch status=publish_error request_id=%s err=%q", dispatch.RequestID, err)
+			if strings.TrimSpace(deliveryID) != "" {
+				if nackErr := api.NackOpenClawDelivery(ctx, token, deliveryID); nackErr != nil {
+					d.logf("dispatch status=nack_error delivery_id=%s err=%q", deliveryID, nackErr)
+				}
+			}
+			return
+		}
+		if strings.TrimSpace(deliveryID) != "" {
+			if err := api.AckOpenClawDelivery(ctx, token, deliveryID); err != nil {
+				d.logf("dispatch status=ack_error delivery_id=%s err=%q", deliveryID, err)
+			}
+		}
+		return
+	}
+
+	select {
+	case workerSem <- struct{}{}:
+	case <-ctx.Done():
+		return
+	}
+
+	workers.Add(1)
+	go func(dispatch SkillDispatch, deliveryID string) {
+		defer workers.Done()
+		defer func() { <-workerSem }()
+		d.handleDispatch(ctx, api, token, cfg, dispatch, deliveryID)
+	}(dispatch, deliveryID)
 }
 
 func (d Daemon) handleDispatch(
@@ -162,13 +288,17 @@ func (d Daemon) handleDispatch(
 	payload := dispatchResultPayload(cfg, dispatch, res)
 	if err := api.PublishResult(ctx, token, payload); err != nil {
 		d.logf("dispatch status=publish_error request_id=%s err=%q", dispatch.RequestID, err)
-		if nackErr := api.NackOpenClawDelivery(ctx, token, deliveryID); nackErr != nil {
-			d.logf("dispatch status=nack_error delivery_id=%s err=%q", deliveryID, nackErr)
+		if strings.TrimSpace(deliveryID) != "" {
+			if nackErr := api.NackOpenClawDelivery(ctx, token, deliveryID); nackErr != nil {
+				d.logf("dispatch status=nack_error delivery_id=%s err=%q", deliveryID, nackErr)
+			}
 		}
 		return
 	}
-	if err := api.AckOpenClawDelivery(ctx, token, deliveryID); err != nil {
-		d.logf("dispatch status=ack_error delivery_id=%s err=%q", deliveryID, err)
+	if strings.TrimSpace(deliveryID) != "" {
+		if err := api.AckOpenClawDelivery(ctx, token, deliveryID); err != nil {
+			d.logf("dispatch status=ack_error delivery_id=%s err=%q", deliveryID, err)
+		}
 	}
 
 	if res.Err != nil {

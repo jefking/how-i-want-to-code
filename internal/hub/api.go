@@ -40,7 +40,8 @@ func NewAPIClient(baseURL string) APIClient {
 	return APIClient{
 		BaseURL: strings.TrimRight(strings.TrimSpace(baseURL), "/"),
 		HTTPClient: &http.Client{
-			Timeout: 20 * time.Second,
+			// Pull transport may long-poll up to 20s. Keep client timeout safely above that.
+			Timeout: 35 * time.Second,
 		},
 		Logf: func(string, ...any) {},
 	}
@@ -411,17 +412,9 @@ func parsePulledOpenClawMessage(body []byte) (PulledOpenClawMessage, error) {
 		return PulledOpenClawMessage{}, fmt.Errorf("decode pull body: %w", err)
 	}
 
-	result := root
-	if nested, ok := root["result"].(map[string]any); ok {
-		result = nested
-	}
-
-	deliveryID := firstNonEmpty(
-		stringAt(result, "delivery_id"),
-		stringAt(root, "delivery_id"),
-		stringAtPath(result, "delivery", "id"),
-	)
-	message := extractPulledMessage(result, root)
+	inbound := extractInboundOpenClawMessage(root)
+	deliveryID := inbound.DeliveryID
+	message := inbound.Message
 	if deliveryID == "" {
 		if len(message) == 0 {
 			return PulledOpenClawMessage{}, errNoPulledMessage
@@ -432,27 +425,17 @@ func parsePulledOpenClawMessage(body []byte) (PulledOpenClawMessage, error) {
 		return PulledOpenClawMessage{}, fmt.Errorf("pull response missing openclaw message")
 	}
 
-	return PulledOpenClawMessage{
-		DeliveryID: deliveryID,
-		MessageID: firstNonEmpty(
-			stringAt(result, "message_id"),
-			stringAt(root, "message_id"),
-			stringAtPath(result, "openclaw_message", "message_id"),
-			stringAt(message, "message_id"),
-			stringAt(message, "id"),
-		),
-		Message: message,
-	}, nil
+	return inbound, nil
 }
 
 func extractPulledMessage(result, root map[string]any) map[string]any {
 	candidates := []any{
 		valueAt(result, "openclaw_message", "message"),
-		valueAt(result, "message"),
 		valueAt(result, "openclaw_message"),
+		valueAt(result, "message"),
 		valueAt(root, "openclaw_message", "message"),
-		valueAt(root, "message"),
 		valueAt(root, "openclaw_message"),
+		valueAt(root, "message"),
 	}
 	for _, candidate := range candidates {
 		msg := toMap(candidate)
@@ -463,9 +446,60 @@ func extractPulledMessage(result, root map[string]any) map[string]any {
 		if nested := toMap(msg["message"]); len(nested) > 0 && looksLikeDispatchEnvelope(nested) {
 			return nested
 		}
+		// Some transports place the envelope inside message.payload.
+		if nested := toMap(msg["payload"]); len(nested) > 0 && looksLikeDispatchEnvelope(nested) {
+			return nested
+		}
 		return msg
 	}
 	return nil
+}
+
+func extractInboundOpenClawMessage(root map[string]any) PulledOpenClawMessage {
+	result := root
+	if nested := toMap(root["result"]); len(nested) > 0 {
+		result = nested
+	}
+
+	message := extractPulledMessage(result, root)
+	if len(message) == 0 {
+		switch {
+		case looksLikeDispatchEnvelope(result):
+			message = result
+		case looksLikeDispatchEnvelope(root):
+			message = root
+		}
+	}
+
+	return PulledOpenClawMessage{
+		DeliveryID: firstNonEmpty(
+			stringAt(result, "delivery_id"),
+			stringAt(result, "deliveryId"),
+			stringAt(root, "delivery_id"),
+			stringAt(root, "deliveryId"),
+			stringAtPath(result, "delivery", "id"),
+			stringAtPath(result, "delivery", "delivery_id"),
+			stringAtPath(result, "delivery", "deliveryId"),
+			stringAtPath(root, "delivery", "id"),
+			stringAtPath(root, "delivery", "delivery_id"),
+			stringAtPath(root, "delivery", "deliveryId"),
+		),
+		MessageID: firstNonEmpty(
+			stringAt(result, "message_id"),
+			stringAt(result, "messageId"),
+			stringAt(root, "message_id"),
+			stringAt(root, "messageId"),
+			stringAtPath(result, "openclaw_message", "message_id"),
+			stringAtPath(result, "openclaw_message", "messageId"),
+			stringAtPath(result, "delivery", "message_id"),
+			stringAtPath(result, "delivery", "messageId"),
+			stringAtPath(root, "delivery", "message_id"),
+			stringAtPath(root, "delivery", "messageId"),
+			stringAt(message, "message_id"),
+			stringAt(message, "id"),
+		),
+		Message: message,
+	}
 }
 
 func looksLikeDispatchEnvelope(msg map[string]any) bool {
