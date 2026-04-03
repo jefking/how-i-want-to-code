@@ -14,7 +14,9 @@ For each run, the harness performs this flow:
 3. Create isolated run workspace: `/dev/shm/temp/<guid>` (fallback `/tmp/temp/<guid>`)
 4. Clone all configured repos + base branch before prompting Codex
 5. Run Codex in the configured target subdirectory (single repo) or shared workspace (multi-repo)
-6. For each repo with changes: commit, push to a `moltenhub-...` branch, and create a PR with a title that starts with `moltenhub-`
+6. For each repo with changes:
+   - if `base_branch` is `main`, create and push a new `moltenhub-...` branch, then create a PR
+   - if `base_branch` is not `main`, stay on that branch, push fixes there, and reuse its open PR
 7. Wait for required PR checks (`gh pr checks --watch --required`) per changed repo
 8. If required checks fail, re-run Codex with remediation context, push fixes, and re-check until green or retry limit is reached
 
