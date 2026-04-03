@@ -14,7 +14,7 @@ For each run, the harness performs this flow:
 3. Create isolated run workspace: `/dev/shm/temp/<guid>` (fallback `/tmp/temp/<guid>`)
 4. Clone all configured repos + base branch before prompting Codex
 5. Run Codex in the configured target subdirectory (single repo) or shared workspace (multi-repo)
-6. For each repo with changes: commit, push, and create a PR
+6. For each repo with changes: commit, push to a `moltenhub-...` branch, and create a PR with a title that starts with `moltenhub-`
 7. Wait for required PR checks (`gh pr checks --watch --required`) per changed repo
 8. If required checks fail, re-run Codex with remediation context, push fixes, and re-check until green or retry limit is reached
 
@@ -167,7 +167,7 @@ Optional fields (with defaults):
 - `target_subdir` (default: `.` for repo root)
 - `target_subdir` applies to the first repo in `repos` for multi-repo jobs
 - `commit_message` (default: auto-generated from prompt)
-- `pr_title` (default: auto-generated from prompt)
+- `pr_title` (default: auto-generated from prompt and prefixed with `moltenhub-`; custom values are also prefixed automatically)
 - `pr_body` (default: auto-generated with prompt summary)
 - `labels` (`[]string`)
 - `reviewers` (`[]string`)

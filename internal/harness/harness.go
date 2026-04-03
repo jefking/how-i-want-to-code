@@ -426,6 +426,7 @@ func workspaceCodexPrompt(prompt, targetSubdir string, repos []repoWorkspace) st
 		b.WriteString(fmt.Sprintf("- %s => %s\n", repo.RelDir, repo.URL))
 	}
 	b.WriteString("- If you modify files in any repository, keep each changed repository on its own branch and PR.\n")
+	b.WriteString("- Start every branch name and PR title with 'moltenhub-'.\n")
 	return strings.TrimSpace(b.String())
 }
 
@@ -724,6 +725,7 @@ func withCompletionGatePrompt(prompt string) string {
 	return base + `
 
 Completion requirements:
+- Start all branches/PRs with 'moltenhub-'.
 - Keep working until there is a PR for your changes and required CI/CD checks are green.
 - If CI/CD fails, continue fixing code/tests/workflows until checks pass.
 - If you changed multiple repositories, ensure each changed repository has its own branch and PR.

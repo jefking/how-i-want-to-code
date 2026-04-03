@@ -29,7 +29,7 @@ func TestBranchNameIncludesSlugTimeAndGuid(t *testing.T) {
 
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	got := BranchName("Build API", now, "abcdef123456")
-	want := "codex/build-api-20260402-150405-abcdef12"
+	want := "moltenhub-build-api-20260402-150405-abcdef12"
 	if got != want {
 		t.Fatalf("BranchName() = %q, want %q", got, want)
 	}
