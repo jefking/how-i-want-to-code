@@ -46,6 +46,22 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	}
 }
 
+func TestBrokerCapturesPRURLFromStageLine(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("dispatch status=start request_id=req-pr skill=codex_harness_run repo=git@github.com:acme/repo.git")
+	b.IngestLog("dispatch request_id=req-pr stage=pr status=ok pr_url=https://github.com/acme/repo/pull/101")
+
+	snap := b.Snapshot()
+	if len(snap.Tasks) != 1 {
+		t.Fatalf("tasks = %d, want 1", len(snap.Tasks))
+	}
+	if snap.Tasks[0].PRURL != "https://github.com/acme/repo/pull/101" {
+		t.Fatalf("task.PRURL = %q", snap.Tasks[0].PRURL)
+	}
+}
+
 func TestBrokerParsesQuotedErrorText(t *testing.T) {
 	t.Parallel()
 

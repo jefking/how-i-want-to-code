@@ -346,7 +346,7 @@
 
     .log-wrap {
       display: grid;
-      grid-template-rows: auto 1fr;
+      grid-template-rows: auto auto 1fr;
       height: 100%;
     }
 
@@ -359,6 +359,64 @@
       gap: 8px;
       font-size: 0.84rem;
       color: var(--muted);
+    }
+
+    .task-result {
+      display: none;
+      align-items: center;
+      gap: 10px;
+      flex-wrap: wrap;
+      padding: 8px 14px;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+    }
+
+    .task-result.show {
+      display: flex;
+    }
+
+    .task-result.ok {
+      color: #b9efd3;
+      background: rgba(79, 211, 140, 0.14);
+    }
+
+    .task-result.no_changes {
+      color: #ffe2ad;
+      background: rgba(255, 190, 85, 0.14);
+    }
+
+    .task-result.error,
+    .task-result.invalid {
+      color: #ffd2d2;
+      background: rgba(242, 113, 113, 0.14);
+    }
+
+    .task-result-title {
+      font-size: 0.7rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
+    .task-result-detail {
+      color: var(--muted);
+    }
+
+    .task-result.ok .task-result-detail {
+      color: #d7f6e6;
+    }
+
+    .task-result-link {
+      color: #a7d6ff;
+      font-family: "IBM Plex Mono", "Consolas", monospace;
+      text-decoration: none;
+      border-bottom: 1px dotted rgba(167, 214, 255, 0.6);
+      word-break: break-all;
+    }
+
+    .task-result-link:hover {
+      color: #d0eaff;
+      border-bottom-color: rgba(208, 234, 255, 0.9);
     }
 
     .term {
@@ -460,6 +518,7 @@
 
         <section class="panel log-wrap">
           <div id="task-head" class="task-head">Select a task to inspect logs</div>
+          <div id="task-result" class="task-result"></div>
           <pre id="terminal" class="term"></pre>
         </section>
       </div>
@@ -480,6 +539,7 @@
     const taskCount = document.getElementById("task-count");
     const taskList = document.getElementById("task-list");
     const taskHead = document.getElementById("task-head");
+    const taskResult = document.getElementById("task-result");
     const terminal = document.getElementById("terminal");
     const localPromptForm = document.getElementById("local-prompt-form");
     const localPromptInput = document.getElementById("local-prompt-input");
@@ -592,6 +652,55 @@
       return `[${stream}] ${text}`;
     }
 
+    function clearTaskResult() {
+      taskResult.className = "task-result";
+      taskResult.replaceChildren();
+    }
+
+    function renderTaskResult(task) {
+      clearTaskResult();
+
+      if (!task || task.request_id === MAIN_TASK_ID) {
+        return;
+      }
+
+      const status = task.status || "";
+      if (status !== "ok" && status !== "no_changes" && status !== "error" && status !== "invalid") {
+        return;
+      }
+
+      taskResult.className = `task-result show ${statusClass(status)}`;
+
+      const title = document.createElement("span");
+      title.className = "task-result-title";
+      taskResult.appendChild(title);
+
+      const detail = document.createElement("span");
+      detail.className = "task-result-detail";
+
+      if (status === "ok") {
+        title.textContent = "Task Success";
+        detail.textContent = task.pr_url ? "Pull request created." : "Completed.";
+      } else if (status === "no_changes") {
+        title.textContent = "Task Complete";
+        detail.textContent = "No code changes were detected.";
+      } else {
+        title.textContent = "Task Failed";
+        detail.textContent = task.error ? task.error : "See logs for failure details.";
+      }
+      taskResult.appendChild(detail);
+
+      if (status === "ok" && task.pr_url) {
+        const link = document.createElement("a");
+        link.className = "task-result-link";
+        link.href = task.pr_url;
+        link.target = "_blank";
+        link.rel = "noopener noreferrer";
+        link.textContent = task.pr_url;
+        taskResult.appendChild(link);
+      }
+    }
+
     function selectTask(id) {
       state.selectedTaskId = id || "";
       render(state.snapshot);
@@ -674,12 +783,14 @@
       const selected = tasks.find(t => t.request_id === state.selectedTaskId);
       if (!selected) {
         taskHead.textContent = "Select a task to inspect logs";
+        clearTaskResult();
         terminal.textContent = "";
         return;
       }
 
       const selectedLabel = selected.display_id || selected.request_id;
       taskHead.textContent = `${selectedLabel} | ${selected.status || "pending"} | ${selected.stage || "-"}`;
+      renderTaskResult(selected);
       terminal.replaceChildren();
 
       if (!selected.logs?.length) {
