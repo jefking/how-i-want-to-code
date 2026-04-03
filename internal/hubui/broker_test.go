@@ -14,7 +14,7 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	b.IngestLog("dispatch status=start request_id=req-42 skill=codex_harness_run repo=git@github.com:acme/repo.git")
 	b.IngestLog("dispatch request_id=req-42 stage=codex status=start")
 	b.IngestLog("dispatch request_id=req-42 cmd phase=codex name=codex stream=stdout b64=" + base64.StdEncoding.EncodeToString([]byte("thinking...")))
-	b.IngestLog("dispatch status=ok request_id=req-42 workspace=/tmp/run branch=codex/feature pr_url=https://github.com/acme/repo/pull/99")
+	b.IngestLog("dispatch status=ok request_id=req-42 workspace=/tmp/run branch=moltenhub-feature pr_url=https://github.com/acme/repo/pull/99")
 
 	snap := b.Snapshot()
 	if len(snap.Tasks) != 1 {
@@ -102,7 +102,7 @@ func TestBrokerCapturesWorkspaceAndBranchFromErrorStatus(t *testing.T) {
 	t.Parallel()
 
 	b := NewBroker()
-	b.IngestLog(`dispatch status=error request_id=req-err-ws exit_code=40 workspace=/tmp/run-x branch=codex/fix pr_url=https://github.com/acme/repo/pull/55 err="clone failed"`)
+	b.IngestLog(`dispatch status=error request_id=req-err-ws exit_code=40 workspace=/tmp/run-x branch=moltenhub-fix pr_url=https://github.com/acme/repo/pull/55 err="clone failed"`)
 
 	snap := b.Snapshot()
 	if len(snap.Tasks) != 1 {
@@ -112,8 +112,8 @@ func TestBrokerCapturesWorkspaceAndBranchFromErrorStatus(t *testing.T) {
 	if task.WorkspaceDir != "/tmp/run-x" {
 		t.Fatalf("workspace = %q, want /tmp/run-x", task.WorkspaceDir)
 	}
-	if task.Branch != "codex/fix" {
-		t.Fatalf("branch = %q, want codex/fix", task.Branch)
+	if task.Branch != "moltenhub-fix" {
+		t.Fatalf("branch = %q, want moltenhub-fix", task.Branch)
 	}
 	if task.PRURL != "https://github.com/acme/repo/pull/55" {
 		t.Fatalf("pr_url = %q", task.PRURL)

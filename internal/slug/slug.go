@@ -40,5 +40,5 @@ func BranchName(prompt string, now time.Time, guid string) string {
 	if shortGUID == "" {
 		shortGUID = "noguid"
 	}
-	return fmt.Sprintf("codex/%s-%s-%s", slug, now.UTC().Format("20060102-150405"), shortGUID)
+	return fmt.Sprintf("moltenhub-%s-%s-%s", slug, now.UTC().Format("20060102-150405"), shortGUID)
 }

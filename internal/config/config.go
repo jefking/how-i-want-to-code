@@ -10,6 +10,8 @@ import (
 	"strings"
 )
 
+const prTitlePrefix = "moltenhub-"
+
 // Config is the v1 public contract for a harness run.
 type Config struct {
 	Version       string   `json:"version"`
@@ -78,6 +80,8 @@ func (c *Config) ApplyDefaults() {
 	}
 	if strings.TrimSpace(c.PRTitle) == "" {
 		c.PRTitle = defaultPRTitle(c.Prompt)
+	} else {
+		c.PRTitle = prefixedPRTitle(c.PRTitle)
 	}
 	if strings.TrimSpace(c.PRBody) == "" {
 		c.PRBody = defaultPRBody(c.Prompt)
@@ -161,9 +165,9 @@ func defaultCommitMessage(prompt string) string {
 func defaultPRTitle(prompt string) string {
 	summary := summarize(prompt, 72)
 	if summary == "" {
-		return "Codex automated update"
+		summary = "Codex automated update"
 	}
-	return summary
+	return prefixedPRTitle(summary)
 }
 
 func defaultPRBody(prompt string) string {
@@ -175,6 +179,17 @@ func defaultPRBody(prompt string) string {
 }
 
 var wsRE = regexp.MustCompile(`\s+`)
+
+func prefixedPRTitle(title string) string {
+	title = strings.TrimSpace(title)
+	if title == "" {
+		return prTitlePrefix + "Codex automated update"
+	}
+	if strings.HasPrefix(strings.ToLower(title), prTitlePrefix) {
+		return title
+	}
+	return prTitlePrefix + title
+}
 
 func summarize(s string, max int) string {
 	s = strings.TrimSpace(s)

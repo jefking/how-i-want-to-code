@@ -196,3 +196,47 @@ func TestValidateAllowsRootSubdir(t *testing.T) {
 		t.Fatalf("Validate() error = %v", err)
 	}
 }
+
+func TestApplyDefaultsPrefixesDefaultPRTitle(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		RepoURL: "git@github.com:acme/repo.git",
+		Prompt:  "fix tests",
+	}
+	cfg.ApplyDefaults()
+
+	if got, want := cfg.PRTitle, "moltenhub-fix tests"; got != want {
+		t.Fatalf("PRTitle = %q, want %q", got, want)
+	}
+}
+
+func TestApplyDefaultsPrefixesCustomPRTitle(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		RepoURL: "git@github.com:acme/repo.git",
+		Prompt:  "fix tests",
+		PRTitle: "release cleanup",
+	}
+	cfg.ApplyDefaults()
+
+	if got, want := cfg.PRTitle, "moltenhub-release cleanup"; got != want {
+		t.Fatalf("PRTitle = %q, want %q", got, want)
+	}
+}
+
+func TestApplyDefaultsKeepsExistingPRTitlePrefix(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		RepoURL: "git@github.com:acme/repo.git",
+		Prompt:  "fix tests",
+		PRTitle: "moltenhub-release cleanup",
+	}
+	cfg.ApplyDefaults()
+
+	if got, want := cfg.PRTitle, "moltenhub-release cleanup"; got != want {
+		t.Fatalf("PRTitle = %q, want %q", got, want)
+	}
+}

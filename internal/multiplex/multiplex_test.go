@@ -34,7 +34,7 @@ func TestRunTracksStatusesFromHarnessLogs(t *testing.T) {
 			return harness.Result{
 				ExitCode:     harness.ExitSuccess,
 				WorkspaceDir: "/tmp/run-ok",
-				Branch:       "codex/build-feature",
+				Branch:       "moltenhub-build-feature",
 				PRURL:        "https://github.com/acme/repo/pull/12",
 			}
 		case "nochange":
@@ -44,7 +44,7 @@ func TestRunTracksStatusesFromHarnessLogs(t *testing.T) {
 			return harness.Result{
 				ExitCode:     harness.ExitSuccess,
 				WorkspaceDir: "/tmp/run-nochanges",
-				Branch:       "codex/nochange",
+				Branch:       "moltenhub-nochange",
 				NoChanges:    true,
 			}
 		default:

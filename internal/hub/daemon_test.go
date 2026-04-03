@@ -126,20 +126,20 @@ func TestDispatchResultPayloadIncludesRepoResults(t *testing.T) {
 	res := harness.Result{
 		ExitCode:     harness.ExitSuccess,
 		WorkspaceDir: "/tmp/run",
-		Branch:       "codex/feature",
+		Branch:       "moltenhub-feature",
 		PRURL:        "https://github.com/acme/repo-a/pull/10",
 		RepoResults: []harness.RepoResult{
 			{
 				RepoURL: "git@github.com:acme/repo-a.git",
 				RepoDir: "/tmp/run/repo-01-repo-a",
-				Branch:  "codex/feature",
+				Branch:  "moltenhub-feature",
 				PRURL:   "https://github.com/acme/repo-a/pull/10",
 				Changed: true,
 			},
 			{
 				RepoURL: "git@github.com:acme/repo-b.git",
 				RepoDir: "/tmp/run/repo-02-repo-b",
-				Branch:  "codex/feature",
+				Branch:  "moltenhub-feature",
 				PRURL:   "https://github.com/acme/repo-b/pull/20",
 				Changed: true,
 			},
