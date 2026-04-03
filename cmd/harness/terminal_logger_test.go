@@ -2,9 +2,22 @@ package main
 
 import (
 	"encoding/base64"
+	"io"
 	"strings"
 	"testing"
 )
+
+type recordingTerminalLogSink struct {
+	lines []string
+}
+
+func (s *recordingTerminalLogSink) WriteLine(line string) {
+	s.lines = append(s.lines, line)
+}
+
+func (s *recordingTerminalLogSink) Close() error {
+	return nil
+}
 
 func TestFormatTerminalLogLineDecodesBase64CommandOutput(t *testing.T) {
 	t.Parallel()
@@ -73,5 +86,23 @@ func TestFormatTerminalLogLineLeavesHubHeartbeatUntouched(t *testing.T) {
 	}
 	if got != line {
 		t.Fatalf("got %q, want original line", got)
+	}
+}
+
+func TestTerminalLoggerCaptureWritesTrimmedLineToSink(t *testing.T) {
+	t.Parallel()
+
+	sink := &recordingTerminalLogSink{}
+	logger := newTerminalLogger(io.Discard, false)
+	logger.sink = sink
+
+	logger.Capture("  session=task-004 status=ok  ")
+	logger.Capture("   ")
+
+	if len(sink.lines) != 1 {
+		t.Fatalf("sink lines = %d, want 1", len(sink.lines))
+	}
+	if sink.lines[0] != "session=task-004 status=ok" {
+		t.Fatalf("sink line = %q", sink.lines[0])
 	}
 }

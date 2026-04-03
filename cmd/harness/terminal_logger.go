@@ -25,12 +25,21 @@ type terminalLogger struct {
 	out io.Writer
 	tty bool
 
+	sink terminalLogSink
+
 	progressActive bool
 	progressWidth  int
 }
 
 func newDefaultTerminalLogger() *terminalLogger {
-	return newTerminalLogger(os.Stderr, isTerminalFile(os.Stderr))
+	logger := newTerminalLogger(os.Stderr, isTerminalFile(os.Stderr))
+	sink, err := newDefaultTaskLogMirror()
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "warn: failed to initialize %s log mirror: %v\n", logDirectoryName, err)
+		return logger
+	}
+	logger.sink = sink
+	return logger
 }
 
 func newTerminalLogger(out io.Writer, tty bool) *terminalLogger {
@@ -74,15 +83,32 @@ func (l *terminalLogger) Print(line string) {
 	switch mode {
 	case terminalLogModeProgress:
 		if l.tty {
+			l.writeSinkLocked(rendered)
 			l.renderProgressLocked(rendered)
 			return
 		}
 		l.clearProgressLocked()
 		_, _ = fmt.Fprintln(l.out, rendered)
+		l.writeSinkLocked(rendered)
 	default:
 		l.clearProgressLocked()
 		_, _ = fmt.Fprintln(l.out, rendered)
+		l.writeSinkLocked(rendered)
 	}
+}
+
+func (l *terminalLogger) Capture(line string) {
+	if l == nil {
+		return
+	}
+	rendered := strings.TrimSpace(line)
+	if rendered == "" {
+		return
+	}
+
+	l.mu.Lock()
+	defer l.mu.Unlock()
+	l.writeSinkLocked(rendered)
 }
 
 func (l *terminalLogger) Close() {
@@ -96,6 +122,17 @@ func (l *terminalLogger) Close() {
 		l.progressActive = false
 		l.progressWidth = 0
 	}
+	if l.sink != nil {
+		_ = l.sink.Close()
+		l.sink = nil
+	}
+}
+
+func (l *terminalLogger) writeSinkLocked(line string) {
+	if l.sink == nil {
+		return
+	}
+	l.sink.WriteLine(line)
 }
 
 func (l *terminalLogger) renderProgressLocked(text string) {

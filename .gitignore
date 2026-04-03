@@ -1,6 +1,7 @@
 /templates/
 !/templates/*.example.json
 .*
+.log/
 !.github/
 !.github/workflows/
 !.github/workflows/*.yml

@@ -82,6 +82,18 @@ You can provide `--config` multiple times. Each value may be:
 
 Per-session logs are emitted to stderr with `session=<id>` prefixes, and a final per-session status summary is printed to stdout.
 
+## Debug Logs
+
+At runtime, the harness mirrors terminal output into a local `.log` directory in the current working directory.
+
+- Aggregate stream: `.log/terminal.log`
+- Task/request stream: `.log/<identifier parts>/terminal.log`
+
+Identifier parts are split by `-` to make isolation fast:
+
+- `request_id=local-1712345678-000001` -> `.log/local/1712345678/000001/terminal.log`
+- `session=task-003` -> `.log/task/003/terminal.log`
+
 ## Hub Init Config (v1)
 
 Required fields:
