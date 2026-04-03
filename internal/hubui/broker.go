@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"encoding/base64"
 	"encoding/json"
+	"net/url"
 	"sort"
 	"strconv"
 	"strings"
@@ -53,11 +54,19 @@ type Task struct {
 	Logs         []TaskLog `json:"logs"`
 }
 
+// Connection captures current monitor connectivity state.
+type Connection struct {
+	HubConnected bool   `json:"hub_connected"`
+	HubDomain    string `json:"hub_domain,omitempty"`
+	HubBaseURL   string `json:"hub_base_url,omitempty"`
+}
+
 // Snapshot is the complete monitor payload for the web UI.
 type Snapshot struct {
-	GeneratedAt string  `json:"generated_at"`
-	Events      []Event `json:"events"`
-	Tasks       []Task  `json:"tasks"`
+	GeneratedAt string     `json:"generated_at"`
+	Connection  Connection `json:"connection"`
+	Events      []Event    `json:"events"`
+	Tasks       []Task     `json:"tasks"`
 }
 
 // Broker collects daemon logs and exposes monitor state snapshots.
@@ -73,6 +82,10 @@ type Broker struct {
 	tasks       map[string]*taskState
 	runConfigs  map[string][]byte
 	subs        map[chan struct{}]struct{}
+
+	hubConnected bool
+	hubBaseURL   string
+	hubDomain    string
 }
 
 type taskState struct {
@@ -139,6 +152,7 @@ func (b *Broker) IngestLog(line string) {
 		t := b.ensureTaskLocked(requestID, now)
 		b.updateTaskFromLineLocked(t, line, fields, now)
 	}
+	b.updateHubConnectionFromLineLocked(line, fields)
 
 	b.notifySubscribersLocked()
 }
@@ -154,7 +168,12 @@ func (b *Broker) Snapshot() Snapshot {
 
 	snapshot := Snapshot{
 		GeneratedAt: b.now().UTC().Format(time.RFC3339Nano),
-		Events:      append([]Event(nil), b.events...),
+		Connection: Connection{
+			HubConnected: b.hubConnected,
+			HubDomain:    b.hubDomain,
+			HubBaseURL:   b.hubBaseURL,
+		},
+		Events: append([]Event(nil), b.events...),
 	}
 
 	tasks := make([]*taskState, 0, len(b.tasks))
@@ -400,6 +419,41 @@ func (b *Broker) appendTaskLogLocked(t *taskState, line TaskLog) {
 	}
 }
 
+func (b *Broker) updateHubConnectionFromLineLocked(line string, fields map[string]string) {
+	if baseURL := strings.TrimSpace(fields["base_url"]); baseURL != "" {
+		b.hubBaseURL = baseURL
+		if domain := hubDomainFromBaseURL(baseURL); domain != "" {
+			b.hubDomain = domain
+		}
+	}
+	if domain := strings.TrimSpace(firstNonEmpty(fields["domain"], fields["hub_domain"])); domain != "" {
+		b.hubDomain = domain
+	}
+
+	switch {
+	case strings.HasPrefix(line, "hub.auth status=ok"):
+		b.hubConnected = true
+	case strings.HasPrefix(line, "hub.ws status=connected"):
+		b.hubConnected = true
+	case strings.HasPrefix(line, "hub.transport mode=openclaw_pull"):
+		// Pull mode still means the daemon is connected to MoltenHub transport.
+		b.hubConnected = true
+	case strings.HasPrefix(line, "hub.connection "):
+		switch strings.ToLower(strings.TrimSpace(fields["status"])) {
+		case "connected", "online", "ok":
+			b.hubConnected = true
+		case "disconnected", "offline", "error":
+			b.hubConnected = false
+		}
+	case strings.HasPrefix(line, "hub.ws status=disabled"),
+		strings.HasPrefix(line, "hub.ws status=error"),
+		strings.HasPrefix(line, "hub.ws status=disconnected"),
+		strings.HasPrefix(line, "hub.pull status=error"),
+		strings.HasPrefix(line, "hub.agent status=offline"):
+		b.hubConnected = false
+	}
+}
+
 func (b *Broker) notifySubscribersLocked() {
 	for ch := range b.subs {
 		select {
@@ -495,6 +549,18 @@ func parseIntField(v string) (int, bool) {
 		return 0, false
 	}
 	return n, true
+}
+
+func hubDomainFromBaseURL(baseURL string) string {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return ""
+	}
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return ""
+	}
+	return strings.TrimSpace(u.Hostname())
 }
 
 func firstNonEmpty(values ...string) string {

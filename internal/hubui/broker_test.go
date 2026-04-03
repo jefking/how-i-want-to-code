@@ -53,6 +53,55 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	}
 }
 
+func TestBrokerTracksMoltenHubConnectionAndDomain(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("hub.connection status=configured base_url=https://na.hub.molten.bot/v1")
+	b.IngestLog("hub.auth status=ok")
+
+	snap := b.Snapshot()
+	if !snap.Connection.HubConnected {
+		t.Fatal("connection.hub_connected = false, want true")
+	}
+	if snap.Connection.HubBaseURL != "https://na.hub.molten.bot/v1" {
+		t.Fatalf("connection.hub_base_url = %q", snap.Connection.HubBaseURL)
+	}
+	if snap.Connection.HubDomain != "na.hub.molten.bot" {
+		t.Fatalf("connection.hub_domain = %q", snap.Connection.HubDomain)
+	}
+}
+
+func TestBrokerTracksMoltenHubConnectionTransitions(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("hub.connection status=configured base_url=https://eu.hub.molten.bot/v1")
+	b.IngestLog("hub.ws status=connected")
+	if !b.Snapshot().Connection.HubConnected {
+		t.Fatal("connection.hub_connected = false after websocket connect")
+	}
+
+	b.IngestLog(`hub.ws status=disconnected err="network reset"`)
+	if b.Snapshot().Connection.HubConnected {
+		t.Fatal("connection.hub_connected = true after websocket disconnect")
+	}
+
+	b.IngestLog("hub.transport mode=openclaw_pull")
+	if !b.Snapshot().Connection.HubConnected {
+		t.Fatal("connection.hub_connected = false after pull transport fallback")
+	}
+
+	b.IngestLog(`hub.pull status=error err="poll timeout"`)
+	snap := b.Snapshot()
+	if snap.Connection.HubConnected {
+		t.Fatal("connection.hub_connected = true after pull transport error")
+	}
+	if snap.Connection.HubDomain != "eu.hub.molten.bot" {
+		t.Fatalf("connection.hub_domain = %q", snap.Connection.HubDomain)
+	}
+}
+
 func TestBrokerCapturesPRURLFromStageLine(t *testing.T) {
 	t.Parallel()
 

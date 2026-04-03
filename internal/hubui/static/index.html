@@ -66,9 +66,42 @@
     .status-row {
       display: flex;
       align-items: center;
-      gap: 8px;
+      gap: 10px;
       color: var(--muted);
       font-size: 0.9rem;
+      flex-wrap: wrap;
+    }
+
+    .status-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      border: 1px solid var(--border);
+      border-radius: 999px;
+      background: rgba(17, 28, 42, 0.74);
+      padding: 5px 10px;
+      min-height: 30px;
+    }
+
+    .status-text {
+      display: grid;
+      gap: 1px;
+      min-width: 0;
+    }
+
+    .status-label {
+      color: var(--muted);
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      font-size: 0.62rem;
+      line-height: 1.1;
+    }
+
+    .status-value {
+      color: #d8e6f4;
+      font-size: 0.75rem;
+      line-height: 1.1;
+      word-break: break-word;
     }
 
     .dot {
@@ -610,8 +643,20 @@
         <div class="sub">Live task status + terminal output</div>
       </div>
       <div class="status-row">
-        <span id="conn-dot" class="dot"></span>
-        <span id="conn-text">Connecting...</span>
+        <div class="status-item">
+          <span id="local-conn-dot" class="dot"></span>
+          <span class="status-text">
+            <span class="status-label">Local Instance</span>
+            <span id="local-conn-text" class="status-value">Connecting...</span>
+          </span>
+        </div>
+        <div class="status-item">
+          <span id="hub-conn-dot" class="dot"></span>
+          <span class="status-text">
+            <span class="status-label">MoltenHub</span>
+            <span id="hub-conn-text" class="status-value">Waiting for hub status...</span>
+          </span>
+        </div>
       </div>
     </div>
 
@@ -696,8 +741,10 @@
       rerunInFlight: new Set(),
     };
 
-    const connDot = document.getElementById("conn-dot");
-    const connText = document.getElementById("conn-text");
+    const localConnDot = document.getElementById("local-conn-dot");
+    const localConnText = document.getElementById("local-conn-text");
+    const hubConnDot = document.getElementById("hub-conn-dot");
+    const hubConnText = document.getElementById("hub-conn-text");
     const taskCount = document.getElementById("task-count");
     const taskList = document.getElementById("task-list");
     const taskHead = document.getElementById("task-head");
@@ -708,9 +755,41 @@
     const localPromptSubmit = document.getElementById("local-prompt-submit");
     const localPromptStatus = document.getElementById("local-prompt-status");
 
-    function setConnection(online, text) {
-      connDot.classList.toggle("online", online);
-      connText.textContent = text;
+    function setIndicator(dot, textNode, online, text) {
+      dot.classList.toggle("online", online);
+      textNode.textContent = text;
+    }
+
+    function setLocalConnection(online, text) {
+      setIndicator(localConnDot, localConnText, online, text);
+    }
+
+    function setHubConnection(online, text) {
+      setIndicator(hubConnDot, hubConnText, online, text);
+    }
+
+    function renderHubConnection(snapshot) {
+      if (!snapshot || typeof snapshot.connection !== "object" || snapshot.connection === null) {
+        setHubConnection(false, "Hub status unavailable");
+        return;
+      }
+
+      const conn = snapshot.connection;
+      const domain = typeof conn.hub_domain === "string" ? conn.hub_domain.trim() : "";
+      const baseURL = typeof conn.hub_base_url === "string" ? conn.hub_base_url.trim() : "";
+      const target = domain || baseURL || "hub";
+
+      if (conn.hub_connected) {
+        setHubConnection(true, `Connected to ${target}`);
+        return;
+      }
+
+      if (domain || baseURL) {
+        setHubConnection(false, `Disconnected from ${target}`);
+        return;
+      }
+
+      setHubConnection(false, "Connecting...");
     }
 
     function relativeTime(iso) {
@@ -1258,6 +1337,7 @@
     function render(snapshot) {
       if (!snapshot) return;
       state.snapshot = snapshot;
+      renderHubConnection(snapshot);
       renderTasks(snapshot);
       renderTerminal(snapshot);
     }
@@ -1271,7 +1351,7 @@
         const snapshot = await response.json();
         render(snapshot);
       } catch (err) {
-        setConnection(false, `Unable to load state: ${err.message}`);
+        setLocalConnection(false, `Unable to load state: ${err.message}`);
       }
     }
 
@@ -1279,7 +1359,7 @@
       const stream = new EventSource("/api/stream");
 
       stream.onopen = () => {
-        setConnection(true, "Live stream connected");
+        setLocalConnection(true, "Connected");
       };
 
       stream.onmessage = (event) => {
@@ -1292,7 +1372,7 @@
       };
 
       stream.onerror = () => {
-        setConnection(false, "Reconnecting...");
+        setLocalConnection(false, "Reconnecting...");
       };
     }
 

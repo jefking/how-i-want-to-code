@@ -70,6 +70,7 @@ func (d Daemon) Run(ctx context.Context, cfg InitConfig) error {
 	if strings.TrimSpace(api.BaseURL) != "" {
 		cfg.BaseURL = strings.TrimRight(strings.TrimSpace(api.BaseURL), "/")
 	}
+	d.logf("hub.connection status=configured base_url=%s", cfg.BaseURL)
 	d.logf("hub.auth status=ok")
 	if err := SaveRuntimeConfig(defaultRuntimeConfigPath, cfg.BaseURL, token, cfg.SessionKey); err != nil {
 		return fmt.Errorf("hub runtime config: %w", err)
