@@ -75,28 +75,29 @@ func runSingle(args []string) int {
 
 	result := h.Run(context.Background(), cfg)
 	if result.Err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", result.Err)
+		writeStderrLine(logger, fmt.Sprintf("error: %v", result.Err))
 		if result.WorkspaceDir != "" {
-			fmt.Fprintf(os.Stderr, "workspace: %s\n", result.WorkspaceDir)
+			writeStderrLine(logger, fmt.Sprintf("workspace: %s", result.WorkspaceDir))
 		}
 		return result.ExitCode
 	}
 
 	if result.NoChanges {
-		fmt.Printf("status=no_changes workspace=%s branch=%s\n", result.WorkspaceDir, result.Branch)
+		writeStdoutLine(logger, fmt.Sprintf("status=no_changes workspace=%s branch=%s", result.WorkspaceDir, result.Branch))
 		return harness.ExitSuccess
 	}
-	fmt.Printf("status=ok workspace=%s branch=%s", result.WorkspaceDir, result.Branch)
+	var line strings.Builder
+	line.WriteString(fmt.Sprintf("status=ok workspace=%s branch=%s", result.WorkspaceDir, result.Branch))
 	if result.PRURL != "" {
-		fmt.Printf(" pr_url=%s", result.PRURL)
+		line.WriteString(fmt.Sprintf(" pr_url=%s", result.PRURL))
 	}
 	if prURLs := joinPRURLs(result.RepoResults); prURLs != "" {
-		fmt.Printf(" pr_urls=%s", prURLs)
+		line.WriteString(fmt.Sprintf(" pr_urls=%s", prURLs))
 	}
 	if changedRepos := countChangedRepos(result.RepoResults); changedRepos > 0 {
-		fmt.Printf(" changed_repos=%d", changedRepos)
+		line.WriteString(fmt.Sprintf(" changed_repos=%d", changedRepos))
 	}
-	fmt.Println()
+	writeStdoutLine(logger, line.String())
 
 	return harness.ExitSuccess
 }
@@ -147,23 +148,24 @@ func runMultiplex(args []string) int {
 
 	result := mx.Run(context.Background(), configPaths)
 	for _, s := range result.Sessions {
-		fmt.Printf("session=%s status=%s config=%s stage=%s", s.ID, s.State, s.ConfigPath, s.Stage)
+		var line strings.Builder
+		line.WriteString(fmt.Sprintf("session=%s status=%s config=%s stage=%s", s.ID, s.State, s.ConfigPath, s.Stage))
 		if s.ExitCode != harness.ExitSuccess {
-			fmt.Printf(" exit_code=%d", s.ExitCode)
+			line.WriteString(fmt.Sprintf(" exit_code=%d", s.ExitCode))
 		}
 		if s.WorkspaceDir != "" {
-			fmt.Printf(" workspace=%s", s.WorkspaceDir)
+			line.WriteString(fmt.Sprintf(" workspace=%s", s.WorkspaceDir))
 		}
 		if s.Branch != "" {
-			fmt.Printf(" branch=%s", s.Branch)
+			line.WriteString(fmt.Sprintf(" branch=%s", s.Branch))
 		}
 		if s.PRURL != "" {
-			fmt.Printf(" pr_url=%s", s.PRURL)
+			line.WriteString(fmt.Sprintf(" pr_url=%s", s.PRURL))
 		}
 		if s.Error != "" {
-			fmt.Printf(" err=%q", s.Error)
+			line.WriteString(fmt.Sprintf(" err=%q", s.Error))
 		}
-		fmt.Println()
+		writeStdoutLine(logger, line.String())
 	}
 
 	return result.ExitCode()
@@ -256,10 +258,32 @@ func runHub(args []string) int {
 	daemon.Logf = daemonLogger
 
 	if err := daemon.Run(ctx, cfg); err != nil {
-		fmt.Fprintf(os.Stderr, "error: %v\n", err)
+		writeStderrLine(logger, fmt.Sprintf("error: %v", err))
 		return hubExitCode(err)
 	}
 	return harness.ExitSuccess
+}
+
+func writeStdoutLine(logger *terminalLogger, line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+	fmt.Fprintln(os.Stdout, line)
+	if logger != nil {
+		logger.Capture(line)
+	}
+}
+
+func writeStderrLine(logger *terminalLogger, line string) {
+	line = strings.TrimSpace(line)
+	if line == "" {
+		return
+	}
+	fmt.Fprintln(os.Stderr, line)
+	if logger != nil {
+		logger.Capture(line)
+	}
 }
 
 func runLocalDispatch(
