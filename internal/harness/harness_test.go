@@ -128,6 +128,7 @@ func TestRunNonMainBranchReusesExistingBranchAndPR(t *testing.T) {
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
 	runDir := filepath.Join("/tmp", "temp", guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	prURL := "https://github.com/acme/repo/pull/77"
@@ -138,7 +139,7 @@ func TestRunNonMainBranchReusesExistingBranchAndPR(t *testing.T) {
 		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
 		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
 		{cmd: cloneCommand(cfg, repoDir)},
-		{cmd: codexCommand(targetDir, cfg.Prompt)},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 		{cmd: addCommand(repoDir)},
 		{cmd: commitCommand(repoDir, cfg.CommitMessage)},
@@ -149,11 +150,7 @@ func TestRunNonMainBranchReusesExistingBranchAndPR(t *testing.T) {
 
 	h := New(fake)
 	h.Now = func() time.Time { return now }
-	h.Workspace = workspace.Manager{
-		PathExists: func(string) bool { return false },
-		NewGUID:    func() string { return guid },
-		MkdirAll:   func(string, os.FileMode) error { return nil },
-	}
+	h.Workspace = testWorkspaceManager(guid)
 	h.TargetDirOK = func(path string) bool { return path == targetDir }
 
 	res := h.Run(context.Background(), cfg)
@@ -182,6 +179,7 @@ func TestRunNonMainBranchWithoutOpenPRFails(t *testing.T) {
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
 	runDir := filepath.Join("/tmp", "temp", guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 
@@ -191,7 +189,7 @@ func TestRunNonMainBranchWithoutOpenPRFails(t *testing.T) {
 		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
 		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
 		{cmd: cloneCommand(cfg, repoDir)},
-		{cmd: codexCommand(targetDir, cfg.Prompt)},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 		{cmd: addCommand(repoDir)},
 		{cmd: commitCommand(repoDir, cfg.CommitMessage)},
@@ -201,11 +199,7 @@ func TestRunNonMainBranchWithoutOpenPRFails(t *testing.T) {
 
 	h := New(fake)
 	h.Now = func() time.Time { return now }
-	h.Workspace = workspace.Manager{
-		PathExists: func(string) bool { return false },
-		NewGUID:    func() string { return guid },
-		MkdirAll:   func(string, os.FileMode) error { return nil },
-	}
+	h.Workspace = testWorkspaceManager(guid)
 	h.TargetDirOK = func(path string) bool { return path == targetDir }
 
 	res := h.Run(context.Background(), cfg)
