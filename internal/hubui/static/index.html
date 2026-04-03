@@ -86,9 +86,6 @@
     }
 
     .layout {
-      display: grid;
-      grid-template-columns: minmax(320px, 35%) minmax(420px, 1fr);
-      gap: 16px;
       min-height: calc(100vh - 130px);
     }
 
@@ -125,7 +122,6 @@
       overflow: auto;
     }
 
-    .event-list,
     .task-list {
       display: grid;
       gap: 8px;
@@ -177,22 +173,17 @@
       gap: 16px;
     }
 
-    .prompt-wrap {
-      display: grid;
-      grid-template-rows: auto 1fr;
-    }
-
     .prompt-form {
-      height: 100%;
       display: grid;
       gap: 10px;
       padding: 12px;
-      grid-template-rows: 1fr auto auto;
+      grid-template-rows: auto auto auto;
     }
 
     .prompt-text {
       width: 100%;
-      height: 100%;
+      height: calc(7 * 1.4em + 20px);
+      min-height: calc(7 * 1.4em + 20px);
       resize: vertical;
       border: 1px solid var(--border);
       border-radius: 8px;
@@ -313,6 +304,9 @@
     }
 
     .badge.running { background: var(--running); }
+    .badge.main { background: var(--accent); }
+    .badge.idle { background: #7a8ea3; }
+    .badge.active { background: #7eb8eb; }
     .badge.ok { background: var(--good); }
     .badge.no_changes { background: var(--warn); }
     .badge.error, .badge.invalid { background: var(--bad); color: #2d1515; }
@@ -323,6 +317,31 @@
       gap: 4px 10px;
       color: var(--muted);
       font-size: 0.74rem;
+    }
+
+    .task-output-list {
+      margin-top: 8px;
+      border-top: 1px dashed rgba(125, 154, 185, 0.32);
+      padding-top: 7px;
+      display: grid;
+      gap: 4px;
+    }
+
+    .task-output-line {
+      font-family: "IBM Plex Mono", "Consolas", monospace;
+      font-size: 0.72rem;
+      color: #c7d4e2;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .task-output-line.stderr {
+      color: #f2b5b5;
+    }
+
+    .task-output-line.meta {
+      color: var(--meta);
     }
 
     .log-wrap {
@@ -382,7 +401,6 @@
 
     @media (max-width: 980px) {
       .layout {
-        grid-template-columns: 1fr;
         min-height: auto;
       }
       .right-col {
@@ -396,7 +414,7 @@
     <div class="header">
       <div>
         <div class="title">Codex Hub Monitor</div>
-        <div class="sub">Inbound hub events + live task status + terminal output</div>
+        <div class="sub">Live task status + terminal output</div>
       </div>
       <div class="status-row">
         <span id="conn-dot" class="dot"></span>
@@ -405,16 +423,6 @@
     </div>
 
     <div class="layout">
-      <section class="panel">
-        <div class="panel-header">
-          <span>Hub Events</span>
-          <span class="counter" id="event-count">0</span>
-        </div>
-        <div class="scroll">
-          <div id="event-list" class="event-list"></div>
-        </div>
-      </section>
-
       <div class="right-col">
         <section class="panel prompt-wrap">
           <div class="panel-header">
@@ -424,6 +432,7 @@
             <textarea
               id="local-prompt-input"
               class="prompt-text"
+              rows="7"
               spellcheck="false"
               placeholder='{
   "repo": "git@github.com:org/repo.git",
@@ -458,6 +467,9 @@
   </div>
 
   <script>
+    const MAIN_TASK_ID = "__main__";
+    const MAIN_TASK_LABEL = "main";
+
     const state = {
       snapshot: null,
       selectedTaskId: "",
@@ -465,9 +477,7 @@
 
     const connDot = document.getElementById("conn-dot");
     const connText = document.getElementById("conn-text");
-    const eventCount = document.getElementById("event-count");
     const taskCount = document.getElementById("task-count");
-    const eventList = document.getElementById("event-list");
     const taskList = document.getElementById("task-list");
     const taskHead = document.getElementById("task-head");
     const terminal = document.getElementById("terminal");
@@ -506,50 +516,80 @@
       localPromptStatus.textContent = text;
     }
 
-    function renderEvents(snapshot) {
-      const events = [...(snapshot.events || [])].slice(-120).reverse();
-      eventCount.textContent = String(snapshot.events?.length || 0);
-      eventList.replaceChildren();
+    function extractField(line, key) {
+      if (!line || !key) return "";
+      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+      const match = line.match(new RegExp(`(?:^|\\s)${escaped}=([^\\s]+)`));
+      return match ? match[1] : "";
+    }
 
-      if (!events.length) {
-        const empty = document.createElement("div");
-        empty.className = "placeholder";
-        empty.textContent = "No inbound events yet.";
-        eventList.appendChild(empty);
-        return;
+    function decodeB64(value) {
+      if (!value) return "";
+      try {
+        const raw = atob(value);
+        const bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0));
+        return new TextDecoder().decode(bytes);
+      } catch (_err) {
+        return "";
       }
+    }
+
+    function displayTasks(snapshot) {
+      const events = snapshot.events || [];
+      const mainLogs = [];
+      let startedAt = "";
 
       for (const event of events) {
-        const node = document.createElement("article");
-        node.className = "event";
+        if (event.request_id) continue;
 
-        const head = document.createElement("div");
-        head.className = "event-head";
-
-        const kind = document.createElement("span");
-        kind.className = "event-kind";
-        kind.textContent = event.kind || "log";
-        head.appendChild(kind);
-
-        const time = document.createElement("span");
-        time.className = "event-time";
-        time.textContent = relativeTime(event.time);
-        head.appendChild(time);
-
-        if (event.request_id) {
-          const req = document.createElement("span");
-          req.className = "event-time";
-          req.textContent = `req=${event.request_id}`;
-          head.appendChild(req);
+        if (!startedAt && event.time) {
+          startedAt = event.time;
         }
 
-        const line = document.createElement("div");
-        line.className = "event-line";
-        line.textContent = event.line || "";
+        const line = event.line || "";
+        const stream = extractField(line, "stream") || "meta";
+        const b64 = extractField(line, "b64");
+        const decoded = decodeB64(b64);
 
-        node.append(head, line);
-        eventList.appendChild(node);
+        mainLogs.push({
+          time: event.time || snapshot.generated_at,
+          stream,
+          text: decoded || line,
+        });
       }
+
+      const mainTask = {
+        request_id: MAIN_TASK_ID,
+        display_id: MAIN_TASK_LABEL,
+        status: mainLogs.length ? "active" : "idle",
+        stage: "default thread",
+        skill: "-",
+        repo: "-",
+        started_at: startedAt || snapshot.generated_at,
+        updated_at: mainLogs.length ? mainLogs[mainLogs.length - 1].time : snapshot.generated_at,
+        logs: mainLogs,
+      };
+
+      return [mainTask, ...(snapshot.tasks || [])];
+    }
+
+    function taskPreviewLines(task) {
+      const logs = Array.isArray(task.logs) ? task.logs : [];
+      if (!logs.length) return [];
+      const outputLogs = logs.filter((row) => {
+        const stream = row.stream || "meta";
+        return stream === "stdout" || stream === "stderr";
+      });
+      const source = outputLogs.length ? outputLogs : logs;
+      return source.slice(-5);
+    }
+
+    function previewText(row) {
+      const stream = row.stream || "meta";
+      const text = String(row.text || "").replace(/\s+/g, " ").trim();
+      if (!text) return `[${stream}]`;
+      if (stream === "stdout") return text;
+      return `[${stream}] ${text}`;
     }
 
     function selectTask(id) {
@@ -558,7 +598,7 @@
     }
 
     function renderTasks(snapshot) {
-      const tasks = snapshot.tasks || [];
+      const tasks = displayTasks(snapshot);
       taskCount.textContent = String(tasks.length);
       taskList.replaceChildren();
 
@@ -584,7 +624,7 @@
 
         const id = document.createElement("div");
         id.className = "task-id";
-        id.textContent = task.request_id;
+        id.textContent = task.display_id || task.request_id;
 
         const badge = document.createElement("span");
         badge.className = `badge ${statusClass(task.status)}`;
@@ -605,13 +645,32 @@
         update.textContent = `updated: ${relativeTime(task.updated_at)}`;
         meta.append(stage, skill, repo, update);
 
-        node.append(top, meta);
+        const output = document.createElement("div");
+        output.className = "task-output-list";
+
+        const previews = taskPreviewLines(task);
+        if (!previews.length) {
+          const empty = document.createElement("div");
+          empty.className = "task-output-line meta";
+          empty.textContent = "No output yet.";
+          output.appendChild(empty);
+        } else {
+          for (const row of previews) {
+            const line = document.createElement("div");
+            const stream = row.stream || "meta";
+            line.className = `task-output-line ${stream}`;
+            line.textContent = previewText(row);
+            output.appendChild(line);
+          }
+        }
+
+        node.append(top, meta, output);
         taskList.appendChild(node);
       }
     }
 
     function renderTerminal(snapshot) {
-      const tasks = snapshot.tasks || [];
+      const tasks = displayTasks(snapshot);
       const selected = tasks.find(t => t.request_id === state.selectedTaskId);
       if (!selected) {
         taskHead.textContent = "Select a task to inspect logs";
@@ -619,7 +678,8 @@
         return;
       }
 
-      taskHead.textContent = `${selected.request_id} | ${selected.status || "pending"} | ${selected.stage || "-"}`;
+      const selectedLabel = selected.display_id || selected.request_id;
+      taskHead.textContent = `${selectedLabel} | ${selected.status || "pending"} | ${selected.stage || "-"}`;
       terminal.replaceChildren();
 
       if (!selected.logs?.length) {
@@ -642,7 +702,6 @@
     function render(snapshot) {
       if (!snapshot) return;
       state.snapshot = snapshot;
-      renderEvents(snapshot);
       renderTasks(snapshot);
       renderTerminal(snapshot);
     }
