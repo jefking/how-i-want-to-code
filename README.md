@@ -11,7 +11,7 @@ For each run, the harness performs this flow:
 
 1. Validate local tooling: `git`, `gh`, `codex`
 2. Validate GitHub auth: `gh auth status`
-3. Create isolated run workspace: `/dev/shm/<guid>` (fallback `/tmp/<guid>`)
+3. Create isolated run workspace: `/dev/shm/temp/<guid>` (fallback `/tmp/temp/<guid>`)
 4. Clone all configured repos + base branch before prompting Codex
 5. Run Codex in the configured target subdirectory (single repo) or shared workspace (multi-repo)
 6. For each repo with changes: commit, push, and create a PR
