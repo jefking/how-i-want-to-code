@@ -15,9 +15,7 @@ For each run, the harness performs this flow:
 4. Seed `AGENTS.md` into the run root from `./library/AGENTS.md`
 5. Clone all configured repos + base branch before prompting Codex
 6. Run Codex in the configured target subdirectory (single repo) or shared workspace (multi-repo, with `--skip-git-repo-check`), with prompt context that starts with `you are ./AGENTS.md` and points to the seeded file
-7. For each changed repo:
-   - if `base_branch` is `main`, create and push a new `moltenhub-...` branch, then create a PR
-   - if `base_branch` is not `main`, stay on that branch, push fixes there, and reuse its open PR
+7. For each repo with changes: if `base_branch` is `main`, create/push a `moltenhub-...` branch; otherwise stay on the existing non-`main` branch, then create/reuse a PR with a title that starts with `moltenhub-`
 8. Wait for required PR checks (`gh pr checks --watch --required`) per changed repo
 9. If required checks fail, re-run Codex with remediation context, push fixes, and re-check until green or retry limit is reached
 
@@ -174,7 +172,7 @@ Optional fields (with defaults):
 - `version` (default: `v1`)
 - `repo` / `repo_url` (single-repo aliases; when combined with `repos`, they are included as the first repo)
 - `repos` (`[]string`; if set, all repos are cloned before Codex runs)
-- `base_branch` (default: `main`)
+- `base_branch` (default: `main`; `main` creates a new `moltenhub-...` work branch, non-`main` stays on that branch)
 - `target_subdir` (default: `.` for repo root)
 - `target_subdir` applies to the first repo in `repos` for multi-repo jobs
 - `commit_message` (default: auto-generated from prompt)

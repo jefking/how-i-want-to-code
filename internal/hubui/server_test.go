@@ -134,6 +134,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function renderTaskProgress(") {
 		t.Fatalf("expected index html to include renderTaskProgress handler")
 	}
+	if !strings.Contains(markup, `id="local-conn-text"`) {
+		t.Fatalf("expected index html to include local connection indicator")
+	}
+	if !strings.Contains(markup, `id="hub-conn-text"`) {
+		t.Fatalf("expected index html to include moltenhub connection indicator")
+	}
+	if !strings.Contains(markup, "function renderHubConnection(") {
+		t.Fatalf("expected index html to include renderHubConnection handler")
+	}
 }
 
 func TestHandlerLocalPromptSubmitAccepted(t *testing.T) {

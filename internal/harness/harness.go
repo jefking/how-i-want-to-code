@@ -171,22 +171,28 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 		return h.fail(ExitConfig, "config", fmt.Errorf("target_subdir does not exist or is not a directory: %s", cfg.TargetSubdir), runDir)
 	}
 
-	createBranch := shouldCreateBranch(cfg.BaseBranch)
+	createWorkBranch := shouldCreateWorkBranch(cfg.BaseBranch)
 	branch := strings.TrimSpace(cfg.BaseBranch)
-	if createBranch {
+	if createWorkBranch {
 		branch = slug.BranchName(cfg.Prompt, h.Now(), guid)
 	}
 	for i := range repos {
 		repos[i].Branch = branch
-		if createBranch {
-			h.logf("stage=git status=start action=branch branch=%s repo=%s repo_dir=%s", branch, repos[i].URL, repos[i].RelDir)
-			if _, err := h.runCommand(ctx, "git", branchCommand(repos[i].Dir, branch)); err != nil {
-				return h.fail(ExitGit, "git", err, runDir)
-			}
-			h.logf("stage=git status=ok action=branch branch=%s repo=%s repo_dir=%s", branch, repos[i].URL, repos[i].RelDir)
+		if !createWorkBranch {
+			h.logf(
+				"stage=git status=ok action=branch_reuse branch=%s base_branch=%s repo=%s repo_dir=%s",
+				branch,
+				cfg.BaseBranch,
+				repos[i].URL,
+				repos[i].RelDir,
+			)
 			continue
 		}
-		h.logf("stage=git status=ok action=branch mode=reuse branch=%s repo=%s repo_dir=%s", branch, repos[i].URL, repos[i].RelDir)
+		h.logf("stage=git status=start action=branch branch=%s repo=%s repo_dir=%s", branch, repos[i].URL, repos[i].RelDir)
+		if _, err := h.runCommand(ctx, "git", branchCommand(repos[i].Dir, branch)); err != nil {
+			return h.fail(ExitGit, "git", err, runDir)
+		}
+		h.logf("stage=git status=ok action=branch branch=%s repo=%s repo_dir=%s", branch, repos[i].URL, repos[i].RelDir)
 	}
 
 	codexDir := targetDir
@@ -279,22 +285,25 @@ func (h Harness) processChangedRepo(
 	h.logf("stage=git status=ok action=commit repo=%s repo_dir=%s", repo.URL, repo.RelDir)
 
 	h.logf("stage=pr status=start repo=%s repo_dir=%s", repo.URL, repo.RelDir)
-	if sameBranchName(repo.Branch, cfg.BaseBranch) {
-		prRes, err := h.runCommand(ctx, "pr", prLookupCommand(repo.Dir, repo.Branch))
+	createWorkBranch := shouldCreateWorkBranch(cfg.BaseBranch)
+	if !createWorkBranch {
+		prLookupRes, err := h.runCommand(ctx, "pr", prLookupByHeadCommand(repo.Dir, repo.Branch))
 		if err != nil {
 			return ExitPR, "pr", err
 		}
-		repo.PRURL = extractFirstURL(prRes.Stdout)
-		if repo.PRURL == "" {
-			return ExitPR, "pr", fmt.Errorf(
-				"no open PR found for repo %s on branch %q; create/open a PR first or run with base_branch=main",
-				repo.URL,
-				repo.Branch,
-			)
+		repo.PRURL = extractFirstURL(prLookupRes.Stdout)
+	}
+
+	if repo.PRURL == "" {
+		var (
+			prRes execx.Result
+			err   error
+		)
+		if createWorkBranch {
+			prRes, err = h.runCommand(ctx, "pr", prCreateCommand(repo.Dir, cfg, repo.Branch))
+		} else {
+			prRes, err = h.runCommand(ctx, "pr", prCreateWithoutBaseCommand(repo.Dir, cfg, repo.Branch))
 		}
-		h.logf("stage=pr status=ok action=reuse repo=%s repo_dir=%s pr_url=%s", repo.URL, repo.RelDir, repo.PRURL)
-	} else {
-		prRes, err := h.runCommand(ctx, "pr", prCreateCommand(repo.Dir, cfg, repo.Branch))
 		if err != nil {
 			return ExitPR, "pr", err
 		}
@@ -302,8 +311,8 @@ func (h Harness) processChangedRepo(
 		if repo.PRURL == "" {
 			return ExitPR, "pr", fmt.Errorf("gh pr create did not return a PR URL for repo %s", repo.URL)
 		}
-		h.logf("stage=pr status=ok action=create repo=%s repo_dir=%s pr_url=%s", repo.URL, repo.RelDir, repo.PRURL)
 	}
+	h.logf("stage=pr status=ok repo=%s repo_dir=%s pr_url=%s", repo.URL, repo.RelDir, repo.PRURL)
 
 	for attempt := 0; ; attempt++ {
 		var (
@@ -534,7 +543,8 @@ func workspaceCodexPrompt(prompt, targetSubdir string, repos []repoWorkspace) st
 		b.WriteString(fmt.Sprintf("- %s => %s\n", repo.RelDir, repo.URL))
 	}
 	b.WriteString("- If you modify files in any repository, keep each changed repository on its own branch and PR.\n")
-	b.WriteString("- Only create a new branch when starting from 'main'; for non-'main' remediation branches, stay on the existing branch.\n")
+	b.WriteString("- Only create a new branch when starting from 'main'; if you're fixing an existing non-'main' branch, stay on it.\n")
+	b.WriteString("- Start every new branch name and PR title with 'moltenhub-'.\n")
 	return strings.TrimSpace(b.String())
 }
 
@@ -741,26 +751,11 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 	}
 }
 
-var githubURL = regexp.MustCompile(`https://github\.com/\S+`)
+var githubURL = regexp.MustCompile(`https://github\.com/[^\s"'\\}\]]+`)
 
 func extractFirstURL(text string) string {
 	m := githubURL.FindString(text)
 	return strings.TrimSpace(m)
-}
-
-func shouldCreateBranch(baseBranch string) bool {
-	return normalizeBranchRef(baseBranch) == "main"
-}
-
-func sameBranchName(a, b string) bool {
-	return normalizeBranchRef(a) == normalizeBranchRef(b)
-}
-
-func normalizeBranchRef(branch string) string {
-	branch = strings.TrimSpace(branch)
-	branch = strings.TrimPrefix(branch, "refs/heads/")
-	branch = strings.TrimPrefix(branch, "origin/")
-	return branch
 }
 
 func preflightCommands() []execx.Command {
@@ -784,6 +779,17 @@ func cloneRepoCommand(repoURL, baseBranch, repoDir string) execx.Command {
 		Name: "git",
 		Args: []string{"clone", "--branch", baseBranch, "--single-branch", repoURL, repoDir},
 	}
+}
+
+func shouldCreateWorkBranch(baseBranch string) bool {
+	return normalizeBranchRef(baseBranch) == "main"
+}
+
+func normalizeBranchRef(branch string) string {
+	branch = strings.TrimSpace(branch)
+	branch = strings.TrimPrefix(branch, "refs/heads/")
+	branch = strings.TrimPrefix(branch, "origin/")
+	return branch
 }
 
 func branchCommand(repoDir, branch string) execx.Command {
@@ -855,11 +861,33 @@ func prCreateCommand(repoDir string, cfg config.Config, branch string) execx.Com
 	return execx.Command{Dir: repoDir, Name: "gh", Args: args}
 }
 
-func prLookupCommand(repoDir, branch string) execx.Command {
+func prCreateWithoutBaseCommand(repoDir string, cfg config.Config, branch string) execx.Command {
+	args := []string{
+		"pr", "create",
+		"--head", branch,
+		"--title", cfg.PRTitle,
+		"--body", cfg.PRBody,
+	}
+	for _, label := range cfg.Labels {
+		if strings.TrimSpace(label) == "" {
+			continue
+		}
+		args = append(args, "--label", label)
+	}
+	for _, reviewer := range cfg.Reviewers {
+		if strings.TrimSpace(reviewer) == "" {
+			continue
+		}
+		args = append(args, "--reviewer", reviewer)
+	}
+	return execx.Command{Dir: repoDir, Name: "gh", Args: args}
+}
+
+func prLookupByHeadCommand(repoDir, branch string) execx.Command {
 	return execx.Command{
 		Dir:  repoDir,
 		Name: "gh",
-		Args: []string{"pr", "list", "--head", branch, "--state", "open", "--json", "url", "--jq", ".[0].url"},
+		Args: []string{"pr", "list", "--state", "open", "--head", branch, "--json", "url", "--limit", "1"},
 	}
 }
 
@@ -911,7 +939,8 @@ When a task fails:
   {"repos":["git@github.com:jefking/how-i-want-to-code.git"],"base_branch":"main","target_subdir":".","prompt":"<DEFINE A STRONG CLEAR PROMPT THAT GOES IN HERE>"}
 
 Completion requirements:
-- Only create a new branch when starting from 'main'. If fixing a non-'main' branch, stay on that branch.
+- Only create a new branch when starting from 'main'; if you're fixing an existing non-'main' branch, stay on it.
+- Start every new branch and every PR title with 'moltenhub-'.
 - Keep working until there is a PR for your changes and required CI/CD checks are green.
 - If CI/CD fails, continue fixing code/tests/workflows until checks pass.
 - If you changed multiple repositories, ensure each changed repository has its own branch and PR.
