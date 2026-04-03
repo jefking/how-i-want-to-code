@@ -105,6 +105,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function dismissTask(") {
 		t.Fatalf("expected index html to include dismissTask handler")
 	}
+	if !strings.Contains(markup, ".task-progress") {
+		t.Fatalf("expected index html to include task progress styles")
+	}
+	if !strings.Contains(markup, "function renderTaskProgress(") {
+		t.Fatalf("expected index html to include renderTaskProgress handler")
+	}
 }
 
 func TestHandlerLocalPromptSubmitAccepted(t *testing.T) {

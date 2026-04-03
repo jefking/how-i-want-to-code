@@ -350,6 +350,71 @@
       font-size: 0.74rem;
     }
 
+    .task-progress {
+      margin-top: 8px;
+      display: grid;
+      gap: 5px;
+    }
+
+    .task-progress-track {
+      position: relative;
+      height: 14px;
+    }
+
+    .task-progress-line {
+      position: absolute;
+      left: 7px;
+      right: 7px;
+      top: 50%;
+      height: 2px;
+      transform: translateY(-50%);
+      background: rgba(125, 154, 185, 0.34);
+      border-radius: 999px;
+      overflow: hidden;
+    }
+
+    .task-progress-fill {
+      width: 0;
+      height: 100%;
+      background: linear-gradient(90deg, #66c6ff, #4fd38c);
+      transition: width .18s ease;
+    }
+
+    .task-progress-steps {
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    .task-progress-step {
+      width: 14px;
+      height: 14px;
+      border-radius: 50%;
+      border: 2px solid #506884;
+      background: #1c2f44;
+      cursor: help;
+      transition: background-color .12s ease, border-color .12s ease, box-shadow .12s ease;
+    }
+
+    .task-progress-step.done {
+      background: #5ad796;
+      border-color: #b5f5d0;
+    }
+
+    .task-progress-step.current {
+      background: #56bfff;
+      border-color: #cae9ff;
+      box-shadow: 0 0 0 3px rgba(86, 191, 255, 0.16);
+    }
+
+    .task-progress-label {
+      color: var(--meta);
+      font-size: 0.68rem;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+
     .task-output-list {
       margin-top: 8px;
       border-top: 1px dashed rgba(125, 154, 185, 0.32);
@@ -563,6 +628,14 @@
     const MAIN_TASK_LABEL = "main";
     const DISMISSED_TASKS_KEY = "hubui.dismissedTaskIds";
     const COMPLETED_STATUSES = new Set(["ok", "no_changes", "error", "invalid"]);
+    const TASK_PROGRESS_STEPS = [
+      { id: "received", label: "Task Received", detail: "Dispatch accepted by hub." },
+      { id: "run", label: "Run Started", detail: "Harness run initialized." },
+      { id: "prepare", label: "Prepare", detail: "Preflight, auth, and workspace setup." },
+      { id: "clone", label: "Git Clone", detail: "Repository clone and branch setup." },
+      { id: "codex", label: "Codex", detail: "Codex execution in progress." },
+      { id: "finalize", label: "Finalize", detail: "Commit, PR, and checks." },
+    ];
 
     function loadDismissedTaskIDs() {
       try {
@@ -735,6 +808,88 @@
       return `[${stream}] ${text}`;
     }
 
+    function taskProgressIndex(task) {
+      if (!task || task.request_id === MAIN_TASK_ID) {
+        return 0;
+      }
+
+      const stage = String(task.stage || "").toLowerCase();
+      const status = String(task.status || "").toLowerCase();
+      let index = 0;
+
+      if (status === "running") {
+        index = 1;
+      }
+
+      if (stage === "preflight" || stage === "auth" || stage === "workspace" || stage === "config") {
+        index = Math.max(index, 2);
+      } else if (stage === "clone") {
+        index = Math.max(index, 3);
+      } else if (stage === "codex") {
+        index = Math.max(index, 4);
+      } else if (stage === "git" || stage === "pr" || stage === "checks") {
+        index = Math.max(index, 5);
+      }
+
+      const max = TASK_PROGRESS_STEPS.length - 1;
+      if (index < 0) return 0;
+      if (index > max) return max;
+      return index;
+    }
+
+    function renderTaskProgress(task) {
+      if (!task || task.request_id === MAIN_TASK_ID || isCompletedTask(task)) {
+        return null;
+      }
+
+      const index = taskProgressIndex(task);
+      const progress = document.createElement("div");
+      progress.className = "task-progress";
+
+      const track = document.createElement("div");
+      track.className = "task-progress-track";
+
+      const line = document.createElement("div");
+      line.className = "task-progress-line";
+
+      const fill = document.createElement("div");
+      fill.className = "task-progress-fill";
+      if (TASK_PROGRESS_STEPS.length > 1) {
+        fill.style.width = `${(index / (TASK_PROGRESS_STEPS.length - 1)) * 100}%`;
+      } else {
+        fill.style.width = "100%";
+      }
+      line.appendChild(fill);
+
+      const steps = document.createElement("div");
+      steps.className = "task-progress-steps";
+      for (let i = 0; i < TASK_PROGRESS_STEPS.length; i += 1) {
+        const step = TASK_PROGRESS_STEPS[i];
+        const marker = document.createElement("span");
+        marker.className = "task-progress-step";
+
+        let stateText = "upcoming";
+        if (i < index) {
+          marker.classList.add("done");
+          stateText = "done";
+        } else if (i === index) {
+          marker.classList.add("current");
+          stateText = "current";
+        }
+
+        marker.title = `${step.label}: ${stateText}. ${step.detail}`;
+        steps.appendChild(marker);
+      }
+
+      const label = document.createElement("div");
+      label.className = "task-progress-label";
+      label.textContent = `current step: ${TASK_PROGRESS_STEPS[index].label}`;
+
+      track.append(line, steps);
+      progress.append(track, label);
+      return progress;
+    }
+
     function clearTaskResult() {
       taskResult.className = "task-result";
       taskResult.replaceChildren();
@@ -845,7 +1000,8 @@
         meta.className = "task-meta";
 
         const stage = document.createElement("div");
-        stage.textContent = `stage: ${task.stage || "-"}`;
+        const stageLabel = task.stage ? `${task.stage}${task.stage_status ? ` (${task.stage_status})` : ""}` : "-";
+        stage.textContent = `stage: ${stageLabel}`;
         const skill = document.createElement("div");
         skill.textContent = `skill: ${task.skill || "-"}`;
         const repo = document.createElement("div");
@@ -853,6 +1009,8 @@
         const update = document.createElement("div");
         update.textContent = `updated: ${relativeTime(task.updated_at)}`;
         meta.append(stage, skill, repo, update);
+
+        const progress = renderTaskProgress(task);
 
         const output = document.createElement("div");
         output.className = "task-output-list";
@@ -873,7 +1031,11 @@
           }
         }
 
-        node.append(top, meta, output);
+        if (progress) {
+          node.append(top, meta, progress, output);
+        } else {
+          node.append(top, meta, output);
+        }
         taskList.appendChild(node);
       }
     }
