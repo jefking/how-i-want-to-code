@@ -319,6 +319,83 @@ func TestRunFailedChecksWithNoRemediationChangesFails(t *testing.T) {
 	}
 }
 
+func TestRunMultiRepoCreatesPRsForEachChangedRepo(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	cfg.RepoURL = ""
+	cfg.Repo = ""
+	cfg.Repos = []string{
+		"git@github.com:acme/repo-a.git",
+		"git@github.com:acme/repo-b.git",
+	}
+	cfg.TargetSubdir = "."
+
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := filepath.Join("/tmp", guid)
+	branch := "codex/build-api-20260402-150405-abcdef12"
+
+	repoRelA := repoWorkspaceDirName(cfg.Repos[0], 0, len(cfg.Repos))
+	repoRelB := repoWorkspaceDirName(cfg.Repos[1], 1, len(cfg.Repos))
+	repoDirA := filepath.Join(runDir, repoRelA)
+	repoDirB := filepath.Join(runDir, repoRelB)
+	codexPrompt := workspaceCodexPrompt(cfg.Prompt, cfg.TargetSubdir, []repoWorkspace{
+		{URL: cfg.Repos[0], RelDir: repoRelA},
+		{URL: cfg.Repos[1], RelDir: repoRelB},
+	})
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneRepoCommand(cfg.Repos[0], cfg.BaseBranch, repoDirA)},
+		{cmd: cloneRepoCommand(cfg.Repos[1], cfg.BaseBranch, repoDirB)},
+		{cmd: branchCommand(repoDirA, branch)},
+		{cmd: branchCommand(repoDirB, branch)},
+		{cmd: codexCommand(runDir, codexPrompt)},
+		{cmd: statusCommand(repoDirA), res: execx.Result{Stdout: " M file-a.go\n"}},
+		{cmd: statusCommand(repoDirB), res: execx.Result{Stdout: " M file-b.go\n"}},
+		{cmd: addCommand(repoDirA)},
+		{cmd: commitCommand(repoDirA, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDirA, branch)},
+		{cmd: prCreateCommand(repoDirA, cfg, branch), res: execx.Result{Stdout: "https://github.com/acme/repo-a/pull/10\n"}},
+		{cmd: prChecksCommand(repoDirA, "https://github.com/acme/repo-a/pull/10")},
+		{cmd: addCommand(repoDirB)},
+		{cmd: commitCommand(repoDirB, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDirB, branch)},
+		{cmd: prCreateCommand(repoDirB, cfg, branch), res: execx.Result{Stdout: "https://github.com/acme/repo-b/pull/20\n"}},
+		{cmd: prChecksCommand(repoDirB, "https://github.com/acme/repo-b/pull/20")},
+	}}
+
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = workspace.Manager{
+		PathExists: func(string) bool { return false },
+		NewGUID:    func() string { return guid },
+		MkdirAll:   func(string, os.FileMode) error { return nil },
+	}
+	h.TargetDirOK = func(path string) bool { return path == repoDirA }
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.ExitCode != ExitSuccess {
+		t.Fatalf("ExitCode = %d", res.ExitCode)
+	}
+	if got, want := len(res.RepoResults), 2; got != want {
+		t.Fatalf("len(RepoResults) = %d, want %d", got, want)
+	}
+	if res.RepoResults[0].PRURL == "" || res.RepoResults[1].PRURL == "" {
+		t.Fatalf("RepoResults PRs = %#v", res.RepoResults)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
+	}
+}
+
 func TestCommandBuilders(t *testing.T) {
 	t.Parallel()
 
