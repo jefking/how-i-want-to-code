@@ -704,11 +704,18 @@ func extractFirstURL(text string) string {
 }
 
 func shouldCreateBranch(baseBranch string) bool {
-	return sameBranchName(baseBranch, "main")
+	return normalizeBranchRef(baseBranch) == "main"
 }
 
 func sameBranchName(a, b string) bool {
-	return strings.EqualFold(strings.TrimSpace(a), strings.TrimSpace(b))
+	return normalizeBranchRef(a) == normalizeBranchRef(b)
+}
+
+func normalizeBranchRef(branch string) string {
+	branch = strings.TrimSpace(branch)
+	branch = strings.TrimPrefix(branch, "refs/heads/")
+	branch = strings.TrimPrefix(branch, "origin/")
+	return branch
 }
 
 func preflightCommands() []execx.Command {

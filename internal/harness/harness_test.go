@@ -821,11 +821,31 @@ func TestShouldCreateBranch(t *testing.T) {
 	if !shouldCreateBranch("main") {
 		t.Fatal("shouldCreateBranch(main) = false, want true")
 	}
-	if !shouldCreateBranch(" Main ") {
-		t.Fatal("shouldCreateBranch(\" Main \") = false, want true")
+	if !shouldCreateBranch(" refs/heads/main ") {
+		t.Fatal("shouldCreateBranch(\" refs/heads/main \") = false, want true")
+	}
+	if !shouldCreateBranch("origin/main") {
+		t.Fatal("shouldCreateBranch(origin/main) = false, want true")
+	}
+	if shouldCreateBranch("Main") {
+		t.Fatal("shouldCreateBranch(Main) = true, want false")
 	}
 	if shouldCreateBranch("release/hotfix") {
 		t.Fatal("shouldCreateBranch(non-main) = true, want false")
+	}
+}
+
+func TestSameBranchName(t *testing.T) {
+	t.Parallel()
+
+	if !sameBranchName("refs/heads/release/2026.04-hotfix", "release/2026.04-hotfix") {
+		t.Fatal("sameBranchName(refs/heads/*, *) = false, want true")
+	}
+	if !sameBranchName("origin/release/2026.04-hotfix", "release/2026.04-hotfix") {
+		t.Fatal("sameBranchName(origin/*, *) = false, want true")
+	}
+	if sameBranchName("Main", "main") {
+		t.Fatal("sameBranchName(Main, main) = true, want false")
 	}
 }
 
