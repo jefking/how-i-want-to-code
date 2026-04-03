@@ -268,10 +268,13 @@ func runHub(args []string) int {
 			}
 			go func(requestID string, runCfg config.Config, dedupeKey string) {
 				defer func() { <-localDispatchSem }()
+				finalState := ""
 				if dedupeKey != "" {
-					defer localSubmitDeduper.Done(dedupeKey, requestID)
+					defer func() {
+						localSubmitDeduper.Done(dedupeKey, requestID, finalState)
+					}()
 				}
-				runLocalDispatch(ctx, runner, daemonLogger, cfg.Skill.Name, requestID, runCfg)
+				finalState = runLocalDispatch(ctx, runner, daemonLogger, cfg.Skill.Name, requestID, runCfg)
 			}(requestID, runCfg, dedupeKey)
 
 			return requestID, nil
@@ -328,7 +331,7 @@ func runLocalDispatch(
 	skill string,
 	requestID string,
 	runCfg config.Config,
-) {
+) string {
 	logf(
 		"dispatch status=start request_id=%s skill=%s repo=%s repos=%s",
 		requestID,
@@ -354,11 +357,11 @@ func runLocalDispatch(
 			res.PRURL,
 			res.Err,
 		)
-		return
+		return "error"
 	}
 	if res.NoChanges {
 		logf("dispatch status=no_changes request_id=%s workspace=%s branch=%s", requestID, res.WorkspaceDir, res.Branch)
-		return
+		return "no_changes"
 	}
 	logf(
 		"dispatch status=ok request_id=%s workspace=%s branch=%s pr_url=%s pr_urls=%s changed_repos=%d",
@@ -369,6 +372,7 @@ func runLocalDispatch(
 		joinPRURLs(res.RepoResults),
 		countChangedRepos(res.RepoResults),
 	)
+	return "ok"
 }
 
 func monitorURL(addr string) string {
