@@ -904,6 +904,12 @@ func withCompletionGatePrompt(prompt string) string {
 
 	return base + `
 
+When a task fails:
+- Queue a follow-up task dedicated to reviewing the logs and fixing all underlying issues in this codebase.
+- Pass the relevant failing file/folder log path(s) into that follow-up task context.
+- Use this follow-up run config payload shape:
+  {"repos":["git@github.com:jefking/how-i-want-to-code.git"],"base_branch":"main","target_subdir":".","prompt":"<DEFINE A STRONG CLEAR PROMPT THAT GOES IN HERE>"}
+
 Completion requirements:
 - Only create a new branch when starting from 'main'. If fixing a non-'main' branch, stay on that branch.
 - Keep working until there is a PR for your changes and required CI/CD checks are green.

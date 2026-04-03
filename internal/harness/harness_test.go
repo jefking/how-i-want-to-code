@@ -878,6 +878,23 @@ func TestCommandBuilders(t *testing.T) {
 	}
 }
 
+func TestWithCompletionGatePromptIncludesFailureQueueContract(t *testing.T) {
+	t.Parallel()
+
+	got := withCompletionGatePrompt("Build API")
+	wantSnippets := []string{
+		"When a task fails:",
+		"Queue a follow-up task dedicated to reviewing the logs and fixing all underlying issues in this codebase.",
+		`{"repos":["git@github.com:jefking/how-i-want-to-code.git"],"base_branch":"main","target_subdir":".","prompt":"<DEFINE A STRONG CLEAR PROMPT THAT GOES IN HERE>"}`,
+		"Completion requirements:",
+	}
+	for _, snippet := range wantSnippets {
+		if !strings.Contains(got, snippet) {
+			t.Fatalf("withCompletionGatePrompt() missing snippet %q", snippet)
+		}
+	}
+}
+
 func TestShouldCreateBranch(t *testing.T) {
 	t.Parallel()
 
