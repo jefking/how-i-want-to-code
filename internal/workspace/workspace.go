@@ -11,6 +11,7 @@ import (
 const (
 	defaultRAMBase  = "/dev/shm"
 	defaultDiskBase = "/tmp"
+	defaultRunRoot  = "temp"
 )
 
 // Manager creates isolated run directories.
@@ -41,7 +42,7 @@ func (m Manager) SelectBase() string {
 	return defaultDiskBase
 }
 
-// CreateRunDir creates a GUID-named run directory under the selected base.
+// CreateRunDir creates a GUID-named run directory under <base>/temp.
 func (m Manager) CreateRunDir() (string, string, error) {
 	mkdirAll := m.MkdirAll
 	if mkdirAll == nil {
@@ -57,7 +58,7 @@ func (m Manager) CreateRunDir() (string, string, error) {
 		return "", "", fmt.Errorf("generated empty guid")
 	}
 
-	runDir := filepath.Join(m.SelectBase(), guid)
+	runDir := filepath.Join(m.SelectBase(), defaultRunRoot, guid)
 	if err := mkdirAll(runDir, 0o755); err != nil {
 		return "", "", fmt.Errorf("create run dir: %w", err)
 	}

@@ -63,7 +63,7 @@ func TestRunHappyPathCreatesPR(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -117,7 +117,7 @@ func TestRunCodexFailureStopsBeforeCommitAndPR(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -162,7 +162,7 @@ func TestRunNoChangesSkipsPR(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -211,7 +211,7 @@ func TestRunFailedChecksTriggersCodexRemediation(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -270,7 +270,7 @@ func TestRunFailedChecksWithNoRemediationChangesFails(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -325,7 +325,7 @@ func TestRunNoChecksReportedRetriesBeforePassing(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -388,7 +388,7 @@ func TestRunNoChecksReportedAfterRetryWindowTriggersRemediation(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -465,7 +465,7 @@ func TestRunNoRequiredChecksFallsBackToAllChecks(t *testing.T) {
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "codex/build-api-20260402-150405-abcdef12"
@@ -532,7 +532,7 @@ func TestRunMultiRepoCreatesPRsForEachChangedRepo(t *testing.T) {
 
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
-	runDir := filepath.Join("/tmp", guid)
+	runDir := filepath.Join("/tmp", "temp", guid)
 	branch := "codex/build-api-20260402-150405-abcdef12"
 
 	repoRelA := repoWorkspaceDirName(cfg.Repos[0], 0, len(cfg.Repos))

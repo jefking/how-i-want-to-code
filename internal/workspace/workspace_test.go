@@ -45,7 +45,36 @@ func TestCreateRunDirUsesGUIDSubfolder(t *testing.T) {
 	if guid != "abc123" {
 		t.Fatalf("guid = %q", guid)
 	}
-	want := filepath.Join("/dev/shm", "abc123")
+	want := filepath.Join("/dev/shm", "temp", "abc123")
+	if runDir != want {
+		t.Fatalf("runDir = %q, want %q", runDir, want)
+	}
+	if createdPath != want {
+		t.Fatalf("created path = %q, want %q", createdPath, want)
+	}
+}
+
+func TestCreateRunDirFallsBackToTmpTempRoot(t *testing.T) {
+	t.Parallel()
+
+	var createdPath string
+	m := Manager{
+		PathExists: func(string) bool { return false },
+		NewGUID:    func() string { return "abc123" },
+		MkdirAll: func(path string, _ os.FileMode) error {
+			createdPath = path
+			return nil
+		},
+	}
+
+	runDir, guid, err := m.CreateRunDir()
+	if err != nil {
+		t.Fatalf("CreateRunDir() error = %v", err)
+	}
+	if guid != "abc123" {
+		t.Fatalf("guid = %q", guid)
+	}
+	want := filepath.Join("/tmp", "temp", "abc123")
 	if runDir != want {
 		t.Fatalf("runDir = %q, want %q", runDir, want)
 	}
