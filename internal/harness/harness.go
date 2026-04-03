@@ -135,7 +135,8 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	}
 	agentsPath, err := h.Workspace.SeedAgentsFile(runDir)
 	if err != nil {
-		return h.fail(ExitWorkspace, "workspace", err, runDir)
+		h.logf("stage=workspace status=warn action=seed_agents err=%q", err)
+		agentsPath = ""
 	}
 	h.logf("stage=workspace status=ok run_dir=%s guid=%s agents=%s", runDir, guid, agentsPath)
 
@@ -192,7 +193,9 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	}
 	codexOpts := codexRunOptions{SkipGitRepoCheck: len(repos) > 1}
 	codexBasePrompt := workspaceCodexPrompt(cfg.Prompt, cfg.TargetSubdir, repos)
-	codexBasePrompt = withAgentsPrompt(codexBasePrompt, agentsPath)
+	if strings.TrimSpace(agentsPath) != "" {
+		codexBasePrompt = withAgentsPrompt(codexBasePrompt, agentsPath)
+	}
 	codexTargetLabel := codexTargetLabel(cfg.TargetSubdir, len(repos) > 1)
 
 	h.logf("stage=codex status=start target=%s", codexTargetLabel)
