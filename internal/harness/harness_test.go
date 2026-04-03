@@ -120,6 +120,114 @@ func TestRunHappyPathCreatesPR(t *testing.T) {
 	}
 }
 
+func TestRunNonMainBranchReusesExistingBranchAndPR(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	cfg.BaseBranch = "release/2026.04-hotfix"
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := filepath.Join("/tmp", "temp", guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
+	repoDir := filepath.Join(runDir, "repo")
+	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
+	prURL := "https://github.com/acme/repo/pull/77"
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
+		{cmd: addCommand(repoDir)},
+		{cmd: commitCommand(repoDir, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDir, cfg.BaseBranch)},
+		{cmd: prLookupByHeadCommand(repoDir, cfg.BaseBranch), res: execx.Result{Stdout: prURL + "\n"}},
+		{cmd: prChecksCommand(repoDir, prURL)},
+	}}
+
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = testWorkspaceManager(guid)
+	h.TargetDirOK = func(path string) bool { return path == targetDir }
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.ExitCode != ExitSuccess {
+		t.Fatalf("ExitCode = %d", res.ExitCode)
+	}
+	if got, want := res.Branch, cfg.BaseBranch; got != want {
+		t.Fatalf("Branch = %q, want %q", got, want)
+	}
+	if got, want := res.PRURL, prURL; got != want {
+		t.Fatalf("PRURL = %q, want %q", got, want)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
+	}
+}
+
+func TestRunNonMainBranchPushNonFastForwardRetriesWithRebase(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	cfg.BaseBranch = "release/2026.04-hotfix"
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := filepath.Join("/tmp", "temp", guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
+	repoDir := filepath.Join(runDir, "repo")
+	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
+	prURL := "https://github.com/acme/repo/pull/77"
+
+	pushRejected := execx.Result{
+		Stderr: "! [rejected]        release/2026.04-hotfix -> release/2026.04-hotfix (fetch first)\n",
+	}
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
+		{cmd: addCommand(repoDir)},
+		{cmd: commitCommand(repoDir, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDir, cfg.BaseBranch), res: pushRejected, err: errors.New("push rejected")},
+		{cmd: pullRebaseCommand(repoDir, cfg.BaseBranch)},
+		{cmd: pushCommand(repoDir, cfg.BaseBranch)},
+		{cmd: prLookupByHeadCommand(repoDir, cfg.BaseBranch), res: execx.Result{Stdout: prURL + "\n"}},
+		{cmd: prChecksCommand(repoDir, prURL)},
+	}}
+
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = testWorkspaceManager(guid)
+	h.TargetDirOK = func(path string) bool { return path == targetDir }
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.ExitCode != ExitSuccess {
+		t.Fatalf("ExitCode = %d", res.ExitCode)
+	}
+	if got, want := res.Branch, cfg.BaseBranch; got != want {
+		t.Fatalf("Branch = %q, want %q", got, want)
+	}
+	if got, want := res.PRURL, prURL; got != want {
+		t.Fatalf("PRURL = %q, want %q", got, want)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
+	}
+}
+
 func TestRunCodexFailureStopsBeforeCommitAndPR(t *testing.T) {
 	t.Parallel()
 
@@ -854,8 +962,81 @@ func TestCommandBuilders(t *testing.T) {
 	if workflowDispatch.Name != "gh" || workflowDispatch.Dir != repoDir || !reflect.DeepEqual(workflowDispatch.Args, wantWorkflowDispatch) {
 		t.Fatalf("workflow dispatch command unexpected: %+v", workflowDispatch)
 	}
+
+	pullRebase := pullRebaseCommand(repoDir, branch)
+	wantPullRebase := []string{"pull", "--rebase", "origin", branch}
+	if pullRebase.Name != "git" || pullRebase.Dir != repoDir || !reflect.DeepEqual(pullRebase.Args, wantPullRebase) {
+		t.Fatalf("pull rebase command unexpected: %+v", pullRebase)
+	}
 }
 
+func TestWithCompletionGatePromptIncludesFailureQueueContract(t *testing.T) {
+	t.Parallel()
+
+	got := withCompletionGatePrompt("Build API")
+	wantSnippets := []string{
+		"When a task fails:",
+		"Queue a follow-up task dedicated to reviewing the logs and fixing all underlying issues in this codebase.",
+		`{"repos":["git@github.com:jefking/how-i-want-to-code.git"],"base_branch":"main","target_subdir":".","prompt":"<DEFINE A STRONG CLEAR PROMPT THAT GOES IN HERE>"}`,
+		"Completion requirements:",
+	}
+	for _, snippet := range wantSnippets {
+		if !strings.Contains(got, snippet) {
+			t.Fatalf("withCompletionGatePrompt() missing snippet %q", snippet)
+		}
+	}
+}
+
+func TestShouldCreateWorkBranch(t *testing.T) {
+	t.Parallel()
+
+	if !shouldCreateWorkBranch("main") {
+		t.Fatal("shouldCreateWorkBranch(main) = false, want true")
+	}
+	if !shouldCreateWorkBranch(" refs/heads/main ") {
+		t.Fatal("shouldCreateWorkBranch(\" refs/heads/main \") = false, want true")
+	}
+	if !shouldCreateWorkBranch("origin/main") {
+		t.Fatal("shouldCreateWorkBranch(origin/main) = false, want true")
+	}
+	if shouldCreateWorkBranch("Main") {
+		t.Fatal("shouldCreateWorkBranch(Main) = true, want false")
+	}
+	if shouldCreateWorkBranch("release/hotfix") {
+		t.Fatal("shouldCreateWorkBranch(non-main) = true, want false")
+	}
+}
+
+func TestNormalizeBranchRef(t *testing.T) {
+	t.Parallel()
+
+	if got := normalizeBranchRef("refs/heads/release/2026.04-hotfix"); got != "release/2026.04-hotfix" {
+		t.Fatalf("normalizeBranchRef(refs/heads/*) = %q, want %q", got, "release/2026.04-hotfix")
+	}
+	if got := normalizeBranchRef("origin/release/2026.04-hotfix"); got != "release/2026.04-hotfix" {
+		t.Fatalf("normalizeBranchRef(origin/*) = %q, want %q", got, "release/2026.04-hotfix")
+	}
+	if normalizeBranchRef("Main") == normalizeBranchRef("main") {
+		t.Fatal("normalizeBranchRef(Main) equals normalizeBranchRef(main), want different")
+	}
+}
+
+func TestIsNonFastForwardPush(t *testing.T) {
+	t.Parallel()
+
+	if !isNonFastForwardPush(execx.Result{Stderr: "! [rejected] branch -> branch (fetch first)"}, errors.New("push failed")) {
+		t.Fatal("isNonFastForwardPush(fetch first) = false, want true")
+	}
+	if !isNonFastForwardPush(execx.Result{Stderr: "non-fast-forward"}, errors.New("push failed")) {
+		t.Fatal("isNonFastForwardPush(non-fast-forward) = false, want true")
+	}
+	if isNonFastForwardPush(execx.Result{Stderr: "permission denied"}, errors.New("push failed")) {
+		t.Fatal("isNonFastForwardPush(permission denied) = true, want false")
+	}
+	if isNonFastForwardPush(execx.Result{}, nil) {
+		t.Fatal("isNonFastForwardPush(nil err) = true, want false")
+	}
+}
 func containsSequence(args, seq []string) bool {
 	if len(seq) == 0 || len(seq) > len(args) {
 		return false

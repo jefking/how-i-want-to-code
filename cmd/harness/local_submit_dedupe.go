@@ -127,7 +127,7 @@ func (d *localSubmissionDeduper) Begin(key, requestID string) (bool, string, str
 	return true, "accepted", ""
 }
 
-func (d *localSubmissionDeduper) Done(key, requestID string) {
+func (d *localSubmissionDeduper) Done(key, requestID, finalState string) {
 	if d == nil {
 		return
 	}
@@ -136,6 +136,7 @@ func (d *localSubmissionDeduper) Done(key, requestID string) {
 		return
 	}
 	requestID = strings.TrimSpace(requestID)
+	finalState = strings.TrimSpace(finalState)
 
 	now := time.Now()
 	d.mu.Lock()
@@ -146,6 +147,10 @@ func (d *localSubmissionDeduper) Done(key, requestID string) {
 		if existingRequestID != "" {
 			requestID = existingRequestID
 		}
+	}
+	if finalState == "error" {
+		d.gcLocked(now)
+		return
 	}
 	if requestID != "" {
 		d.completed[key] = dedupeRecord{
