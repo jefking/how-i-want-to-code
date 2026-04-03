@@ -122,6 +122,7 @@ func (c *AdaptiveDispatchController) Acquire(ctx context.Context, requestID stri
 
 	var (
 		queued     bool
+		granted    bool
 		queueDepth int
 		running    int
 		allowed    int
@@ -134,7 +135,8 @@ func (c *AdaptiveDispatchController) Acquire(ctx context.Context, requestID stri
 	}
 	c.waiters = append(c.waiters, waiter)
 	c.tryGrantLocked()
-	queued = !waiter.granted
+	granted = waiter.granted
+	queued = !granted
 	if queued {
 		queueDepth = len(c.waiters)
 		running = c.running
@@ -152,7 +154,7 @@ func (c *AdaptiveDispatchController) Acquire(ctx context.Context, requestID stri
 		)
 	}
 
-	if waiter.granted {
+	if granted {
 		return c.releaseFunc(), nil
 	}
 
