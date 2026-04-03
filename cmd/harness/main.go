@@ -4,7 +4,6 @@ import (
 	"context"
 	"flag"
 	"fmt"
-	"log"
 	"os"
 	"os/signal"
 	"path/filepath"
@@ -69,7 +68,8 @@ func runSingle(args []string) int {
 		return harness.ExitConfig
 	}
 
-	logger := log.New(os.Stderr, "", 0)
+	logger := newDefaultTerminalLogger()
+	defer logger.Close()
 	h := harness.New(execx.OSRunner{})
 	h.Logf = logger.Printf
 
@@ -133,7 +133,8 @@ func runMultiplex(args []string) int {
 		return harness.ExitConfig
 	}
 
-	logger := log.New(os.Stderr, "", 0)
+	logger := newDefaultTerminalLogger()
+	defer logger.Close()
 	mx := multiplex.New(execx.OSRunner{})
 	mx.MaxParallel = *parallel
 	mx.Logf = logger.Printf
@@ -187,7 +188,8 @@ func runHub(args []string) int {
 		cfg.Dispatcher.MaxParallel = *parallel
 	}
 
-	logger := log.New(os.Stderr, "", 0)
+	logger := newDefaultTerminalLogger()
+	defer logger.Close()
 	runner := execx.OSRunner{}
 	monitorBroker := hubui.NewBroker()
 	daemonLogger := func(format string, args ...any) {
