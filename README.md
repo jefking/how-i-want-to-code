@@ -85,6 +85,12 @@ Hub mode starts a local monitor UI by default at `http://127.0.0.1:7777`.
 
 The local prompt panel defaults to a schema builder that stores requested repositories in browser local storage and reuses them as a repo picker. Raw JSON mode remains available for advanced or multi-repo payloads.
 
+Automatic mode is available as a runtime flag and hides the browser-local prompt form entirely:
+
+```bash
+./bin/harness hub --init templates/init.example.json --ui-automatic
+```
+
 Override or disable:
 
 ```bash

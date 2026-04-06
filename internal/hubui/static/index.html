@@ -5,6 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>MoltenHub Code</title>
   <script>
+    window.__HUB_UI_CONFIG__ = {"automaticMode":false};
+  </script>
+  <script>
     tailwind.config = {
       theme: {
         extend: {
@@ -166,6 +169,13 @@
       { id: "finalize", label: "Finalize", detail: "Commit, PR, and checks." },
     ];
 
+    function normalizeUIConfig(raw) {
+      const config = raw && typeof raw === "object" ? raw : {};
+      return {
+        automaticMode: Boolean(config.automaticMode),
+      };
+    }
+
     function loadDismissedTaskIDs() {
       try {
         const raw = localStorage.getItem(DISMISSED_TASKS_KEY);
@@ -200,6 +210,7 @@
     }
 
     const state = {
+      ui: normalizeUIConfig(window.__HUB_UI_CONFIG__),
       snapshot: null,
       selectedTaskId: "",
       dismissedTaskIDs: loadDismissedTaskIDs(),
@@ -232,6 +243,8 @@
     const builderBaseBranch = document.getElementById("builder-base-branch");
     const builderTargetSubdir = document.getElementById("builder-target-subdir");
     const builderPromptInput = document.getElementById("builder-prompt-input");
+    const rightCol = document.querySelector(".right-col");
+    const promptWrap = document.querySelector(".prompt-wrap");
 
     function setIndicator(dot, textNode, online, text) {
       dot.classList.toggle("online", online);
@@ -476,6 +489,19 @@
       localPromptHint.textContent = isRaw
         ? "Paste one JSON object with prompt and one of repo, repo_url, or repos. The UI normalizes JSON before submit."
         : "Select a repo, branch, subdir, and prompt in Builder mode. Use Raw JSON for multi-repo runs or advanced fields.";
+    }
+
+    function applyAutomaticMode() {
+      const automatic = Boolean(state.ui?.automaticMode);
+      if (promptWrap) {
+        promptWrap.classList.toggle("hidden", automatic);
+      }
+      if (rightCol) {
+        rightCol.classList.toggle("automatic-mode", automatic);
+      }
+      if (automatic) {
+        setLocalPromptStatus("warn", "Automatic mode enabled; browser prompt input is hidden.");
+      }
     }
 
     function relativeTime(iso) {
@@ -1203,6 +1229,7 @@
       // Builder starts empty until the user fills it in.
     }
     setPromptMode(state.promptMode);
+    applyAutomaticMode();
     loadInitial();
     startStream();
   </script>
