@@ -40,6 +40,19 @@ type Catalog struct {
 	byName map[string]TaskDefinition
 }
 
+var taskDefinitionFieldNames = map[string]struct{}{
+	"name":           {},
+	"description":    {},
+	"target_subdir":  {},
+	"prompt":         {},
+	"commit_message": {},
+	"pr_title":       {},
+	"pr_body":        {},
+	"labels":         {},
+	"github_handle":  {},
+	"reviewers":      {},
+}
+
 // LoadCatalog loads and validates library tasks from ./library/*.json.
 func LoadCatalog(dir string) (Catalog, error) {
 	dir = strings.TrimSpace(dir)
@@ -67,15 +80,17 @@ func LoadCatalog(dir string) (Catalog, error) {
 
 	catalog := Catalog{byName: map[string]TaskDefinition{}}
 	for _, path := range jsonFiles {
-		task, err := loadTaskDefinition(path)
+		tasks, err := loadTaskDefinitions(path)
 		if err != nil {
 			return Catalog{}, err
 		}
-		if _, exists := catalog.byName[task.Name]; exists {
-			return Catalog{}, fmt.Errorf("duplicate library task name %q", task.Name)
+		for _, task := range tasks {
+			if _, exists := catalog.byName[task.Name]; exists {
+				return Catalog{}, fmt.Errorf("duplicate library task name %q", task.Name)
+			}
+			catalog.byName[task.Name] = task
+			catalog.Tasks = append(catalog.Tasks, task)
 		}
-		catalog.byName[task.Name] = task
-		catalog.Tasks = append(catalog.Tasks, task)
 	}
 
 	return catalog, nil
@@ -141,16 +156,62 @@ func (c Catalog) ExpandRunConfig(taskName, repo, branch string) (config.Config, 
 	return cfg, nil
 }
 
-func loadTaskDefinition(path string) (TaskDefinition, error) {
+func loadTaskDefinitions(path string) ([]TaskDefinition, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return TaskDefinition{}, fmt.Errorf("read library task %s: %w", path, err)
+		return nil, fmt.Errorf("read library task %s: %w", path, err)
 	}
 
+	var raw map[string]json.RawMessage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return nil, fmt.Errorf("parse library task %s: %w", path, err)
+	}
+	if len(raw) == 0 {
+		return nil, fmt.Errorf("library task %s: at least one task is required", path)
+	}
+
+	if looksLikeSingleTaskDefinition(raw) {
+		task, err := decodeTaskDefinition(path, "", data)
+		if err != nil {
+			return nil, err
+		}
+		return []TaskDefinition{task}, nil
+	}
+
+	keys := make([]string, 0, len(raw))
+	for key := range raw {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	tasks := make([]TaskDefinition, 0, len(keys))
+	for _, key := range keys {
+		task, err := decodeTaskDefinition(path, key, raw[key])
+		if err != nil {
+			return nil, err
+		}
+		tasks = append(tasks, task)
+	}
+	return tasks, nil
+}
+
+func looksLikeSingleTaskDefinition(raw map[string]json.RawMessage) bool {
+	for key := range raw {
+		if _, ok := taskDefinitionFieldNames[key]; ok {
+			return true
+		}
+	}
+	return false
+}
+
+func decodeTaskDefinition(path, key string, data []byte) (TaskDefinition, error) {
 	var task TaskDefinition
 	dec := json.NewDecoder(bytes.NewReader(data))
 	dec.DisallowUnknownFields()
 	if err := dec.Decode(&task); err != nil {
+		if key != "" {
+			return TaskDefinition{}, fmt.Errorf("parse library task %s key %q: %w", path, key, err)
+		}
 		return TaskDefinition{}, fmt.Errorf("parse library task %s: %w", path, err)
 	}
 
@@ -162,6 +223,18 @@ func loadTaskDefinition(path string) (TaskDefinition, error) {
 	task.PRTitle = strings.TrimSpace(task.PRTitle)
 	task.PRBody = strings.TrimSpace(task.PRBody)
 	task.GitHubHandle = strings.TrimSpace(task.GitHubHandle)
+
+	if key != "" {
+		key = strings.TrimSpace(key)
+		if key == "" {
+			return TaskDefinition{}, fmt.Errorf("library task %s: task key is required", path)
+		}
+		if task.Name == "" {
+			task.Name = key
+		} else if task.Name != key {
+			return TaskDefinition{}, fmt.Errorf("library task %s key %q: name must match key when provided", path, key)
+		}
+	}
 
 	if task.Name == "" {
 		return TaskDefinition{}, fmt.Errorf("library task %s: name is required", path)

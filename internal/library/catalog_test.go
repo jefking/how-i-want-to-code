@@ -13,10 +13,11 @@ func TestLoadCatalogReadsJSONTasks(t *testing.T) {
 
 	dir := t.TempDir()
 	data := `{
-  "name": "security-review",
-  "description": "Audit security boundaries.",
-  "target_subdir": ".",
-  "prompt": "Review the repository."
+  "security-review": {
+    "description": "Audit security boundaries.",
+    "target_subdir": ".",
+    "prompt": "Review the repository."
+  }
 }`
 	if err := os.WriteFile(filepath.Join(dir, "security-review.json"), []byte(data), 0o644); err != nil {
 		t.Fatalf("write task: %v", err)
@@ -40,14 +41,68 @@ func TestLoadCatalogReadsJSONTasks(t *testing.T) {
 	}
 }
 
+func TestLoadCatalogSupportsMultipleKeyedTasksInOneFile(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	data := `{
+  "security-review": {
+    "description": "Audit security boundaries.",
+    "prompt": "Review the repository."
+  },
+  "unit-test-coverage": {
+    "target_subdir": ".",
+    "prompt": "Raise coverage."
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "tasks.json"), []byte(data), 0o644); err != nil {
+		t.Fatalf("write task: %v", err)
+	}
+
+	catalog, err := LoadCatalog(dir)
+	if err != nil {
+		t.Fatalf("LoadCatalog() error = %v", err)
+	}
+	if got, want := catalog.Names(), []string{"security-review", "unit-test-coverage"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Names() = %v, want %v", got, want)
+	}
+	if got, want := catalog.Tasks[0].TargetSubdir, "."; got != want {
+		t.Fatalf("TargetSubdir = %q, want %q", got, want)
+	}
+}
+
+func TestLoadCatalogSupportsLegacySingleTaskShape(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	data := `{
+  "name": "security-review",
+  "description": "Audit security boundaries.",
+  "target_subdir": ".",
+  "prompt": "Review the repository."
+}`
+	if err := os.WriteFile(filepath.Join(dir, "security-review.json"), []byte(data), 0o644); err != nil {
+		t.Fatalf("write task: %v", err)
+	}
+
+	catalog, err := LoadCatalog(dir)
+	if err != nil {
+		t.Fatalf("LoadCatalog() error = %v", err)
+	}
+	if got, want := catalog.Names(), []string{"security-review"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("Names() = %v, want %v", got, want)
+	}
+}
+
 func TestLoadCatalogRejectsUnknownFields(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
 	data := `{
-  "name": "broken-task",
-  "repos": ["git@github.com:acme/repo.git"],
-  "prompt": "x"
+  "broken-task": {
+    "repos": ["git@github.com:acme/repo.git"],
+    "prompt": "x"
+  }
 }`
 	if err := os.WriteFile(filepath.Join(dir, "broken.json"), []byte(data), 0o644); err != nil {
 		t.Fatalf("write task: %v", err)
@@ -58,6 +113,29 @@ func TestLoadCatalogRejectsUnknownFields(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 	if !strings.Contains(err.Error(), "unknown field") {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
+
+func TestLoadCatalogRejectsMismatchedInlineNameForKeyedTask(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	data := `{
+  "security-review": {
+    "name": "wrong-name",
+    "prompt": "Review the repository."
+  }
+}`
+	if err := os.WriteFile(filepath.Join(dir, "broken.json"), []byte(data), 0o644); err != nil {
+		t.Fatalf("write task: %v", err)
+	}
+
+	_, err := LoadCatalog(dir)
+	if err == nil {
+		t.Fatal("expected error, got nil")
+	}
+	if !strings.Contains(err.Error(), "name must match key") {
 		t.Fatalf("unexpected error: %v", err)
 	}
 }
