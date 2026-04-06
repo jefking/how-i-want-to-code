@@ -175,6 +175,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function toggleTerminalOutput(") {
 		t.Fatalf("expected index html to include terminal output toggle handler")
 	}
+	if !strings.Contains(markup, "function setTaskFullscreen(") {
+		t.Fatalf("expected index html to include full screen task toggle handler")
+	}
+	if !strings.Contains(markup, "function fullscreenTasks(") {
+		t.Fatalf("expected index html to exclude the main pseudo-task from full screen mode")
+	}
 	if !strings.Contains(markup, "function isMinimizedTask(") {
 		t.Fatalf("expected index html to include completed-task minimization handler")
 	}
@@ -184,11 +190,23 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="task-terminal-toggle"`) {
 		t.Fatalf("expected index html to include terminal output open/close button")
 	}
+	if !strings.Contains(markup, `id="task-fullscreen-toggle"`) {
+		t.Fatalf("expected index html to include tasks full screen toggle")
+	}
+	if !strings.Contains(markup, `id="task-fullscreen-list"`) {
+		t.Fatalf("expected index html to include full screen task list")
+	}
+	if !strings.Contains(markup, `id="task-fullscreen-terminal"`) {
+		t.Fatalf("expected index html to include full screen terminal output")
+	}
 	if !strings.Contains(markup, `id="local-conn-text"`) {
 		t.Fatalf("expected index html to include local connection indicator")
 	}
 	if !strings.Contains(markup, `id="hub-conn-text"`) {
 		t.Fatalf("expected index html to include moltenhub connection indicator")
+	}
+	if !strings.Contains(markup, `id="prompt-visibility-toggle"`) {
+		t.Fatalf("expected index html to include local prompt visibility toggle")
 	}
 	if !strings.Contains(markup, `id="resource-metrics-text"`) {
 		t.Fatalf("expected index html to include resource metrics indicator")
@@ -232,6 +250,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, "function rememberRepos(") {
 		t.Fatalf("expected index html to include repo history persistence")
+	}
+	if !strings.Contains(markup, "function togglePromptVisibility(") {
+		t.Fatalf("expected index html to include prompt visibility toggle handler")
+	}
+	if !strings.Contains(markup, "function applyPromptVisibility(") {
+		t.Fatalf("expected index html to include prompt visibility renderer")
+	}
+	if !strings.Contains(markup, `const PROMPT_VISIBILITY_KEY = "hubui.localPromptVisible";`) {
+		t.Fatalf("expected index html to persist prompt visibility preference")
 	}
 	if !strings.Contains(markup, "function handlePromptImagePaste(") {
 		t.Fatalf("expected index html to include screenshot paste handler")
@@ -291,11 +318,20 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-terminal-toggle") {
 		t.Fatalf("expected stylesheet to include terminal output toggle styles")
 	}
+	if !strings.Contains(css, ".task-fullscreen-toggle") {
+		t.Fatalf("expected stylesheet to include task full screen toggle styles")
+	}
+	if !strings.Contains(css, ".task-fullscreen") {
+		t.Fatalf("expected stylesheet to include full screen task layout styles")
+	}
 	if !strings.Contains(css, ".task.task-collapsed") {
 		t.Fatalf("expected stylesheet to include collapsed task styles")
 	}
 	if !strings.Contains(css, ".prompt-mode-tab") {
 		t.Fatalf("expected stylesheet to include prompt mode tab styles")
+	}
+	if !strings.Contains(css, ".prompt-visibility-toggle") {
+		t.Fatalf("expected stylesheet to include local prompt visibility toggle styles")
 	}
 	if !strings.Contains(css, ".prompt-grid") {
 		t.Fatalf("expected stylesheet to include prompt grid styles")
