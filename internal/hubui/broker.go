@@ -73,6 +73,7 @@ type ResourceMetrics struct {
 	CPUPercent    float64 `json:"cpu_percent,omitempty"`
 	MemoryPercent float64 `json:"memory_percent,omitempty"`
 	DiskIOMBs     float64 `json:"disk_io_mb_s,omitempty"`
+	NetworkMBs    float64 `json:"network_mb_s,omitempty"`
 	UpdatedAt     string  `json:"updated_at,omitempty"`
 }
 
@@ -530,7 +531,8 @@ func (b *Broker) updateResourceMetricsFromLineLocked(line string, fields map[str
 	cpu, okCPU := parseFloatField(fields["cpu"])
 	mem, okMem := parseFloatField(fields["memory"])
 	disk, okDisk := parseFloatField(fields["disk_io_mb_s"])
-	if !okCPU && !okMem && !okDisk {
+	network, okNetwork := parseFloatField(fields["network_mb_s"])
+	if !okCPU && !okMem && !okDisk && !okNetwork {
 		return
 	}
 
@@ -542,6 +544,9 @@ func (b *Broker) updateResourceMetricsFromLineLocked(line string, fields map[str
 	}
 	if okDisk {
 		b.resources.DiskIOMBs = disk
+	}
+	if okNetwork {
+		b.resources.NetworkMBs = network
 	}
 	b.resources.UpdatedAt = now.UTC().Format(time.RFC3339Nano)
 }

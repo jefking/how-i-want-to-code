@@ -48,6 +48,7 @@ type resourceSample struct {
 	CPUPercent    float64
 	MemoryPercent float64
 	DiskIOMBs     float64
+	NetworkMBs    float64
 }
 
 type resourceSampler interface {
@@ -55,12 +56,15 @@ type resourceSampler interface {
 }
 
 type defaultResourceSampler struct {
-	lastCPUTotal uint64
-	lastCPUIdle  uint64
-	lastDiskIO   uint64
-	lastDiskTS   time.Time
-	haveCPU      bool
-	haveDisk     bool
+	lastCPUTotal  uint64
+	lastCPUIdle   uint64
+	lastDiskIO    uint64
+	lastDiskTS    time.Time
+	lastNetworkIO uint64
+	lastNetworkTS time.Time
+	haveCPU       bool
+	haveDisk      bool
+	haveNetwork   bool
 }
 
 // NewAdaptiveDispatchController returns a queue-aware, adaptive dispatcher.
@@ -298,11 +302,12 @@ func (c *AdaptiveDispatchController) sampleAndUpdate() {
 		state = "adjusted"
 	}
 	c.logf(
-		"debug dispatcher status=window state=%s cpu=%.1f memory=%.1f disk_io_mb_s=%.1f allowed=%d max=%d running=%d queue_depth=%d",
+		"debug dispatcher status=window state=%s cpu=%.1f memory=%.1f disk_io_mb_s=%.1f network_mb_s=%.1f allowed=%d max=%d running=%d queue_depth=%d",
 		state,
 		avg.CPUPercent,
 		avg.MemoryPercent,
 		avg.DiskIOMBs,
+		avg.NetworkMBs,
 		nextAllowed,
 		c.cfg.MaxParallel,
 		running,
@@ -316,8 +321,8 @@ func averageResourceSample(values []resourceSample) resourceSample {
 	}
 
 	var (
-		cpuSum, memSum, diskSum       float64
-		cpuCount, memCount, diskCount int
+		cpuSum, memSum, diskSum, netSum             float64
+		cpuCount, memCount, diskCount, networkCount int
 	)
 	for _, value := range values {
 		if value.CPUPercent > 0 {
@@ -332,6 +337,10 @@ func averageResourceSample(values []resourceSample) resourceSample {
 			diskSum += value.DiskIOMBs
 			diskCount++
 		}
+		if value.NetworkMBs > 0 {
+			netSum += value.NetworkMBs
+			networkCount++
+		}
 	}
 
 	var out resourceSample
@@ -343,6 +352,9 @@ func averageResourceSample(values []resourceSample) resourceSample {
 	}
 	if diskCount > 0 {
 		out.DiskIOMBs = diskSum / float64(diskCount)
+	}
+	if networkCount > 0 {
+		out.NetworkMBs = netSum / float64(networkCount)
 	}
 	return out
 }
@@ -416,6 +428,10 @@ func (s *defaultResourceSampler) sampleLinux() (resourceSample, error) {
 	if err != nil {
 		return resourceSample{}, err
 	}
+	networkTotalBytes, err := readLinuxNetworkIOBytes("/proc/net/dev")
+	if err != nil {
+		return resourceSample{}, err
+	}
 
 	sample := resourceSample{
 		MemoryPercent: memPercent,
@@ -436,13 +452,27 @@ func (s *defaultResourceSampler) sampleLinux() (resourceSample, error) {
 	now := time.Now()
 	if s.haveDisk {
 		if elapsed := now.Sub(s.lastDiskTS).Seconds(); elapsed > 0 {
-			bytesDelta := diskTotalBytes - s.lastDiskIO
-			sample.DiskIOMBs = float64(bytesDelta) / elapsed / (1024 * 1024)
+			if diskTotalBytes >= s.lastDiskIO {
+				bytesDelta := diskTotalBytes - s.lastDiskIO
+				sample.DiskIOMBs = float64(bytesDelta) / elapsed / (1024 * 1024)
+			}
 		}
 	}
 	s.lastDiskIO = diskTotalBytes
 	s.lastDiskTS = now
 	s.haveDisk = true
+
+	if s.haveNetwork {
+		if elapsed := now.Sub(s.lastNetworkTS).Seconds(); elapsed > 0 {
+			if networkTotalBytes >= s.lastNetworkIO {
+				bytesDelta := networkTotalBytes - s.lastNetworkIO
+				sample.NetworkMBs = float64(bytesDelta) / elapsed / (1024 * 1024)
+			}
+		}
+	}
+	s.lastNetworkIO = networkTotalBytes
+	s.lastNetworkTS = now
+	s.haveNetwork = true
 
 	return sample, nil
 }
@@ -455,6 +485,7 @@ func (s *defaultResourceSampler) sampleWindows() (resourceSample, error) {
 		`\\Processor(_Total)\\% Processor Time`,
 		`\\Memory\\% Committed Bytes In Use`,
 		`\\PhysicalDisk(_Total)\\Disk Bytes/sec`,
+		`\\Network Interface(*)\\Bytes Total/sec`,
 	)
 	out, err := cmd.Output()
 	if err != nil {
@@ -471,7 +502,7 @@ func (s *defaultResourceSampler) sampleWindows() (resourceSample, error) {
 
 	data := rows[len(rows)-1]
 	if len(data) < 4 {
-		return resourceSample{}, fmt.Errorf("parse windows resource sample: expected 4 columns, got %d", len(data))
+		return resourceSample{}, fmt.Errorf("parse windows resource sample: expected at least 4 columns, got %d", len(data))
 	}
 
 	cpuPercent, err := parseFlexibleFloat(data[1])
@@ -486,11 +517,20 @@ func (s *defaultResourceSampler) sampleWindows() (resourceSample, error) {
 	if err != nil {
 		return resourceSample{}, fmt.Errorf("parse disk sample: %w", err)
 	}
+	var networkBytesPerSec float64
+	for i := 4; i < len(data); i++ {
+		v, parseErr := parseFlexibleFloat(data[i])
+		if parseErr != nil {
+			continue
+		}
+		networkBytesPerSec += v
+	}
 
 	return resourceSample{
 		CPUPercent:    clampFloat(cpuPercent, 0, 100),
 		MemoryPercent: clampFloat(memPercent, 0, 100),
 		DiskIOMBs:     maxFloat(0, diskBytesPerSec/(1024*1024)),
+		NetworkMBs:    maxFloat(0, networkBytesPerSec/(1024*1024)),
 	}, nil
 }
 
@@ -617,6 +657,42 @@ func readLinuxDiskIOBytes(path string) (uint64, error) {
 	return totalSectors * 512, nil
 }
 
+func readLinuxNetworkIOBytes(path string) (uint64, error) {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return 0, fmt.Errorf("read %s: %w", path, err)
+	}
+
+	var totalBytes uint64
+	for _, line := range strings.Split(string(data), "\n") {
+		line = strings.TrimSpace(line)
+		if line == "" || !strings.Contains(line, ":") {
+			continue
+		}
+		parts := strings.SplitN(line, ":", 2)
+		if len(parts) != 2 {
+			continue
+		}
+		device := strings.TrimSpace(parts[0])
+		if !includeLinuxNetworkDevice(device) {
+			continue
+		}
+
+		fields := strings.Fields(strings.TrimSpace(parts[1]))
+		if len(fields) < 9 {
+			continue
+		}
+		recvBytes, recvErr := strconv.ParseUint(fields[0], 10, 64)
+		txBytes, txErr := strconv.ParseUint(fields[8], 10, 64)
+		if recvErr != nil || txErr != nil {
+			continue
+		}
+		totalBytes += recvBytes + txBytes
+	}
+
+	return totalBytes, nil
+}
+
 var (
 	nvmeWholeDiskRE = regexp.MustCompile(`^nvme\d+n\d+$`)
 	mmcWholeDiskRE  = regexp.MustCompile(`^mmcblk\d+$`)
@@ -644,4 +720,12 @@ func includeLinuxDiskDevice(name string) bool {
 		return true
 	}
 	return false
+}
+
+func includeLinuxNetworkDevice(name string) bool {
+	name = strings.TrimSpace(name)
+	if name == "" {
+		return false
+	}
+	return name != "lo"
 }

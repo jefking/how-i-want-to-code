@@ -202,7 +202,7 @@ func TestAdaptiveDispatchControllerLogsWindowSamplesEvenWhenCapacityIsSteady(t *
 	}, func(format string, args ...any) {
 		lines = append(lines, fmt.Sprintf(format, args...))
 	})
-	controller.sample = staticSample{value: resourceSample{CPUPercent: 20, MemoryPercent: 35, DiskIOMBs: 2}}
+	controller.sample = staticSample{value: resourceSample{CPUPercent: 20, MemoryPercent: 35, DiskIOMBs: 2, NetworkMBs: 7.5}}
 
 	controller.sampleAndUpdate()
 
@@ -216,7 +216,7 @@ func TestAdaptiveDispatchControllerLogsWindowSamplesEvenWhenCapacityIsSteady(t *
 	if !strings.Contains(last, "state=steady") {
 		t.Fatalf("last log = %q, want steady state marker", last)
 	}
-	if !strings.Contains(last, "cpu=20.0") || !strings.Contains(last, "memory=35.0") || !strings.Contains(last, "disk_io_mb_s=2.0") {
+	if !strings.Contains(last, "cpu=20.0") || !strings.Contains(last, "memory=35.0") || !strings.Contains(last, "disk_io_mb_s=2.0") || !strings.Contains(last, "network_mb_s=7.5") {
 		t.Fatalf("last log = %q, want resource values", last)
 	}
 }

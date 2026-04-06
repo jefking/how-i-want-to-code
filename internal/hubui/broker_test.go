@@ -109,7 +109,7 @@ func TestBrokerTracksDispatcherResourceWindow(t *testing.T) {
 	t.Parallel()
 
 	b := NewBroker()
-	b.IngestLog("debug dispatcher status=window state=steady cpu=12.5 memory=48.2 disk_io_mb_s=3.7 allowed=2 max=4 running=1 queue_depth=0")
+	b.IngestLog("debug dispatcher status=window state=steady cpu=12.5 memory=48.2 disk_io_mb_s=3.7 network_mb_s=5.4 allowed=2 max=4 running=1 queue_depth=0")
 
 	snap := b.Snapshot()
 	if got := snap.Resources.CPUPercent; got != 12.5 {
@@ -120,6 +120,9 @@ func TestBrokerTracksDispatcherResourceWindow(t *testing.T) {
 	}
 	if got := snap.Resources.DiskIOMBs; got != 3.7 {
 		t.Fatalf("resources.disk_io_mb_s = %v, want 3.7", got)
+	}
+	if got := snap.Resources.NetworkMBs; got != 5.4 {
+		t.Fatalf("resources.network_mb_s = %v, want 5.4", got)
 	}
 	if snap.Resources.UpdatedAt == "" {
 		t.Fatal("resources.updated_at = empty, want timestamp")

@@ -211,6 +211,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="resource-metrics-text"`) {
 		t.Fatalf("expected index html to include resource metrics indicator")
 	}
+	if !strings.Contains(markup, `id="resource-network-text"`) {
+		t.Fatalf("expected index html to include network metrics indicator")
+	}
 	if !strings.Contains(markup, "function renderHubConnection(") {
 		t.Fatalf("expected index html to include renderHubConnection handler")
 	}

@@ -80,6 +80,7 @@
             <span id="resource-mem-text" class="status-value metric-value text-xs leading-tight text-slate-200">MEM --</span>
           </span>
           <span id="resource-metrics-text" class="status-value metric-value text-xs leading-tight text-slate-200">DISK --</span>
+          <span id="resource-network-text" class="status-value metric-value text-xs leading-tight text-slate-200">NET --</span>
         </div>
       </div>
     </div>
@@ -320,6 +321,7 @@
     const resourceMemIcon = document.getElementById("resource-mem-icon");
     const resourceMemText = document.getElementById("resource-mem-text");
     const resourceMetricsText = document.getElementById("resource-metrics-text");
+    const resourceNetworkText = document.getElementById("resource-network-text");
     const taskCount = document.getElementById("task-count");
     const taskList = document.getElementById("task-list");
     const taskFullscreenToggle = document.getElementById("task-fullscreen-toggle");
@@ -423,7 +425,7 @@
       iconNode.classList.add(metricSeverityClass(value));
     }
 
-    function setMetricText(cpu, mem, disk) {
+    function setMetricText(cpu, mem, disk, network) {
       if (resourceCPUText) {
         resourceCPUText.textContent = formatMetricValue("CPU", cpu, "%");
       }
@@ -432,6 +434,9 @@
       }
       if (resourceMetricsText) {
         resourceMetricsText.textContent = formatMetricValue("DISK", disk, " MB/s");
+      }
+      if (resourceNetworkText) {
+        resourceNetworkText.textContent = formatMetricValue("NET", network, " MB/s");
       }
       setMetricIcon(resourceCPUIcon, cpu);
       setMetricIcon(resourceMemIcon, mem);
@@ -442,18 +447,19 @@
         ? snapshot.resources
         : null;
       if (!resources) {
-        setMetricText(NaN, NaN, NaN);
+        setMetricText(NaN, NaN, NaN, NaN);
         return;
       }
 
       const cpu = Number(resources.cpu_percent);
       const mem = Number(resources.memory_percent);
       const disk = Number(resources.disk_io_mb_s);
-      if (!Number.isFinite(cpu) && !Number.isFinite(mem) && !Number.isFinite(disk)) {
-        setMetricText(NaN, NaN, NaN);
+      const network = Number(resources.network_mb_s);
+      if (!Number.isFinite(cpu) && !Number.isFinite(mem) && !Number.isFinite(disk) && !Number.isFinite(network)) {
+        setMetricText(NaN, NaN, NaN, NaN);
         return;
       }
-      setMetricText(cpu, mem, disk);
+      setMetricText(cpu, mem, disk, network);
     }
 
     function escapeLiteralNewlinesInJSONStrings(raw) {
