@@ -186,6 +186,7 @@ func TestRunNonMainBranchReusesExistingBranchAndPR(t *testing.T) {
 		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
 		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
 		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: fetchMainBranchCommand(repoDir)},
 		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 		{cmd: addCommand(repoDir)},
@@ -241,6 +242,7 @@ func TestRunNonMainBranchPushNonFastForwardRetriesWithRebase(t *testing.T) {
 		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
 		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
 		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: fetchMainBranchCommand(repoDir)},
 		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 		{cmd: addCommand(repoDir)},
@@ -832,6 +834,7 @@ func TestRunNonMainBranchReusesExistingPR(t *testing.T) {
 		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
 		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
 		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: fetchMainBranchCommand(repoDir)},
 		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 		{cmd: addCommand(repoDir)},
@@ -884,6 +887,7 @@ func TestRunNonMainBranchCreatesPRWithoutExplicitBaseWhenNoOpenPR(t *testing.T) 
 		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
 		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
 		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: fetchMainBranchCommand(repoDir)},
 		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 		{cmd: addCommand(repoDir)},
@@ -926,6 +930,10 @@ func TestCommandBuilders(t *testing.T) {
 	clone := cloneCommand(cfg, repoDir)
 	if clone.Name != "git" || !reflect.DeepEqual(clone.Args, []string{"clone", "--branch", "main", "--single-branch", cfg.RepoURL, repoDir}) {
 		t.Fatalf("clone command unexpected: %+v", clone)
+	}
+	fetchMain := fetchMainBranchCommand(repoDir)
+	if fetchMain.Name != "git" || fetchMain.Dir != repoDir || !reflect.DeepEqual(fetchMain.Args, []string{"fetch", "origin", "main:refs/remotes/origin/main"}) {
+		t.Fatalf("fetch main command unexpected: %+v", fetchMain)
 	}
 	authStatus := authCommand()
 	if authStatus.Name != "gh" || !reflect.DeepEqual(authStatus.Args, []string{"auth", "status"}) {
