@@ -145,6 +145,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function renderHubConnection(") {
 		t.Fatalf("expected index html to include renderHubConnection handler")
 	}
+	if !strings.Contains(markup, `id="prompt-mode-builder"`) {
+		t.Fatalf("expected index html to include builder mode toggle")
+	}
+	if !strings.Contains(markup, `id="builder-repo-select"`) {
+		t.Fatalf("expected index html to include repo history select")
+	}
+	if !strings.Contains(markup, "function rememberRepos(") {
+		t.Fatalf("expected index html to include repo history persistence")
+	}
 }
 
 func TestHandlerServesStaticCSS(t *testing.T) {
@@ -171,6 +180,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".task.task-collapsed") {
 		t.Fatalf("expected stylesheet to include collapsed task styles")
+	}
+	if !strings.Contains(css, ".prompt-mode-tab") {
+		t.Fatalf("expected stylesheet to include prompt mode tab styles")
+	}
+	if !strings.Contains(css, ".prompt-grid") {
+		t.Fatalf("expected stylesheet to include prompt grid styles")
 	}
 }
 
