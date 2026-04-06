@@ -459,7 +459,7 @@ func failureFollowUpRunConfig(failedRequestID string, failedResult harness.Resul
 
 func failureFollowUpPrompt(failedRequestID string, failedResult harness.Result, logPaths []string) string {
 	var b strings.Builder
-	b.WriteString("Investigate and fix the root causes of a failed harness task in this codebase.")
+	b.WriteString("Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results.")
 
 	if id := strings.TrimSpace(failedRequestID); id != "" {
 		b.WriteString("\n\nFailed request ID: ")
@@ -491,6 +491,7 @@ func failureFollowUpPrompt(failedRequestID string, failedResult harness.Result, 
 	b.WriteString("\n\nRequired outcome:")
 	b.WriteString("\n- Start by reading the log paths above.")
 	b.WriteString("\n- Fix all underlying issues in code/tests/workflows; do not apply superficial bandaids.")
+	b.WriteString("\n- Treat every error in the referenced logs as actionable until you have either fixed it or proven it is not causal.")
 	b.WriteString("\n- Validate the fixes locally where possible and summarize what was verified.")
 
 	return strings.TrimSpace(b.String())

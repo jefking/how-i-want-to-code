@@ -74,8 +74,8 @@ jobs:
           tags: |
             type=raw,value=vnext,enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
             type=raw,value=vnext,enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.channel == 'pre-production' }}
-            type=raw,value=gitbuild-${{ github.run_number }}-${{ github.run_attempt }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
-            type=raw,value=gitbuild-${{ github.run_number }}-${{ github.run_attempt }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.channel == 'pre-production' }}
+            type=raw,value=${{ github.run_number }},enable=${{ github.event_name == 'push' && github.ref == 'refs/heads/main' }}
+            type=raw,value=${{ github.run_number }},enable=${{ github.event_name == 'workflow_dispatch' && github.event.inputs.channel == 'pre-production' }}
 
       - name: Build and push
         uses: docker/build-push-action@v6
