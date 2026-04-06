@@ -36,6 +36,13 @@ Build a container image:
 docker build -t moltenhub-code:latest .
 ```
 
+GitHub Actions publish flow:
+
+- pushes to `main` publish `moltenai/moltenhub-code:vnext`
+- published GitHub releases publish `moltenai/moltenhub-code:latest`
+- manual dispatch supports either channel
+- required repository secret: `DOCKERHUB_TOKEN`
+
 Run with PAT auth via `GITHUB_TOKEN`:
 
 ```bash
@@ -125,7 +132,7 @@ Runtime logs are mirrored to `.log`:
 When a task fails (local or hub-dispatched), the harness queues a follow-up local task that:
 
 - includes relevant failing log paths in prompt context
-- uses run config shape: `{"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"base_branch":"main","target_subdir":".","prompt":"..."}`
+- uses run config shape: `{"repos":["git@github.com:jefking/moltenhub-code.git"],"base_branch":"main","target_subdir":".","prompt":"..."}`
 - asks for root-cause fixes (not superficial bandaids)
 
 ## Exit Codes
