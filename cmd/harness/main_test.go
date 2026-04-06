@@ -190,4 +190,7 @@ func TestFailureFollowUpRunConfigUsesRequiredPayloadShapeAndLogContext(t *testin
 	if !strings.Contains(cfg.Prompt, "clone: repository not found") {
 		t.Fatalf("Prompt missing failure summary: %q", cfg.Prompt)
 	}
+	if !strings.Contains(cfg.Prompt, "Review the failing log paths first, identify every root cause behind the failed task") {
+		t.Fatalf("Prompt missing strong remediation instruction: %q", cfg.Prompt)
+	}
 }
