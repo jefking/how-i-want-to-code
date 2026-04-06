@@ -128,6 +128,11 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	if _, err := h.runCommand(ctx, "auth", authCommand()); err != nil {
 		return h.fail(ExitAuth, "auth", err, "")
 	}
+	if hasGitHubAuthToken() {
+		if _, err := h.runCommand(ctx, "auth", authSetupGitCommand()); err != nil {
+			return h.fail(ExitAuth, "auth", err, "")
+		}
+	}
 	h.logf("stage=auth status=ok")
 
 	h.logf("stage=workspace status=start")
@@ -770,6 +775,14 @@ func authCommand() execx.Command {
 	return execx.Command{Name: "gh", Args: []string{"auth", "status"}}
 }
 
+func authSetupGitCommand() execx.Command {
+	return execx.Command{Name: "gh", Args: []string{"auth", "setup-git"}}
+}
+
+func hasGitHubAuthToken() bool {
+	return strings.TrimSpace(os.Getenv("GH_TOKEN")) != "" || strings.TrimSpace(os.Getenv("GITHUB_TOKEN")) != ""
+}
+
 func cloneCommand(cfg config.Config, repoDir string) execx.Command {
 	return cloneRepoCommand(cfg.RepoURL, cfg.BaseBranch, repoDir)
 }
@@ -938,7 +951,7 @@ When a task fails:
 - Queue a follow-up task dedicated to reviewing the logs and fixing all underlying issues in this codebase.
 - Pass the relevant failing file/folder log path(s) into that follow-up task context.
 - Use this follow-up run config payload shape:
-  {"repos":["git@github.com:jefking/moltenhub-code.git"],"base_branch":"main","target_subdir":".","prompt":"<DEFINE A STRONG CLEAR PROMPT THAT GOES IN HERE>"}
+  {"repos":["git@github.com:jefking/how-i-want-to-code.git"],"base_branch":"main","target_subdir":".","prompt":"<DEFINE A STRONG CLEAR PROMPT THAT GOES IN HERE>"}
 
 Completion requirements:
 - Only create a new branch when starting from 'main'; if you're fixing an existing non-'main' branch, stay on it.
