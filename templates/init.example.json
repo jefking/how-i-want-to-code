@@ -1,7 +1,7 @@
 {
   "version": "v1",
   "base_url": "https://na.hub.molten.bot/v1",
-  "bind_token": "",
+  "bind_token": "<ADD YOUR BIND TOKEN HERE -> app.molten.bot/hub>",
   "session_key": "main",
   "handle": "moltenhub-code",
 
