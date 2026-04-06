@@ -136,6 +136,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function isMinimizedTask(") {
 		t.Fatalf("expected index html to include completed-task minimization handler")
 	}
+	if !strings.Contains(markup, "const COMPLETED_TASK_RETENTION_MS = 5 * 60 * 1000;") {
+		t.Fatalf("expected index html to include completed-task retention timeout")
+	}
+	if !strings.Contains(markup, "function shouldAutoHideCompletedTask(") {
+		t.Fatalf("expected index html to include completed-task auto-hide handler")
+	}
+	if !strings.Contains(markup, "window.setInterval(() => {") {
+		t.Fatalf("expected index html to include periodic task refresh timer")
+	}
 	if !strings.Contains(markup, `"task-collapsed"`) {
 		t.Fatalf("expected index html to include collapsed task class usage")
 	}

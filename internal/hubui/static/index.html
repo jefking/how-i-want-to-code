@@ -120,6 +120,9 @@
     const TASK_PROMPT_PREVIEW_MAX = 30;
     const DISMISSED_TASKS_KEY = "hubui.dismissedTaskIds";
     const COMPLETED_STATUSES = new Set(["ok", "no_changes", "error", "invalid", "duplicate"]);
+    const AUTO_HIDE_COMPLETED_STATUSES = new Set(["ok", "no_changes"]);
+    const COMPLETED_TASK_RETENTION_MS = 5 * 60 * 1000;
+    const RENDER_TICK_MS = 30 * 1000;
     const TASK_PROGRESS_STEPS = [
       { id: "received", label: "Task Received", detail: "Dispatch accepted by hub." },
       { id: "run", label: "Run Started", detail: "Harness run initialized." },
@@ -386,6 +389,21 @@
       return COMPLETED_STATUSES.has(task.status || "");
     }
 
+    function shouldAutoHideCompletedTask(task) {
+      if (!task || task.request_id === MAIN_TASK_ID) {
+        return false;
+      }
+      if (!AUTO_HIDE_COMPLETED_STATUSES.has(task.status || "")) {
+        return false;
+      }
+
+      const updatedAt = Date.parse(task.updated_at || task.started_at || "");
+      if (Number.isNaN(updatedAt)) {
+        return false;
+      }
+      return (Date.now() - updatedAt) >= COMPLETED_TASK_RETENTION_MS;
+    }
+
     function isMinimizedTask(task) {
       return isCompletedTask(task);
     }
@@ -529,6 +547,9 @@
 
       const taskItems = (snapshot.tasks || []).filter((task) => {
         if (!task || !task.request_id) {
+          return false;
+        }
+        if (shouldAutoHideCompletedTask(task)) {
           return false;
         }
         if (!state.dismissedTaskIDs.has(task.request_id)) {
@@ -945,6 +966,11 @@
     localPromptForm.addEventListener("submit", submitLocalPrompt);
     loadInitial();
     startStream();
+    window.setInterval(() => {
+      if (state.snapshot) {
+        render(state.snapshot);
+      }
+    }, RENDER_TICK_MS);
   </script>
 </body>
 </html>
