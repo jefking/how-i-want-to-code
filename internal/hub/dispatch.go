@@ -136,7 +136,6 @@ func parseRunConfigValue(v any) (config.Config, error) {
 
 	var cfg config.Config
 	dec := json.NewDecoder(bytes.NewReader(encoded))
-	dec.DisallowUnknownFields()
 	if err := dec.Decode(&cfg); err != nil {
 		return config.Config{}, fmt.Errorf("decode run config payload: %w", err)
 	}
@@ -232,7 +231,7 @@ func requiredSkillPayloadSchema(dispatchType, skillName string) map[string]any {
 		},
 		"run_config_schema": map[string]any{
 			"type":                 "object",
-			"additionalProperties": false,
+			"additionalProperties": true,
 			"required":             []string{"prompt"},
 			"anyOf": []map[string]any{
 				{"required": []string{"repo"}},

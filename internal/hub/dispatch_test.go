@@ -259,7 +259,7 @@ func TestParseSkillDispatchMatchesLegacyCurrentAndRenamedSkillAliases(t *testing
 	}
 }
 
-func TestParseSkillDispatchRejectsUnknownConfigFields(t *testing.T) {
+func TestParseSkillDispatchIgnoresUnknownConfigFields(t *testing.T) {
 	t.Parallel()
 
 	msg := map[string]any{
@@ -276,11 +276,8 @@ func TestParseSkillDispatchRejectsUnknownConfigFields(t *testing.T) {
 	if !matched {
 		t.Fatal("matched = false, want true")
 	}
-	if err == nil {
-		t.Fatal("expected error, got nil")
-	}
-	if !strings.Contains(err.Error(), "unknown field") {
-		t.Fatalf("unexpected error: %v", err)
+	if err != nil {
+		t.Fatalf("ParseSkillDispatch() error = %v", err)
 	}
 }
 
@@ -328,6 +325,27 @@ func TestParseRunConfigJSONWithReposArray(t *testing.T) {
 	}
 	if cfg.RepoURL != "git@github.com:acme/repo-one.git" {
 		t.Fatalf("RepoURL = %q", cfg.RepoURL)
+	}
+}
+
+func TestParseRunConfigJSONIgnoresUnknownFields(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := ParseRunConfigJSON([]byte(`{
+		"repo": "git@github.com:acme/repo.git",
+		"base_branch": "main",
+		"target_subdir": ".",
+		"prompt": "make a change",
+		"extra_field": {"ignored": true}
+	}`))
+	if err != nil {
+		t.Fatalf("ParseRunConfigJSON() error = %v", err)
+	}
+	if cfg.RepoURL != "git@github.com:acme/repo.git" {
+		t.Fatalf("RepoURL = %q", cfg.RepoURL)
+	}
+	if cfg.Prompt != "make a change" {
+		t.Fatalf("Prompt = %q", cfg.Prompt)
 	}
 }
 
