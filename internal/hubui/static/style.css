@@ -227,6 +227,14 @@ body {
   gap: 16px;
 }
 
+.right-col.automatic-mode {
+  grid-template-rows: minmax(240px, 38%) minmax(320px, 1fr);
+}
+
+.prompt-wrap.hidden {
+  display: none;
+}
+
 .prompt-form {
   display: grid;
   gap: 10px;
@@ -774,6 +782,9 @@ select.prompt-control {
   }
   .right-col {
     grid-template-rows: minmax(250px, 40vh) minmax(220px, 34vh) minmax(260px, 46vh);
+  }
+  .right-col.automatic-mode {
+    grid-template-rows: minmax(240px, 38vh) minmax(320px, 1fr);
   }
   .prompt-grid {
     grid-template-columns: minmax(0, 1fr);

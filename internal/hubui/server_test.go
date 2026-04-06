@@ -157,6 +157,28 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function rememberRepos(") {
 		t.Fatalf("expected index html to include repo history persistence")
 	}
+	if !strings.Contains(markup, `window.__HUB_UI_CONFIG__ = {"automaticMode":false};`) {
+		t.Fatalf("expected index html to include default UI config")
+	}
+}
+
+func TestHandlerIndexInjectsAutomaticModeConfig(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	srv.AutomaticMode = true
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d", resp.Code)
+	}
+
+	markup := resp.Body.String()
+	if !strings.Contains(markup, `window.__HUB_UI_CONFIG__ = {"automaticMode":true};`) {
+		t.Fatalf("expected automatic mode UI config, got %q", markup)
+	}
 }
 
 func TestHandlerServesStaticCSS(t *testing.T) {
