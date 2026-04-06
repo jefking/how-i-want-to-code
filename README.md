@@ -102,12 +102,13 @@ Override or disable:
 
 Required:
 
-- `prompt`
+- one of `prompt` or `library_task_name`
 - one of `repo`, `repo_url`, or `repos`
 
 Common optional fields:
 
 - `base_branch` (default `main`)
+- `branch` (alias for `base_branch`, mainly for library-backed skill calls)
 - `target_subdir` (default `.`)
 - `commit_message`
 - `pr_title` (auto-prefixed with `moltenhub-`)
@@ -117,6 +118,16 @@ Common optional fields:
 - `reviewers`
 
 Example: [`templates/run.example.json`](templates/run.example.json)
+
+Library-backed runs can also use:
+
+```json
+{
+  "repo": "git@github.com:acme/target-repo.git",
+  "branch": "main",
+  "library_task_name": "unit-test-coverage"
+}
+```
 
 ## Hub Init Config (`v1`)
 
@@ -141,7 +152,7 @@ Runtime logs are mirrored to `.log`:
 When a task fails (local or hub-dispatched), the harness queues a follow-up local task that:
 
 - includes relevant failing log paths in prompt context
-- uses run config shape: `{"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"base_branch":"main","target_subdir":".","prompt":"..."}`
+- uses run config shape: `{"repos":["git@github.com:jefking/moltenhub-code.git"],"base_branch":"main","target_subdir":".","prompt":"..."}`
 - asks for root-cause fixes (not superficial bandaids)
 
 ## Exit Codes
