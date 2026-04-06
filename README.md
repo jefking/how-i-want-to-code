@@ -82,6 +82,8 @@ Hub listener:
 
 Hub mode starts a local monitor UI by default at `http://127.0.0.1:7777`.
 
+The local prompt panel defaults to a schema builder that stores requested repositories in browser local storage and reuses them as a repo picker. Raw JSON mode remains available for advanced or multi-repo payloads.
+
 Override or disable:
 
 ```bash

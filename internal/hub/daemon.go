@@ -569,7 +569,12 @@ func dispatchResultPayload(cfg InitConfig, dispatch SkillDispatch, res harness.R
 	if res.Err != nil {
 		errText := res.Err.Error()
 		payload["error"] = errText
-		payload["message"] = "task failed: " + errText
+		payload["message"] = "task failed; error details included"
+		payload["failure"] = map[string]any{
+			"message": "task failed",
+			"error":   errText,
+			"details": result,
+		}
 	}
 	if dispatch.ReplyTo != "" {
 		payload["reply_to"] = dispatch.ReplyTo

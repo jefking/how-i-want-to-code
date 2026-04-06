@@ -204,7 +204,90 @@ body {
   display: grid;
   gap: 10px;
   padding: 12px;
-  grid-template-rows: auto auto auto;
+}
+
+.prompt-panel.hidden {
+  display: none;
+}
+
+.prompt-mode-tabs {
+  display: inline-flex;
+  padding: 4px;
+  border-radius: 10px;
+  border: 1px solid var(--border);
+  background: #0d1825;
+}
+
+.prompt-mode-tab {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 0.73rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color .12s ease, color .12s ease;
+}
+
+.prompt-mode-tab.active {
+  background: #23405d;
+  color: #eef6ff;
+}
+
+.prompt-grid {
+  display: grid;
+  gap: 10px;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.prompt-field {
+  display: grid;
+  gap: 6px;
+}
+
+.prompt-label {
+  color: var(--meta);
+  font-size: 0.69rem;
+  font-weight: 700;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.prompt-control {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #0d1825;
+  color: #d8e4f2;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+}
+
+.prompt-control:focus {
+  outline: 1px solid #6a8aac;
+  border-color: #6a8aac;
+}
+
+.prompt-input,
+.prompt-control[type="text"],
+select.prompt-control {
+  min-height: 40px;
+  padding: 9px 10px;
+  font-size: 0.79rem;
+}
+
+select.prompt-control {
+  appearance: none;
+  background-image:
+    linear-gradient(45deg, transparent 50%, #8cb3d8 50%),
+    linear-gradient(135deg, #8cb3d8 50%, transparent 50%);
+  background-position:
+    calc(100% - 18px) calc(50% - 3px),
+    calc(100% - 12px) calc(50% - 3px);
+  background-size: 6px 6px, 6px 6px;
+  background-repeat: no-repeat;
 }
 
 .prompt-text {
@@ -664,5 +747,8 @@ body {
   }
   .right-col {
     grid-template-rows: minmax(250px, 40vh) minmax(220px, 34vh) minmax(260px, 46vh);
+  }
+  .prompt-grid {
+    grid-template-columns: minmax(0, 1fr);
   }
 }
