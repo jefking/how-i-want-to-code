@@ -569,7 +569,15 @@ func dispatchResultPayload(cfg InitConfig, dispatch SkillDispatch, res harness.R
 	if res.Err != nil {
 		errText := res.Err.Error()
 		payload["error"] = errText
-		payload["message"] = "task failed: " + errText
+		payload["message"] = "failure: task failed with error details: " + errText
+		payload["error_details"] = map[string]any{
+			"message":       errText,
+			"exit_code":     res.ExitCode,
+			"workspace_dir": res.WorkspaceDir,
+			"branch":        res.Branch,
+			"pr_url":        res.PRURL,
+			"no_changes":    res.NoChanges,
+		}
 	}
 	if dispatch.ReplyTo != "" {
 		payload["reply_to"] = dispatch.ReplyTo

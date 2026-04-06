@@ -112,6 +112,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `href="/static/style.css"`) {
 		t.Fatalf("expected index html to include external stylesheet link")
 	}
+	if !strings.Contains(markup, `src="https://molten.bot/logo.svg"`) {
+		t.Fatalf("expected index html to include molten logo")
+	}
 	if !strings.Contains(markup, `"task-close"`) {
 		t.Fatalf("expected index html to include task close class usage")
 	}
