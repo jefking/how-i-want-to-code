@@ -96,12 +96,13 @@ Override or disable:
 
 Required:
 
-- `prompt`
+- one of `prompt` or `library_task_name`
 - one of `repo`, `repo_url`, or `repos`
 
 Common optional fields:
 
 - `base_branch` (default `main`)
+- `branch` (alias for `base_branch`, mainly for library-backed skill calls)
 - `target_subdir` (default `.`)
 - `commit_message`
 - `pr_title` (auto-prefixed with `moltenhub-`)
@@ -111,6 +112,16 @@ Common optional fields:
 - `reviewers`
 
 Example: [`templates/run.example.json`](templates/run.example.json)
+
+Library-backed runs can also use:
+
+```json
+{
+  "repo": "git@github.com:acme/target-repo.git",
+  "branch": "main",
+  "library_task_name": "unit-test-coverage"
+}
+```
 
 ## Hub Init Config (`v1`)
 
