@@ -929,13 +929,6 @@ select.prompt-control {
   box-shadow: 0 0 0 3px rgba(86, 191, 255, 0.16);
 }
 
-.task-progress-label {
-  color: var(--meta);
-  font-size: 0.68rem;
-  text-transform: uppercase;
-  letter-spacing: 0.05em;
-}
-
 .task-output-list {
   margin-top: 8px;
   border-top: 1px dashed rgba(125, 154, 185, 0.32);

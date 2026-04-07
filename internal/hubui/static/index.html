@@ -1541,12 +1541,8 @@
         steps.appendChild(marker);
       }
 
-      const label = document.createElement("div");
-      label.className = "task-progress-label";
-      label.textContent = `current step: ${TASK_PROGRESS_STEPS[index].label}`;
-
       track.append(line, steps);
-      progress.append(track, label);
+      progress.append(track);
       return progress;
     }
 

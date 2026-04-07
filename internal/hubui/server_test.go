@@ -175,6 +175,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function renderTaskProgress(") {
 		t.Fatalf("expected index html to include renderTaskProgress handler")
 	}
+	if strings.Contains(markup, "current step:") {
+		t.Fatalf("expected index html to remove current step label text from task progress")
+	}
 	if !strings.Contains(markup, "function formatTaskBranch(") {
 		t.Fatalf("expected index html to include branch formatter for task metadata")
 	}
