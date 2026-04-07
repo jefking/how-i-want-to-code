@@ -70,8 +70,6 @@ func ParseSkillDispatch(msg map[string]any, expectedType, expectedSkill string) 
 		ReplyTo: firstNonEmpty(
 			stringAt(msg, "reply_to"),
 			stringAt(msg, "replyTo"),
-			stringAt(msg, "to_agent_uri"),
-			stringAt(msg, "to_agent_uuid"),
 			stringAt(msg, "from"),
 			stringAt(msg, "source"),
 			stringAt(msg, "source_agent_uri"),
@@ -82,8 +80,28 @@ func ParseSkillDispatch(msg map[string]any, expectedType, expectedSkill string) 
 			stringAt(msg, "from_agent_id"),
 			stringAtPath(msg, "payload", "reply_to"),
 			stringAtPath(msg, "payload", "from"),
+			stringAtPath(msg, "payload", "source"),
+			stringAtPath(msg, "payload", "source_agent_uri"),
+			stringAtPath(msg, "payload", "source_agent_uuid"),
+			stringAtPath(msg, "payload", "source_agent_id"),
+			stringAtPath(msg, "payload", "from_agent_uri"),
+			stringAtPath(msg, "payload", "from_agent_uuid"),
+			stringAtPath(msg, "payload", "from_agent_id"),
 			stringAtPath(msg, "data", "reply_to"),
 			stringAtPath(msg, "data", "from"),
+			stringAtPath(msg, "data", "source"),
+			stringAtPath(msg, "data", "source_agent_uri"),
+			stringAtPath(msg, "data", "source_agent_uuid"),
+			stringAtPath(msg, "data", "source_agent_id"),
+			stringAtPath(msg, "data", "from_agent_uri"),
+			stringAtPath(msg, "data", "from_agent_uuid"),
+			stringAtPath(msg, "data", "from_agent_id"),
+			stringAt(msg, "to_agent_uri"),
+			stringAt(msg, "to_agent_uuid"),
+			stringAtPath(msg, "payload", "to_agent_uri"),
+			stringAtPath(msg, "payload", "to_agent_uuid"),
+			stringAtPath(msg, "data", "to_agent_uri"),
+			stringAtPath(msg, "data", "to_agent_uuid"),
 		),
 	}
 
@@ -187,6 +205,8 @@ func extractConfigValue(msg map[string]any) (any, bool) {
 		{"payload", "input"},
 		{"data", "config"},
 		{"data", "input"},
+		{"payload"},
+		{"data"},
 	}
 	for _, path := range paths {
 		if value, ok := valueAtPath(msg, path...); ok {
