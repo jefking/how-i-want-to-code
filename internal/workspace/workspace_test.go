@@ -10,7 +10,10 @@ import (
 func TestSelectBasePrefersDevShm(t *testing.T) {
 	t.Parallel()
 
-	m := Manager{PathExists: func(path string) bool { return path == "/dev/shm" }}
+	m := Manager{
+		PathExists: func(path string) bool { return path == "/dev/shm" },
+		CanExec:    func(string) bool { return true },
+	}
 	if got := m.SelectBase(); got != "/dev/shm" {
 		t.Fatalf("SelectBase() = %q", got)
 	}
@@ -25,12 +28,25 @@ func TestSelectBaseFallsBackToTmp(t *testing.T) {
 	}
 }
 
+func TestSelectBaseFallsBackToTmpWhenDevShmIsNoExec(t *testing.T) {
+	t.Parallel()
+
+	m := Manager{
+		PathExists: func(path string) bool { return path == "/dev/shm" },
+		CanExec:    func(path string) bool { return path != "/dev/shm" },
+	}
+	if got := m.SelectBase(); got != "/tmp" {
+		t.Fatalf("SelectBase() = %q", got)
+	}
+}
+
 func TestCreateRunDirUsesGUIDSubfolder(t *testing.T) {
 	t.Parallel()
 
 	var createdPath string
 	m := Manager{
 		PathExists: func(path string) bool { return path == "/dev/shm" },
+		CanExec:    func(string) bool { return true },
 		NewGUID:    func() string { return "abc123" },
 		MkdirAll: func(path string, _ os.FileMode) error {
 			createdPath = path
@@ -106,6 +122,7 @@ func TestCreateRunDirFallsBackWhenDevShmCreateFails(t *testing.T) {
 	var created []string
 	m := Manager{
 		PathExists: func(path string) bool { return path == "/dev/shm" },
+		CanExec:    func(string) bool { return true },
 		NewGUID:    func() string { return "abc123" },
 		MkdirAll: func(path string, _ os.FileMode) error {
 			created = append(created, path)
@@ -245,5 +262,50 @@ func TestResolveAgentsSeedPathUsesEnvOverride(t *testing.T) {
 	t.Setenv(agentsSeedEnv, seedPath)
 	if got := resolveAgentsSeedPath(); got != seedPath {
 		t.Fatalf("resolveAgentsSeedPath() = %q, want %q", got, seedPath)
+	}
+}
+
+func TestParseMountInfoLineCollectsMountAndSuperOptions(t *testing.T) {
+	t.Parallel()
+
+	line := "31 24 0:27 / /dev/shm rw,nosuid,nodev,noexec,relatime - tmpfs shm rw,size=65536k,inode64"
+	mountPoint, options, ok := parseMountInfoLine(line)
+	if !ok {
+		t.Fatal("parseMountInfoLine() ok = false, want true")
+	}
+	if mountPoint != "/dev/shm" {
+		t.Fatalf("mountPoint = %q, want /dev/shm", mountPoint)
+	}
+	opts := parseMountOptions(options)
+	if _, has := opts["noexec"]; !has {
+		t.Fatalf("options = %q, want to include noexec", options)
+	}
+}
+
+func TestParseProcMountsLineExtractsOptions(t *testing.T) {
+	t.Parallel()
+
+	line := "tmpfs /dev/shm tmpfs rw,nosuid,nodev,noexec,relatime,size=65536k 0 0"
+	mountPoint, options, ok := parseProcMountsLine(line)
+	if !ok {
+		t.Fatal("parseProcMountsLine() ok = false, want true")
+	}
+	if mountPoint != "/dev/shm" {
+		t.Fatalf("mountPoint = %q, want /dev/shm", mountPoint)
+	}
+	opts := parseMountOptions(options)
+	if _, has := opts["noexec"]; !has {
+		t.Fatalf("options = %q, want to include noexec", options)
+	}
+}
+
+func TestPathWithinMountUsesLongestPrefixMatchCompatibleLogic(t *testing.T) {
+	t.Parallel()
+
+	if !pathWithinMount("/dev/shm/temp/abc", "/dev/shm") {
+		t.Fatal("pathWithinMount() = false, want true")
+	}
+	if pathWithinMount("/tmp/work", "/dev/shm") {
+		t.Fatal("pathWithinMount() = true, want false")
 	}
 }
