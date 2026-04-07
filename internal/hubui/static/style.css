@@ -412,6 +412,24 @@ body .right-col.prompt-collapsed.task-output-hidden {
 .prompt-wrap.panel {
   display: flex;
   flex-direction: column;
+  border-color: rgba(74, 118, 178, 0.18);
+  background:
+    linear-gradient(180deg, rgba(223, 241, 255, 0.96), rgba(245, 250, 255, 0.9) 18%, rgba(255, 255, 255, 0.92) 100%),
+    linear-gradient(160deg, rgba(255, 255, 255, 0.9), rgba(240, 246, 255, 0.8));
+  box-shadow:
+    0 18px 42px rgba(83, 132, 197, 0.16),
+    inset 0 1px 0 rgba(255, 255, 255, 0.72);
+}
+
+.prompt-wrap .panel-header {
+  border-bottom-color: rgba(116, 160, 213, 0.2);
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));
+  color: #6f88ad;
+  letter-spacing: 0.11em;
+}
+
+.prompt-wrap .panel-header span:first-child {
+  color: #5475a5;
 }
 
 .prompt-wrap.prompt-collapsed {
@@ -421,10 +439,14 @@ body .right-col.prompt-collapsed.task-output-hidden {
 .prompt-form {
   display: grid;
   gap: 10px;
-  padding: 12px;
+  padding: 14px 14px 13px;
   min-width: 0;
   min-height: 0;
   overflow-y: auto;
+}
+
+.prompt-mode-row {
+  margin-bottom: 2px;
 }
 
 .prompt-form.hidden,
@@ -436,25 +458,27 @@ body .right-col.prompt-collapsed.task-output-hidden {
 
 .prompt-mode-tabs {
   display: inline-flex;
-  gap: 2px;
+  gap: 4px;
   padding: 5px;
-  border-radius: 999px;
-  border: 1px solid var(--border);
-  background: linear-gradient(160deg, rgba(12, 28, 52, 0.96), rgba(20, 36, 64, 0.9));
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08), 0 14px 28px rgba(10, 44, 102, 0.14);
+  border-radius: 14px;
+  border: 1px solid rgba(28, 57, 94, 0.24);
+  background: linear-gradient(180deg, rgba(37, 59, 93, 0.98), rgba(31, 51, 84, 0.94));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.08),
+    0 14px 28px rgba(10, 44, 102, 0.14);
 }
 
 .prompt-mode-tab {
   border: 0;
   background: transparent;
-  color: rgba(199, 214, 238, 0.7);
+  color: rgba(212, 225, 244, 0.72);
   border-radius: 999px;
-  padding: 9px 15px;
-  font-size: 0.71rem;
+  padding: 11px 18px;
+  font-size: 0.73rem;
   font-weight: 800;
-  letter-spacing: 0.07em;
+  letter-spacing: 0.06em;
   text-transform: uppercase;
-  transition: background-color 0.14s ease, color 0.14s ease, transform 0.14s ease;
+  transition: background-color 0.14s ease, color 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease;
 }
 
 .prompt-mode-tab:hover {
@@ -462,15 +486,17 @@ body .right-col.prompt-collapsed.task-output-hidden {
 }
 
 .prompt-mode-tab.active {
-  background: var(--brand-gradient);
+  background: linear-gradient(135deg, #46bfff 0%, #2588ff 52%, #4c6dff 100%);
   color: #fff;
-  box-shadow: 0 10px 20px rgba(10, 132, 255, 0.22);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.18),
+    0 10px 20px rgba(28, 119, 255, 0.28);
 }
 
 .prompt-grid {
   display: flex;
   align-items: flex-end;
-  gap: 10px;
+  gap: 12px;
   flex-wrap: nowrap;
 }
 
@@ -481,25 +507,25 @@ body .right-col.prompt-collapsed.task-output-hidden {
 }
 
 .prompt-field-repo-history {
-  flex: 0 1 clamp(190px, 24%, 300px);
+  flex: 0 1 clamp(240px, 28%, 340px);
 }
 
 .prompt-field-repository {
   flex: 1 1 320px;
-  min-width: 260px;
+  min-width: 280px;
 }
 
 .prompt-field-base-branch,
 .prompt-field-target-subdir {
-  flex: 0 1 clamp(140px, 16%, 220px);
+  flex: 0 1 clamp(150px, 17%, 220px);
   max-width: clamp(180px, 18%, 220px);
 }
 
 .prompt-label {
-  color: var(--meta);
-  font-size: 0.68rem;
+  color: #7f98bb;
+  font-size: 0.69rem;
   font-weight: 800;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.1em;
   text-transform: uppercase;
 }
 
@@ -514,11 +540,13 @@ body .right-col.prompt-collapsed.task-output-hidden {
 .prompt-text,
 .prompt-action-paste {
   width: 100%;
-  border: 1px solid rgba(17, 34, 68, 0.12);
-  border-radius: 14px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.96), rgba(240, 245, 255, 0.84));
+  border: 1px solid rgba(112, 163, 221, 0.34);
+  border-radius: 16px;
+  background: linear-gradient(180deg, rgba(251, 254, 255, 0.98), rgba(234, 245, 255, 0.88));
   color: var(--text);
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.75);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.92),
+    0 7px 18px rgba(115, 162, 214, 0.08);
 }
 
 .prompt-control,
@@ -545,19 +573,19 @@ body .right-col.prompt-collapsed.task-output-hidden {
 .prompt-input,
 .prompt-control[type="text"],
 select.prompt-control {
-  min-height: 42px;
-  padding: 10px 12px;
-  font-size: 0.79rem;
+  min-height: 44px;
+  padding: 11px 14px;
+  font-size: 0.84rem;
 }
 
 .prompt-input-action-wrap .prompt-input {
-  padding-right: 38px;
+  padding-right: 42px;
 }
 
 .prompt-input-action {
   position: absolute;
   top: 50%;
-  right: 8px;
+  right: 10px;
   transform: translateY(-50%);
   display: inline-flex;
   align-items: center;
@@ -567,8 +595,8 @@ select.prompt-control {
   border: 1px solid transparent;
   border-radius: 999px;
   background: transparent;
-  color: var(--meta);
-  font-size: 0.71rem;
+  color: #6b87af;
+  font-size: 0.75rem;
   font-weight: 800;
   line-height: 1;
   transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
@@ -589,13 +617,14 @@ select.prompt-control {
 select.prompt-control {
   appearance: none;
   background-image:
-    linear-gradient(45deg, transparent 50%, #0a84ff 50%),
-    linear-gradient(135deg, #0a84ff 50%, transparent 50%);
+    linear-gradient(45deg, transparent 50%, #3d82dc 50%),
+    linear-gradient(135deg, #3d82dc 50%, transparent 50%);
   background-position:
-    calc(100% - 18px) calc(50% - 3px),
-    calc(100% - 12px) calc(50% - 3px);
-  background-size: 6px 6px, 6px 6px;
+    calc(100% - 20px) calc(50% - 4px),
+    calc(100% - 13px) calc(50% - 4px);
+  background-size: 7px 7px, 7px 7px;
   background-repeat: no-repeat;
+  padding-right: 34px;
 }
 
 .prompt-text {
@@ -605,7 +634,7 @@ select.prompt-control {
   font-size: 0.79rem;
   line-height: 1.45;
   padding: 12px;
-  background: linear-gradient(160deg, rgba(255, 255, 255, 0.98), rgba(241, 246, 255, 0.9));
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(241, 248, 255, 0.92));
 }
 
 .prompt-image-chip {

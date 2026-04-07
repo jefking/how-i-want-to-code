@@ -309,16 +309,16 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	}
 
 	css := resp.Body.String()
-	if !strings.Contains(css, ".prompt-wrap.panel {\n  display: flex;\n  flex-direction: column;\n}") {
+	if !strings.Contains(css, ".prompt-wrap.panel {\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);") {
 		t.Fatalf("expected studio panel to stack header/form without clipping")
 	}
-	if !strings.Contains(css, ".prompt-mode-tabs {\n  display: inline-flex;\n  gap: 2px;\n  padding: 5px;\n  border-radius: 999px;") {
+	if !strings.Contains(css, ".prompt-mode-tabs {\n  display: inline-flex;\n  gap: 4px;\n  padding: 5px;\n  border-radius: 14px;") {
 		t.Fatalf("expected studio mode tabs to use the refined segmented-control spacing")
 	}
-	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 12px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
+	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 14px 14px 13px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
 		t.Fatalf("expected studio form content to scroll instead of clipping controls")
 	}
-	if !strings.Contains(css, ".prompt-field-repository {\n  flex: 1 1 320px;\n  min-width: 260px;\n}") {
+	if !strings.Contains(css, ".prompt-field-repository {\n  flex: 1 1 320px;\n  min-width: 280px;\n}") {
 		t.Fatalf("expected repository input to retain enough width beside the history selector")
 	}
 	if !strings.Contains(css, ".prompt-actions {\n  display: flex;\n  align-items: center;\n  flex-wrap: wrap;\n  gap: 10px;\n}") {
@@ -338,6 +338,33 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	}
 	if !strings.Contains(css, "@media (max-width: 640px) {\n  .prompt-actions {\n    gap: 6px;\n  }\n\n  .prompt-action-paste {\n    flex: 1 1 100%;\n    width: 100%;\n    max-width: none;\n  }\n\n  .submit-status-inline {\n    flex: 1 1 100%;\n    width: 100%;\n    min-width: 0;\n    margin-right: 0;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }") {
 		t.Fatalf("expected mobile layout to keep Studio action controls fully visible")
+	}
+}
+
+func TestStudioStylesUseRefinedPanelAndInputTreatment(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/static/style.css", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.Code)
+	}
+
+	css := resp.Body.String()
+	if !strings.Contains(css, ".prompt-wrap.panel {\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);\n  background:\n    linear-gradient(180deg, rgba(223, 241, 255, 0.96), rgba(245, 250, 255, 0.9) 18%, rgba(255, 255, 255, 0.92) 100%),") {
+		t.Fatalf("expected studio panel to use the refreshed blue-tint shell treatment")
+	}
+	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: rgba(116, 160, 213, 0.2);\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));\n  color: #6f88ad;\n  letter-spacing: 0.11em;\n}") {
+		t.Fatalf("expected studio header to use the lighter section title styling")
+	}
+	if !strings.Contains(css, ".prompt-control,\n.prompt-text,\n.prompt-action-paste {\n  width: 100%;\n  border: 1px solid rgba(112, 163, 221, 0.34);\n  border-radius: 16px;\n  background: linear-gradient(180deg, rgba(251, 254, 255, 0.98), rgba(234, 245, 255, 0.88));") {
+		t.Fatalf("expected studio controls to use the updated light-blue input treatment")
+	}
+	if !strings.Contains(css, "select.prompt-control {\n  appearance: none;\n  background-image:\n    linear-gradient(45deg, transparent 50%, #3d82dc 50%),\n    linear-gradient(135deg, #3d82dc 50%, transparent 50%);") {
+		t.Fatalf("expected repository selector to use the refreshed blue chevron treatment")
 	}
 }
 
