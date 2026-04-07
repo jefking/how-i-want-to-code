@@ -224,7 +224,10 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to include moltenhub connection indicator")
 	}
 	if !strings.Contains(markup, `id="prompt-visibility-toggle"`) {
-		t.Fatalf("expected index html to include local prompt visibility toggle")
+		t.Fatalf("expected index html to include prompt studio visibility toggle")
+	}
+	if !strings.Contains(markup, ">Prompt Studio<") {
+		t.Fatalf("expected index html to label the prompt panel as Prompt Studio")
 	}
 	if !strings.Contains(markup, `id="resource-metrics-text"`) {
 		t.Fatalf("expected index html to include resource metrics indicator")
@@ -263,7 +266,7 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to hide screenshot empty-state copy until images are attached")
 	}
 	if !strings.Contains(markup, `id="local-prompt-submit"`) || !strings.Contains(markup, `>Run</button>`) {
-		t.Fatalf("expected index html to render the local prompt submit button with label Run")
+		t.Fatalf("expected index html to render the prompt studio submit button with label Run")
 	}
 	if !strings.Contains(markup, `id="builder-repo-input" class="prompt-control prompt-input"`) || !strings.Contains(markup, `id="builder-target-subdir" class="prompt-control prompt-input"`) {
 		t.Fatalf("expected index html to include builder repo and target subdir inputs")
@@ -379,7 +382,7 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 		t.Fatalf("expected stylesheet to include prompt mode tab styles")
 	}
 	if !strings.Contains(css, ".prompt-visibility-toggle") {
-		t.Fatalf("expected stylesheet to include local prompt visibility toggle styles")
+		t.Fatalf("expected stylesheet to include prompt studio visibility toggle styles")
 	}
 	if !strings.Contains(css, ".prompt-grid") {
 		t.Fatalf("expected stylesheet to include prompt grid styles")
@@ -480,6 +483,14 @@ func TestHandlerLocalPromptSubmitUnavailable(t *testing.T) {
 
 	if resp.StatusCode != http.StatusNotImplemented {
 		t.Fatalf("status = %d, want %d", resp.StatusCode, http.StatusNotImplemented)
+	}
+
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode response: %v", err)
+	}
+	if got, _ := body["error"].(string); got != "prompt studio submit is unavailable" {
+		t.Fatalf("error = %q, want %q", got, "prompt studio submit is unavailable")
 	}
 }
 

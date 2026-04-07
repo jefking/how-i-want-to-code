@@ -81,13 +81,21 @@ Hub listener:
 ./bin/harness hub --init templates/init.example.json
 ```
 
+On startup, hub mode emits a boot diagnosis checklist for:
+
+- `git` CLI availability
+- `gh` CLI availability
+- `codex` CLI availability
+- `gh auth` readiness
+- a Molten Hub connection recommendation (`https://molten.bot/hub`) when the runtime is not connected yet
+
 ## UI
 
 Hub mode starts a local monitor UI by default at `http://127.0.0.1:7777`.
 
-The local prompt panel defaults to a schema builder that stores requested repositories in browser local storage and reuses them as a repo picker. In Builder mode, you can paste clipboard PNG screenshots into the prompt field and they will be attached to the initial Codex run. Raw JSON mode remains available for advanced or multi-repo payloads. The UI also includes a browser-local `Hide Local Prompt` toggle so you can collapse that section without restarting the harness.
+The Prompt Studio panel defaults to a schema builder that stores requested repositories in browser local storage and reuses them as a repo picker. In Builder mode, you can paste clipboard PNG screenshots into the prompt field and they will be attached to the initial Codex run. Raw JSON mode remains available for advanced or multi-repo payloads. The UI also includes a browser-local `Hide` toggle so you can collapse that section without restarting the harness.
 
-Automatic mode is available as a runtime flag and hides the browser-local prompt form entirely:
+Automatic mode is available as a runtime flag and hides the browser Prompt Studio form entirely:
 
 ```bash
 ./bin/harness hub --init templates/init.example.json --ui-automatic
@@ -136,13 +144,15 @@ Library-backed runs can also use:
 Key fields:
 
 - `base_url` (default `https://na.hub.molten.bot/v1`)
-- `bind_token` or `agent_token`
+- `bind_token` or `agent_token` for first-time activation only
 - `session_key` (default `main`)
-- `handle`
+- `handle` (optional)
 - `profile.display_name`
 - `profile.emoji`
 - `profile.bio`
 - `dispatcher.*` (adaptive worker parallelism)
+
+After first successful activation, runtime auth is persisted to `~/.moltenhub/config.json`, so `bind_token` and `handle` are not required in `init.json` for subsequent runs.
 
 Runtime-owned fields:
 
@@ -163,6 +173,8 @@ When a task fails (local or hub-dispatched), the harness queues a follow-up loca
 - includes relevant failing log paths in prompt context
 - uses run config shape: `{"repos":["<same_repo_as_failed_task>"],"base_branch":"main","target_subdir":".","prompt":"..."}`
 - asks for root-cause fixes (not superficial bandaids)
+
+Hub skill failure responses also include an explicit failure message and error details in the published result payload so the calling agent gets a clear failure reason.
 
 ## Exit Codes
 

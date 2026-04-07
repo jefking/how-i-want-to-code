@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -52,9 +53,10 @@ func (d Daemon) Run(ctx context.Context, cfg InitConfig) error {
 	}
 
 	cfg.ApplyDefaults()
-	if stored, err := LoadRuntimeConfig(defaultRuntimeConfigPath); err == nil {
+	runtimeCfgPath := defaultRuntimeConfigPath()
+	if stored, loadedPath, err := loadStoredRuntimeConfig(runtimeCfgPath); err == nil {
 		if applied := applyStoredRuntimeConfig(&cfg, stored); applied {
-			d.logf("hub.runtime_config status=loaded path=%s", defaultRuntimeConfigPath)
+			d.logf("hub.runtime_config status=loaded path=%s", loadedPath)
 		}
 	} else if !errors.Is(err, os.ErrNotExist) {
 		d.logf("hub.runtime_config status=warn err=%q", err)
@@ -75,10 +77,10 @@ func (d Daemon) Run(ctx context.Context, cfg InitConfig) error {
 	}
 	d.logf("hub.connection status=configured base_url=%s", cfg.BaseURL)
 	d.logf("hub.auth status=ok")
-	if err := SaveRuntimeConfig(defaultRuntimeConfigPath, cfg.BaseURL, token, cfg.SessionKey); err != nil {
+	if err := SaveRuntimeConfig(runtimeCfgPath, cfg.BaseURL, token, cfg.SessionKey); err != nil {
 		return fmt.Errorf("hub runtime config: %w", err)
 	}
-	d.logf("hub.runtime_config status=saved path=%s", defaultRuntimeConfigPath)
+	d.logf("hub.runtime_config status=saved path=%s", runtimeCfgPath)
 
 	libraryCatalog, libraryErr := library.LoadCatalog(library.DefaultDir)
 	if libraryErr != nil {
@@ -355,11 +357,33 @@ func (d Daemon) processInboundMessage(
 
 		release, acquireErr := dispatchController.Acquire(ctx, dispatch.RequestID)
 		if acquireErr != nil {
-			if !errors.Is(acquireErr, context.Canceled) && !errors.Is(acquireErr, errDispatchControllerClosed) {
+			if !errors.Is(acquireErr, context.Canceled) {
+				failErr := fmt.Errorf("dispatch acquire: %w", acquireErr)
+				failRes := harness.Result{
+					ExitCode: harness.ExitPreflight,
+					Err:      failErr,
+				}
+				payload := dispatchResultPayload(cfg, dispatch, failRes)
+				if err := api.PublishResult(ctx, token, payload); err != nil {
+					d.logf("dispatch status=publish_error request_id=%s err=%q", dispatch.RequestID, err)
+					if !ackedEarly && strings.TrimSpace(deliveryID) != "" {
+						if nackErr := api.NackOpenClawDelivery(ctx, token, deliveryID); nackErr != nil {
+							d.logf("dispatch status=nack_error delivery_id=%s err=%q", deliveryID, nackErr)
+						}
+					}
+				} else if !ackedEarly && strings.TrimSpace(deliveryID) != "" {
+					if err := api.AckOpenClawDelivery(ctx, token, deliveryID); err != nil {
+						d.logf("dispatch status=ack_error delivery_id=%s err=%q", deliveryID, err)
+					}
+				}
 				d.logf(
-					"dispatch status=error request_id=%s err=%q",
+					"dispatch status=error request_id=%s exit_code=%d workspace=%s branch=%s pr_url=%s err=%q",
 					firstNonEmpty(dispatch.RequestID, dedupeKey),
-					acquireErr,
+					failRes.ExitCode,
+					failRes.WorkspaceDir,
+					failRes.Branch,
+					failRes.PRURL,
+					failRes.Err,
 				)
 			}
 			if deduper != nil {
@@ -696,6 +720,9 @@ func applyStoredRuntimeConfig(cfg *InitConfig, stored RuntimeConfig) bool {
 	if cfg == nil {
 		return false
 	}
+	if strings.TrimSpace(cfg.AgentToken) != "" {
+		return false
+	}
 
 	token := strings.TrimSpace(stored.Token)
 	if token == "" {
@@ -716,6 +743,42 @@ func applyStoredRuntimeConfig(cfg *InitConfig, stored RuntimeConfig) bool {
 	}
 
 	return true
+}
+
+func loadStoredRuntimeConfig(primaryPath string) (RuntimeConfig, string, error) {
+	return loadStoredRuntimeConfigWithLegacyPath(primaryPath, legacyRuntimeConfigPath)
+}
+
+func loadStoredRuntimeConfigWithLegacyPath(primaryPath, legacyPath string) (RuntimeConfig, string, error) {
+	primaryPath = strings.TrimSpace(primaryPath)
+	if primaryPath == "" {
+		primaryPath = defaultRuntimeConfigPath()
+	}
+
+	stored, err := LoadRuntimeConfig(primaryPath)
+	if err == nil {
+		return stored, primaryPath, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return RuntimeConfig{}, primaryPath, err
+	}
+
+	legacyPath = strings.TrimSpace(legacyPath)
+	if legacyPath == "" {
+		return RuntimeConfig{}, primaryPath, err
+	}
+	if filepath.Clean(legacyPath) == filepath.Clean(primaryPath) {
+		return RuntimeConfig{}, primaryPath, err
+	}
+
+	legacyStored, legacyErr := LoadRuntimeConfig(legacyPath)
+	if legacyErr == nil {
+		return legacyStored, legacyPath, nil
+	}
+	if !errors.Is(legacyErr, os.ErrNotExist) {
+		return RuntimeConfig{}, legacyPath, legacyErr
+	}
+	return RuntimeConfig{}, primaryPath, err
 }
 
 func dispatchParseErrorPayload(cfg InitConfig, dispatch SkillDispatch, parseErr error) map[string]any {
