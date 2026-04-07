@@ -52,7 +52,6 @@
         </div>
       </div>
       <div class="status-row flex flex-wrap items-center gap-2.5 text-sm text-hub-muted">
-        <button id="prompt-visibility-toggle" class="prompt-visibility-toggle" type="button" aria-pressed="true">Hide Local Prompt</button>
         <div id="local-conn-item" class="status-item status-item-compact flex min-h-[30px] items-center rounded-full border border-hub-border bg-hub-panel/75" title="Local Instance: Connecting..." aria-label="Local Instance: Connecting..." tabindex="0">
           <span id="local-conn-dot" class="dot"></span>
           <span id="local-conn-text" class="status-tooltip text-xs leading-tight text-slate-200">Local Instance: Connecting...</span>
@@ -89,6 +88,7 @@
         <section class="panel prompt-wrap min-h-[220px] overflow-hidden rounded-2xl border border-hub-border bg-hub-panel bg-[linear-gradient(170deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
           <div class="panel-header flex items-center justify-between gap-2 border-b border-hub-border bg-black/15 px-3.5 py-3 text-[0.92rem] font-semibold uppercase tracking-[0.03em]">
             <span>Local Prompt</span>
+            <button id="prompt-visibility-toggle" class="prompt-visibility-toggle" type="button" aria-pressed="true">Hide</button>
           </div>
           <form id="local-prompt-form" class="prompt-form grid gap-2.5 p-3">
             <div class="prompt-mode-row flex flex-wrap items-center gap-2">
@@ -857,14 +857,17 @@
       const automatic = Boolean(state.ui?.automaticMode);
       const visible = !automatic && state.promptVisible;
       if (promptWrap) {
-        promptWrap.classList.toggle("hidden", !visible);
+        promptWrap.classList.toggle("prompt-collapsed", !visible);
+      }
+      if (localPromptForm) {
+        localPromptForm.classList.toggle("hidden", !visible);
       }
       if (rightCol) {
-        rightCol.classList.toggle("automatic-mode", !visible);
+        rightCol.classList.toggle("prompt-collapsed", !visible);
       }
       if (promptVisibilityToggle) {
         promptVisibilityToggle.disabled = automatic;
-        promptVisibilityToggle.textContent = visible ? "Hide Local Prompt" : "Show Local Prompt";
+        promptVisibilityToggle.textContent = visible ? "Hide" : "Show";
         promptVisibilityToggle.setAttribute("aria-pressed", visible ? "true" : "false");
       }
       if (automatic) {
