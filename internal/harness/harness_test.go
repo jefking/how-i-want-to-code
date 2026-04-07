@@ -1057,7 +1057,7 @@ func TestRunCloneRetriesTransientFailureThenSucceeds(t *testing.T) {
 	agentsPath := filepath.Join(runDir, "AGENTS.md")
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
-	branch := "moltenhub-build-api-20260406-195352-9ded650b"
+	branch := "moltenhub-build-api"
 	prURL := "https://github.com/acme/repo/pull/112"
 
 	cloneTransientFailure := execx.Result{

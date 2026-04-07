@@ -8,10 +8,12 @@ import (
 )
 
 var nonAlnum = regexp.MustCompile(`[^a-z0-9]+`)
+var generatedPromptSuffixRE = regexp.MustCompile(`-[0-9]{8}-[0-9]{6}(?:-[0-9a-f]{1,8})?$`)
 
 // FromPrompt converts prompt text into a branch-safe slug.
 func FromPrompt(prompt string) string {
 	lower := strings.ToLower(strings.TrimSpace(prompt))
+	lower = trimGeneratedPromptSuffix(lower)
 	if lower == "" {
 		return "task"
 	}
@@ -28,6 +30,19 @@ func FromPrompt(prompt string) string {
 		return "task"
 	}
 	return s
+}
+
+func trimGeneratedPromptSuffix(prompt string) string {
+	prompt = strings.TrimSpace(prompt)
+	if prompt == "" {
+		return ""
+	}
+	trimmed := generatedPromptSuffixRE.ReplaceAllString(prompt, "")
+	trimmed = strings.Trim(trimmed, "-")
+	if trimmed == "" {
+		return prompt
+	}
+	return trimmed
 }
 
 // BranchName builds a branch name with a stable prompt slug.

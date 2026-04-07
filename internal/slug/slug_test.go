@@ -24,6 +24,26 @@ func TestFromPromptFallback(t *testing.T) {
 	}
 }
 
+func TestFromPromptTrimsGeneratedSuffix(t *testing.T) {
+	t.Parallel()
+
+	got := FromPrompt("fix flaky ci-20260407-002959-2fc3c864")
+	want := "fix-flaky-ci"
+	if got != want {
+		t.Fatalf("FromPrompt() = %q, want %q", got, want)
+	}
+}
+
+func TestFromPromptTrimsGeneratedSuffixWithoutHash(t *testing.T) {
+	t.Parallel()
+
+	got := FromPrompt("release cleanup-20260407-002959")
+	want := "release-cleanup"
+	if got != want {
+		t.Fatalf("FromPrompt() = %q, want %q", got, want)
+	}
+}
+
 func TestBranchNameUsesStableSlug(t *testing.T) {
 	t.Parallel()
 
