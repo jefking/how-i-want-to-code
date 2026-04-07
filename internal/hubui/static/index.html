@@ -239,7 +239,6 @@
   </div>
 
   <script>
-    const TASK_PROMPT_PREVIEW_MAX = 30;
     const DISMISSED_TASKS_KEY = "hubui.dismissedTaskIds";
     const REPO_HISTORY_KEY = "hubui.repoHistory.v1";
     const PROMPT_MODE_KEY = "hubui.localPromptMode";
@@ -1173,22 +1172,12 @@
       return task.prompt.replace(/\s+/g, " ").trim();
     }
 
-    function taskPromptPreview(task) {
-      const prompt = taskPromptText(task);
-      if (!prompt) return "";
-      if (prompt.length <= TASK_PROMPT_PREVIEW_MAX) {
-        return prompt;
-      }
-      return `${prompt.slice(0, TASK_PROMPT_PREVIEW_MAX)}...`;
-    }
-
     function taskDisplayLabel(task) {
-      const id = task?.display_id || task?.request_id || "";
-      const preview = taskPromptPreview(task);
-      if (!preview) {
+      const prompt = taskPromptText(task);
+      if (!prompt) {
         return "(prompt unavailable)";
       }
-      return preview;
+      return prompt;
     }
 
     function statusClass(status) {

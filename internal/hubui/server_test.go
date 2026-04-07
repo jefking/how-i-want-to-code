@@ -286,6 +286,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if strings.Contains(markup, "return `${id} | ${preview}`;") {
 		t.Fatalf("expected index html to remove request id prefix from task display title")
 	}
+	if strings.Contains(markup, "const TASK_PROMPT_PREVIEW_MAX = 30;") {
+		t.Fatalf("expected index html to avoid fixed prompt preview length caps in task titles")
+	}
+	if strings.Contains(markup, "function taskPromptPreview(") {
+		t.Fatalf("expected index html to remove fixed-length task prompt preview helper")
+	}
+	if !strings.Contains(markup, "const prompt = taskPromptText(task);") || !strings.Contains(markup, "return prompt;") {
+		t.Fatalf("expected index html to pass full task prompt text to task title truncation")
+	}
 	if !strings.Contains(markup, "return \"(prompt unavailable)\";") {
 		t.Fatalf("expected index html to provide prompt-only task titles with fallback text")
 	}
