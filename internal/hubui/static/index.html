@@ -346,6 +346,7 @@
     const promptRawPanel = document.getElementById("prompt-raw-panel");
     const builderRepoSelect = document.getElementById("builder-repo-select");
     const builderRepoHistoryField = document.getElementById("builder-repo-history-field");
+    const builderRepositoryField = document.querySelector(".prompt-field-repository");
     const builderRepoInput = document.getElementById("builder-repo-input");
     const builderBaseBranch = document.getElementById("builder-base-branch");
     const builderTargetSubdir = document.getElementById("builder-target-subdir");
@@ -726,6 +727,14 @@
       }
     }
 
+    function syncBuilderRepositoryVisibility() {
+      const hasSavedHistory = state.repoHistory.length > 0;
+      const usingRepoHistory = normalizeRepoValue(builderRepoSelect.value) !== "";
+      if (builderRepositoryField) {
+        builderRepositoryField.classList.toggle("hidden", hasSavedHistory && usingRepoHistory);
+      }
+    }
+
     function persistPromptMode() {
       try {
         localStorage.setItem(PROMPT_MODE_KEY, state.promptMode);
@@ -811,6 +820,7 @@
 
     function renderRepoHistoryOptions() {
       const currentValue = normalizeRepoValue(builderRepoInput.value);
+      const selectedValue = normalizeRepoValue(builderRepoSelect.value);
       const unique = dedupeRepoValues([currentValue, ...state.repoHistory]);
       const hasSavedHistory = state.repoHistory.length > 0;
 
@@ -832,11 +842,13 @@
         builderRepoSelect.appendChild(option);
       }
 
-      if (currentValue && unique.includes(currentValue)) {
-        builderRepoSelect.value = currentValue;
+      if (selectedValue && unique.includes(selectedValue)) {
+        builderRepoSelect.value = selectedValue;
       } else {
         builderRepoSelect.value = "";
       }
+
+      syncBuilderRepositoryVisibility();
     }
 
     function setPromptMode(mode) {
@@ -1719,6 +1731,14 @@
       if (value) {
         builderRepoInput.value = value;
       }
+      syncBuilderRepositoryVisibility();
+    });
+
+    builderRepoInput.addEventListener("input", () => {
+      if (normalizeRepoValue(builderRepoSelect.value) !== "") {
+        builderRepoSelect.value = "";
+      }
+      syncBuilderRepositoryVisibility();
     });
 
     builderLibraryTask.addEventListener("change", () => {
