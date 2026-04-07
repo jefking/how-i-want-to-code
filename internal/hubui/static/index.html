@@ -612,13 +612,11 @@
     function renderPromptImages() {
       if (!builderImageList || !builderImagesClear) return;
       builderImageList.replaceChildren();
-      builderImagesClear.disabled = state.promptImages.length === 0;
+      const hasImages = state.promptImages.length > 0;
+      builderImagesClear.disabled = !hasImages;
+      builderImageList.classList.toggle("hidden", !hasImages);
 
-      if (!state.promptImages.length) {
-        const empty = document.createElement("div");
-        empty.className = "rounded-lg border border-hub-border bg-[#0d1825] px-3 py-2 text-[0.74rem] leading-[1.35] text-hub-muted";
-        empty.textContent = "No screenshots attached.";
-        builderImageList.appendChild(empty);
+      if (!hasImages) {
         return;
       }
 
