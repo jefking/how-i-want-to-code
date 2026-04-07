@@ -166,8 +166,23 @@ func TestFailureFollowUpPromptDefaultWhenNoPaths(t *testing.T) {
 	if !strings.Contains(got, failureFollowUpRequiredPrompt) {
 		t.Fatalf("prompt missing required instructions: %q", got)
 	}
+	if !strings.Contains(got, ".log/local/<request timestamp>/<request sequence>") {
+		t.Fatalf("prompt missing default log dir hint: %q", got)
+	}
+	if !strings.Contains(got, ".log/local/<request timestamp>/<request sequence>/term") {
+		t.Fatalf("prompt missing default legacy log file hint: %q", got)
+	}
 	if !strings.Contains(got, ".log/local/<request timestamp>/<request sequence>/terminal.log") {
 		t.Fatalf("prompt missing default log path hint: %q", got)
+	}
+	if !strings.Contains(got, "Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.") {
+		t.Fatalf("prompt missing molten hub integration instruction: %q", got)
+	}
+	if !strings.Contains(got, "When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.") {
+		t.Fatalf("prompt missing failure response instruction: %q", got)
+	}
+	if !strings.Contains(got, `"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."`) {
+		t.Fatalf("prompt missing follow-up payload shape: %q", got)
 	}
 }
 
