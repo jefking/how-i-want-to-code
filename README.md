@@ -245,6 +245,12 @@ Key fields:
 After first successful activation, runtime auth is persisted to `./.moltenhub/config.json`, so `bind_token` and `handle` are not required in `init.json` for subsequent runs.
 Runtime config keys `sessionKey` and `timeoutMs` are optional; missing values default to `main` and `20000`.
 
+Local-only behavior:
+
+- If `bind_token`/`agent_token` are missing and no persisted runtime token exists, `harness hub` now starts in local-only mode instead of exiting with auth error.
+- In local-only mode, the monitor UI and `/api/local-prompt` remain available for local runs, and remote Hub transport is skipped.
+- If local-only mode is used with `--ui-listen ""`, startup exits with an auth/config error because there is no remote or local submission channel.
+
 Runtime-owned fields:
 
 - skill contract is fixed to `code_for_me` / `skill_request` / `skill_result`

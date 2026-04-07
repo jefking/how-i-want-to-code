@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -135,6 +136,47 @@ func TestTaskLogDirAndTaskLogPathsValidateInputs(t *testing.T) {
 	}
 	if got := taskLogPaths("", "req-1"); got != nil {
 		t.Fatalf("taskLogPaths(empty root) = %v, want nil", got)
+	}
+
+	paths := taskLogPaths("/tmp/.log", "local-1712345678-000001")
+	want := []string{
+		filepath.Join("/tmp/.log", "local", "1712345678", "000001"),
+		filepath.Join("/tmp/.log", "local", "1712345678", "000001", legacyTaskLogFileName),
+		filepath.Join("/tmp/.log", "local", "1712345678", "000001", logFileName),
+	}
+	if got, wantJoined := strings.Join(paths, "\n"), strings.Join(want, "\n"); got != wantJoined {
+		t.Fatalf("taskLogPaths(...) = %q, want %q", got, wantJoined)
+	}
+}
+
+func TestShouldQueueFailureFollowUpSkipsNonRemediableErrors(t *testing.T) {
+	t.Parallel()
+
+	ok, reason := shouldQueueFailureFollowUp(harness.Result{
+		Err: errors.New("codex: ERROR: Quota exceeded. Check your plan and billing details."),
+	})
+	if ok {
+		t.Fatalf("shouldQueueFailureFollowUp(quota exceeded) = true, want false")
+	}
+	if !strings.Contains(reason, "quota exceeded") {
+		t.Fatalf("reason = %q, want marker containing quota exceeded", reason)
+	}
+
+	ok, reason = shouldQueueFailureFollowUp(harness.Result{
+		Err: errors.New("codex: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header"),
+	})
+	if ok {
+		t.Fatalf("shouldQueueFailureFollowUp(auth failure) = true, want false")
+	}
+	if !strings.Contains(reason, "401 unauthorized") {
+		t.Fatalf("reason = %q, want marker containing 401 unauthorized", reason)
+	}
+
+	ok, reason = shouldQueueFailureFollowUp(harness.Result{
+		Err: errors.New("clone: run git [clone ...]: exit status 128"),
+	})
+	if !ok {
+		t.Fatalf("shouldQueueFailureFollowUp(clone failure) = false, want true (reason=%q)", reason)
 	}
 }
 

@@ -393,6 +393,15 @@ func runHub(args []string) int {
 		return requestID, nil
 	}
 	queueFailureFollowUp = func(failedRequestID string, failedResult harness.Result, failedRunCfg config.Config) {
+		if ok, reason := shouldQueueFailureFollowUp(failedResult); !ok {
+			daemonLogger(
+				"dispatch status=warn action=skip_failure_followup request_id=%s err=%q",
+				failedRequestID,
+				fmt.Sprintf("non-remediable failure detected: %s", reason),
+			)
+			return
+		}
+
 		followUpCfg := failureFollowUpRunConfig(failedRequestID, failedResult, failedRunCfg, logRoot)
 		if len(followUpCfg.RepoList()) == 0 {
 			daemonLogger(
@@ -467,6 +476,24 @@ func runHub(args []string) int {
 				logger.Printf("hub.ui status=error err=%q", err)
 			}
 		}()
+	}
+
+	if !hubCredentialsConfigured(cfg, func() (hub.RuntimeConfig, error) {
+		return hub.LoadRuntimeConfig("")
+	}) {
+		daemonLogger(
+			"hub.auth status=local_only detail=%q",
+			"No bind_token/agent_token configured; skipping remote hub connection. Use the local UI/API to submit tasks.",
+		)
+		if strings.TrimSpace(*uiListen) == "" {
+			writeStderrLine(
+				logger,
+				"error: hub auth not configured and UI disabled; set bind_token/agent_token (or persisted runtime config) or enable --ui-listen",
+			)
+			return harness.ExitAuth
+		}
+		<-ctx.Done()
+		return harness.ExitSuccess
 	}
 
 	daemon := hub.NewDaemon(runner)
@@ -600,6 +627,35 @@ func failureFollowUpRunConfig(
 	}
 }
 
+var failureFollowUpNonRemediableMarkers = []string{
+	"quota exceeded",
+	"insufficient_quota",
+	"billing",
+	"401 unauthorized",
+	"missing bearer or basic authentication",
+	"invalid api key",
+	"invalid_authentication",
+	"authentication error",
+}
+
+func shouldQueueFailureFollowUp(failedResult harness.Result) (bool, string) {
+	if failedResult.Err == nil {
+		return false, "failed task did not include an error"
+	}
+
+	errText := strings.ToLower(strings.TrimSpace(failedResult.Err.Error()))
+	if errText == "" {
+		return false, "failed task error was empty"
+	}
+
+	for _, marker := range failureFollowUpNonRemediableMarkers {
+		if strings.Contains(errText, marker) {
+			return false, marker
+		}
+	}
+	return true, ""
+}
+
 func failureFollowUpRepos(failedResult harness.Result, failedRunCfg config.Config) []string {
 	for _, repo := range failedRunCfg.RepoList() {
 		repo = strings.TrimSpace(repo)
@@ -646,6 +702,7 @@ func taskLogPaths(logRoot, requestID string) []string {
 	}
 	return []string{
 		logDir,
+		filepath.Join(logDir, legacyTaskLogFileName),
 		filepath.Join(logDir, logFileName),
 	}
 }
