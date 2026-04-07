@@ -187,6 +187,7 @@ func TestDaemonRunReturnsAuthErrorWhenTransportIsUnauthorized(t *testing.T) {
 		t.Fatalf("Getwd() error = %v", err)
 	}
 	tmpDir := t.TempDir()
+	// This test mutates process working directory; keep it non-parallel.
 	if err := os.Chdir(tmpDir); err != nil {
 		t.Fatalf("Chdir(%q) error = %v", tmpDir, err)
 	}

@@ -531,8 +531,7 @@ func TestHandleDispatchInvokesOnDispatchFailed(t *testing.T) {
 
 	d.handleDispatch(
 		context.Background(),
-		NewAPIClient(server.URL+"/v1"),
-		"test-token",
+		NewAsyncAPIClientFrom(NewAPIClient(server.URL+"/v1"), "test-token"),
 		cfg,
 		SkillDispatch{
 			RequestID: "req-fail",
@@ -624,8 +623,7 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 	var workers sync.WaitGroup
 	d.processInboundMessage(
 		context.Background(),
-		NewAPIClient(server.URL+"/v1"),
-		"agent-token",
+		NewAsyncAPIClientFrom(NewAPIClient(server.URL+"/v1"), "agent-token"),
 		cfg,
 		msg,
 		"",
@@ -687,8 +685,7 @@ func TestProcessInboundMessageSkipsIgnoredLogForUnknownSkill(t *testing.T) {
 	var workers sync.WaitGroup
 	d.processInboundMessage(
 		context.Background(),
-		APIClient{},
-		"",
+		NewAsyncAPIClientFrom(APIClient{}, ""),
 		cfg,
 		map[string]any{"type": "status_update"},
 		"",
@@ -726,8 +723,7 @@ func TestProcessInboundMessageLogsIgnoredKnownSkill(t *testing.T) {
 	var workers sync.WaitGroup
 	d.processInboundMessage(
 		context.Background(),
-		APIClient{},
-		"",
+		NewAsyncAPIClientFrom(APIClient{}, ""),
 		cfg,
 		map[string]any{
 			"type":  "skill_request",
@@ -793,7 +789,7 @@ func TestProcessInboundMessageInvokesOnDispatchQueued(t *testing.T) {
 			"prompt": "ship rerun button",
 		},
 	}
-	d.processInboundMessage(ctx, APIClient{}, "", cfg, msg, "", "", dispatchController, &workers, nil)
+	d.processInboundMessage(ctx, NewAsyncAPIClientFrom(APIClient{}, ""), cfg, msg, "", "", dispatchController, &workers, nil)
 
 	mu.Lock()
 	defer mu.Unlock()
