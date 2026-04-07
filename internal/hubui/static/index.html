@@ -114,15 +114,17 @@
                 </label>
                 <label class="prompt-field prompt-field-base-branch">
                   <span class="prompt-label">Branch</span>
-                  <span class="prompt-input-action-wrap">
+                  <span class="prompt-input-action-wrap" data-has-action="false">
                     <input id="builder-base-branch" class="prompt-control prompt-input" type="text" value="main" spellcheck="false" placeholder="main">
                     <button
                       id="builder-base-branch-clear"
                       class="prompt-input-action"
                       type="button"
                       aria-label="Reset branch to main"
+                      aria-hidden="true"
                       title="Already on main"
-                      disabled>X</button>
+                      hidden
+                      disabled><span class="prompt-input-action-icon" aria-hidden="true">&times;</span></button>
                   </span>
                 </label>
                 <label class="prompt-field prompt-field-target-subdir">
@@ -1084,8 +1086,14 @@
       if (!builderBaseBranchClear) return;
       const branch = String(builderBaseBranch.value || "").trim();
       const isMain = branch === "" || branch === "main";
+      const branchActionWrap = builderBaseBranchClear.closest(".prompt-input-action-wrap");
       builderBaseBranchClear.disabled = isMain;
+      builderBaseBranchClear.hidden = isMain;
+      builderBaseBranchClear.setAttribute("aria-hidden", String(isMain));
       builderBaseBranchClear.title = isMain ? "Already on main" : "Reset to main";
+      if (branchActionWrap) {
+        branchActionWrap.dataset.hasAction = isMain ? "false" : "true";
+      }
     }
 
     function resetBaseBranchToMain() {

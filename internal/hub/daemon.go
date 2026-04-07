@@ -700,7 +700,7 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 		"repos":        repos,
 		"baseBranch":   "main",
 		"targetSubdir": ".",
-		"prompt":       failureFollowUpPrompt(dispatch.Config, res),
+		"prompt":       failureFollowUpPrompt(dispatch, res),
 	}
 
 	payload := map[string]any{
@@ -713,31 +713,21 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 	return api.PublishResult(ctx, payload)
 }
 
-func failureFollowUpPrompt(runCfg config.Config, res harness.Result) string {
-	paths := failureLogPaths(runCfg, res)
-	contextBlock := failureFollowUpFailureContext(runCfg, res)
-	if len(paths) == 0 {
-		var b strings.Builder
-		b.WriteString(failureFollowUpPromptBase)
-		b.WriteString("\n\n")
-		b.WriteString(failureFollowUpNoPathGuidance)
-		if contextBlock != "" {
-			b.WriteString("\n\n")
-			b.WriteString(contextBlock)
-		}
-		b.WriteString("\n\n")
-		b.WriteString(failurefollowup.ExecutionContract)
-		return b.String()
-	}
-
+func failureFollowUpPrompt(dispatch SkillDispatch, res harness.Result) string {
+	paths := failureLogPaths(dispatch.Config, res)
 	var b strings.Builder
 	b.WriteString(failureFollowUpPromptBase)
-	b.WriteString("\n\nFailing workspace/log paths to review first:")
-	for _, path := range paths {
+	b.WriteString("\n\nRelevant failing log path(s):")
+	if len(paths) == 0 {
 		b.WriteString("\n- ")
-		b.WriteString(path)
+		b.WriteString(failureFollowUpNoPathGuidance)
+	} else {
+		for _, path := range paths {
+			b.WriteString("\n- ")
+			b.WriteString(path)
+		}
 	}
-	if contextBlock != "" {
+	if contextBlock := failureFollowUpContext(dispatch, res); contextBlock != "" {
 		b.WriteString("\n\n")
 		b.WriteString(contextBlock)
 	}
@@ -746,9 +736,10 @@ func failureFollowUpPrompt(runCfg config.Config, res harness.Result) string {
 	return b.String()
 }
 
-func failureFollowUpFailureContext(runCfg config.Config, res harness.Result) string {
+func failureFollowUpContext(dispatch SkillDispatch, res harness.Result) string {
 	lines := []string{
 		"Observed failure context:",
+		fmt.Sprintf("- request_id=%s", strings.TrimSpace(dispatch.RequestID)),
 		fmt.Sprintf("- exit_code=%d", res.ExitCode),
 	}
 	if res.Err != nil {
@@ -763,11 +754,8 @@ func failureFollowUpFailureContext(runCfg config.Config, res harness.Result) str
 	if prURL := strings.TrimSpace(res.PRURL); prURL != "" {
 		lines = append(lines, fmt.Sprintf("- pr_url=%s", prURL))
 	}
-	if repos := runCfg.RepoList(); len(repos) > 0 {
+	if repos := dispatch.Config.RepoList(); len(repos) > 0 {
 		lines = append(lines, fmt.Sprintf("- repos=%s", strings.Join(repos, ",")))
-	}
-	if len(lines) == 1 {
-		return ""
 	}
 	return strings.Join(lines, "\n")
 }
