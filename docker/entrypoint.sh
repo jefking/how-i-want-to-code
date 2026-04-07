@@ -97,7 +97,7 @@ if [ "${init_path}" = "" ]; then
 fi
 
 if [ "${GH_TOKEN:-}" = "" ] && [ "${GITHUB_TOKEN:-}" = "" ]; then
-    github_token_from_init="$(read_init_json_key "${init_path}" "github_token,githubToken,GITHUB_TOKEN,gh_token,ghToken,GH_TOKEN")"
+    github_token_from_init="$(read_init_json_key "${init_path}" "github_token")"
     if [ "${github_token_from_init}" != "" ]; then
         export GITHUB_TOKEN="${github_token_from_init}"
     fi
@@ -117,7 +117,7 @@ if [ "${OPENAI_API_KEY:-}" = "" ]; then
 fi
 
 if [ "${GH_TOKEN:-}" = "" ] && [ "${GITHUB_TOKEN:-}" = "" ]; then
-    echo "missing required GitHub token: set GITHUB_TOKEN/GH_TOKEN or add GITHUB_TOKEN/github_token to ${init_path}" >&2
+    echo "missing required GitHub token: set GITHUB_TOKEN/GH_TOKEN or add github_token to ${init_path}" >&2
     exit 21
 fi
 
