@@ -23,8 +23,17 @@ fi
 gh auth status >/dev/null
 gh auth setup-git >/dev/null
 
+# Keep /usr/local/bin available even when runtime env overrides PATH.
+export PATH="/usr/local/bin:${PATH:-/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin}"
+
 if [ "$#" -eq 0 ]; then
-    set -- harness
+    set -- /usr/local/bin/harness
+fi
+
+if [ "${1#*/}" = "$1" ] && [ -x "/usr/local/bin/$1" ]; then
+    cmd="/usr/local/bin/$1"
+    shift
+    set -- "$cmd" "$@"
 fi
 
 exec "$@"

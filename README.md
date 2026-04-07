@@ -61,7 +61,7 @@ cp templates/run.example.json docker/config/config.json
 docker compose up
 ```
 
-`docker compose` uses a persistent bind mount at `./docker/config -> /workspace/config` and starts `with-config`, which auto-selects:
+`docker compose` uses a persistent bind mount at `./docker/config -> /workspace/config` and starts `/usr/local/bin/with-config`, which auto-selects:
 
 ```bash
 # run mode when config exists
@@ -96,7 +96,7 @@ docker run --rm -it \
   -v "$PWD/docker/config:/workspace/config" \
   -w /workspace \
   moltenhub-code:latest \
-  with-config
+  /usr/local/bin/with-config
 ```
 
 Container startup pre-registers auth before any Codex stage:

@@ -9,4 +9,4 @@ services:
       - .env
     volumes:
       - ./docker/config:/workspace/config
-    command: ["with-config"]
+    command: ["/usr/local/bin/with-config"]

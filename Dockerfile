@@ -37,11 +37,12 @@ WORKDIR /workspace
 COPY --from=build /out/harness /usr/local/bin/harness
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 COPY docker/with-config.sh /usr/local/bin/with-config
-RUN chmod +x /usr/local/bin/harness /usr/local/bin/entrypoint /usr/local/bin/with-config
+RUN sed -i 's/\r$//' /usr/local/bin/entrypoint /usr/local/bin/with-config \
+    && chmod +x /usr/local/bin/harness /usr/local/bin/entrypoint /usr/local/bin/with-config
 
 VOLUME ["/workspace/config"]
 
 USER app
 
 ENTRYPOINT ["/usr/local/bin/entrypoint"]
-CMD ["with-config"]
+CMD ["/usr/local/bin/with-config"]
