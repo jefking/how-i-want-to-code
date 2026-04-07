@@ -77,7 +77,7 @@ func run() int {
 func printUsage() {
 	fmt.Fprintln(os.Stderr, "usage: harness run --config <path-to-json>")
 	fmt.Fprintln(os.Stderr, "   or: harness multiplex --config <path-or-dir> [--config <path-or-dir> ...] [--parallel <n>]")
-	fmt.Fprintln(os.Stderr, "   or: harness hub (--init <path-to-init-json> | --config <path-to-config-json>) [--parallel <n>] [--ui-listen <host:port>] [--ui-automatic]")
+	fmt.Fprintln(os.Stderr, "   or: harness hub [--init <path-to-init-json> | --config <path-to-config-json>] [--parallel <n>] [--ui-listen <host:port>] [--ui-automatic]")
 }
 
 func runSingle(args []string) int {
@@ -214,34 +214,10 @@ func runHub(args []string) int {
 	if err := fs.Parse(args); err != nil {
 		return harness.ExitUsage
 	}
-	if strings.TrimSpace(*initPath) == "" && strings.TrimSpace(*configPath) == "" {
-		fmt.Fprintln(os.Stderr, "missing required --init or --config flag")
-		return harness.ExitUsage
-	}
-	if strings.TrimSpace(*initPath) != "" && strings.TrimSpace(*configPath) != "" {
-		fmt.Fprintln(os.Stderr, "provide only one of --init or --config")
-		return harness.ExitUsage
-	}
-
-	var (
-		cfg hub.InitConfig
-		err error
-	)
-	if strings.TrimSpace(*configPath) != "" {
-		runtimeCfg, err := hub.LoadRuntimeConfig(*configPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "runtime config error: %v\n", err)
-			return harness.ExitConfig
-		}
-		cfg = runtimeCfg.Init()
-		cfg.RuntimeConfigPath = strings.TrimSpace(*configPath)
-	} else {
-		cfg, err = hub.LoadInit(*initPath)
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "init config error: %v\n", err)
-			return harness.ExitConfig
-		}
-		cfg.RuntimeConfigPath = hub.ResolveRuntimeConfigPath(*initPath)
+	cfg, exitCode, err := loadHubBootConfig(*initPath, *configPath)
+	if err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		return exitCode
 	}
 	if *parallel > 0 {
 		cfg.Dispatcher.MaxParallel = *parallel
@@ -595,6 +571,46 @@ func runHub(args []string) int {
 		return hubExitCode(err)
 	}
 	return harness.ExitSuccess
+}
+
+func loadHubBootConfig(initPath, configPath string) (hub.InitConfig, int, error) {
+	initPath = strings.TrimSpace(initPath)
+	configPath = strings.TrimSpace(configPath)
+
+	if initPath != "" && configPath != "" {
+		return hub.InitConfig{}, harness.ExitUsage, fmt.Errorf("provide only one of --init or --config")
+	}
+
+	if configPath != "" {
+		runtimeCfg, err := hub.LoadRuntimeConfig(configPath)
+		if err != nil {
+			return hub.InitConfig{}, harness.ExitConfig, fmt.Errorf("runtime config error: %w", err)
+		}
+		cfg := runtimeCfg.Init()
+		cfg.RuntimeConfigPath = runtimeCfg.RuntimeConfigPath
+		return cfg, harness.ExitSuccess, nil
+	}
+
+	if initPath != "" {
+		cfg, err := hub.LoadInit(initPath)
+		if err != nil {
+			return hub.InitConfig{}, harness.ExitConfig, fmt.Errorf("init config error: %w", err)
+		}
+		cfg.RuntimeConfigPath = hub.ResolveRuntimeConfigPath(initPath)
+		return cfg, harness.ExitSuccess, nil
+	}
+
+	runtimeCfg, err := hub.LoadRuntimeConfig("")
+	if err != nil {
+		if errors.Is(err, os.ErrNotExist) {
+			return hub.InitConfig{}, harness.ExitUsage, fmt.Errorf("missing required --init or --config flag")
+		}
+		return hub.InitConfig{}, harness.ExitConfig, fmt.Errorf("runtime config error: %w", err)
+	}
+
+	cfg := runtimeCfg.Init()
+	cfg.RuntimeConfigPath = runtimeCfg.RuntimeConfigPath
+	return cfg, harness.ExitSuccess, nil
 }
 
 func writeStdoutLine(logger *terminalLogger, line string) {

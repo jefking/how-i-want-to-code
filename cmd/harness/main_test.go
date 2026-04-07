@@ -73,11 +73,111 @@ func TestRunMultiplexUsageMissingConfigFlag(t *testing.T) {
 
 func TestRunHubUsageMissingInitOrConfigFlag(t *testing.T) {
 	orig := os.Args
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+	tempDir := t.TempDir()
 	t.Cleanup(func() { os.Args = orig })
+	t.Cleanup(func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
 	os.Args = []string{"harness", "hub"}
 
 	if code := run(); code != 2 {
 		t.Fatalf("run() = %d, want 2", code)
+	}
+}
+
+func TestLoadHubBootConfigUsesDefaultRuntimeConfigWhenFlagsOmitted(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, ".moltenhub")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+
+	configPath := filepath.Join(configDir, "config.json")
+	configJSON := `{
+  "version": "v1",
+  "base_url": "https://na.hub.molten.bot/v1",
+  "agent_token": "agent_123",
+  "agent_harness": "codex",
+  "session_key": "main",
+  "timeout_ms": 20000
+}`
+	if err := os.WriteFile(configPath, []byte(configJSON), 0o600); err != nil {
+		t.Fatalf("write runtime config: %v", err)
+	}
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	cfg, exitCode, err := loadHubBootConfig("", "")
+	if err != nil {
+		t.Fatalf("loadHubBootConfig() error = %v", err)
+	}
+	if exitCode != harness.ExitSuccess {
+		t.Fatalf("loadHubBootConfig() exitCode = %d, want %d", exitCode, harness.ExitSuccess)
+	}
+	if cfg.RuntimeConfigPath != "./.moltenhub/config.json" {
+		t.Fatalf("RuntimeConfigPath = %q, want %q", cfg.RuntimeConfigPath, "./.moltenhub/config.json")
+	}
+	if cfg.AgentToken != "agent_123" {
+		t.Fatalf("AgentToken = %q, want %q", cfg.AgentToken, "agent_123")
+	}
+}
+
+func TestLoadHubBootConfigWithoutFlagsReturnsConfigErrorForInvalidDefaultRuntimeConfig(t *testing.T) {
+	wd, err := os.Getwd()
+	if err != nil {
+		t.Fatalf("getwd: %v", err)
+	}
+
+	tempDir := t.TempDir()
+	configDir := filepath.Join(tempDir, ".moltenhub")
+	if err := os.MkdirAll(configDir, 0o755); err != nil {
+		t.Fatalf("mkdir config dir: %v", err)
+	}
+
+	configPath := filepath.Join(configDir, "config.json")
+	if err := os.WriteFile(configPath, []byte(`{"base_url":"https://na.hub.molten.bot/v1"}`), 0o600); err != nil {
+		t.Fatalf("write runtime config: %v", err)
+	}
+
+	if err := os.Chdir(tempDir); err != nil {
+		t.Fatalf("chdir temp dir: %v", err)
+	}
+	t.Cleanup(func() {
+		if err := os.Chdir(wd); err != nil {
+			t.Fatalf("restore cwd: %v", err)
+		}
+	})
+
+	_, exitCode, err := loadHubBootConfig("", "")
+	if err == nil {
+		t.Fatal("loadHubBootConfig() error = nil, want error")
+	}
+	if exitCode != harness.ExitConfig {
+		t.Fatalf("loadHubBootConfig() exitCode = %d, want %d", exitCode, harness.ExitConfig)
+	}
+	if !strings.Contains(err.Error(), "runtime config error:") {
+		t.Fatalf("error = %q, want runtime config error prefix", err)
 	}
 }
 
