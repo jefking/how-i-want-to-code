@@ -10,6 +10,11 @@ Provide one of these files:
 - `init.json` to run `harness hub --init /workspace/config/init.json` when `config.json` is absent
 - if both files are absent and `MOLTEN_HUB_TOKEN` is set, `with-config` auto-generates a temporary init config and starts hub mode
 
+When running hub mode, `init.json` may also include runtime secrets:
+
+- `github_token` (or `githubToken`) for GitHub auth bootstrap
+- `openai_api_key` (or `openaiApiKey`) for Codex CLI login when using the Codex harness
+
 You can bootstrap from examples:
 
 ```bash

@@ -55,7 +55,7 @@ Supported harness values:
 
 Pass secrets at container runtime, not at build time. `.env` is excluded from Docker build context via `.dockerignore` so tokens are never copied into image layers.
 
-Create a local env file:
+Optional `.env` flow:
 
 ```bash
 cp .env.example .env
@@ -70,6 +70,11 @@ ANTHROPIC_API_KEY=sk-ant-xxx
 AUGMENT_API_TOKEN=xxx
 AGENT_HARNESS=codex
 ```
+
+`init.json` flow (no `.env` required for hub mode):
+
+- Add `github_token` to satisfy `gh` auth setup
+- Add `openai_api_key` when using the Codex harness
 
 Run with Docker Compose (`docker-compose.yml`):
 
@@ -100,6 +105,12 @@ cp templates/init.example.json moltenhub/init.json
 docker compose up
 ```
 
+For `init.json`-only startup, ensure the container user can read the file:
+
+```bash
+chmod 644 moltenhub/init.json
+```
+
 GitHub Actions publish flow:
 
 - `deploy-vnext` runs automatically on pushes to `main` (including PR merges) and publishes:
@@ -126,8 +137,10 @@ docker run --rm -it \
 Container startup pre-registers auth before any agent stage:
 
 - maps `GITHUB_TOKEN` to `GH_TOKEN` for `gh` commands
+- if `GITHUB_TOKEN`/`GH_TOKEN` are not set, it reads `github_token` from init JSON and exports it
 - runs `gh auth status` and `gh auth setup-git`
 - configures GitHub URL rewrites so `git@github.com:*` and `ssh://git@github.com/*` can use PAT-backed HTTPS
+- for Codex, it reads `openai_api_key` from init JSON when `OPENAI_API_KEY` is unset and performs `codex login --with-api-key`
 
 Single run:
 

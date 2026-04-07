@@ -11,8 +11,6 @@ services:
     ports:
       - 3232:7777
     shm_size: "8gb"
-    env_file:
-      - .env
     volumes:
       - ./.moltenhub/moltenbot000:/workspace/
     command: ["harness", "hub", "--init", "/workspace/init.json", "--ui-listen", ":7777"]
