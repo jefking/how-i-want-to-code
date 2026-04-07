@@ -243,15 +243,15 @@
       <h2 class="text-[2rem] font-semibold leading-tight text-hub-text">Authorize Codex to get started</h2>
 
       <div id="agent-auth-details" class="mt-5 hidden space-y-3">
-        <a id="agent-auth-url" class="block break-all text-[1.05rem] text-[#8dc6ff] underline decoration-dotted underline-offset-2" href="" target="_blank" rel="noopener noreferrer"></a>
         <div class="flex flex-wrap items-center gap-2.5">
           <div id="agent-auth-code" class="font-mono text-[1.15rem] tracking-[0.22em] text-hub-text"></div>
           <button id="agent-auth-copy" class="rounded-md border border-white/20 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-hub-text hover:bg-white/10" type="button">Copy</button>
         </div>
+        <a id="agent-auth-url" class="block break-all text-[1.05rem] text-[#8dc6ff] underline decoration-dotted underline-offset-2" href="" target="_blank" rel="noopener noreferrer"></a>
       </div>
 
       <div class="mt-auto flex justify-end pt-4">
-        <button id="agent-auth-verify" class="rounded-lg border border-hub-border bg-[#173d2b] px-3 py-2 text-sm font-medium text-hub-text hover:bg-[#1f533a]" type="button">Done</button>
+        <button id="agent-auth-verify" class="hidden rounded-lg border border-hub-border bg-[#173d2b] px-3 py-2 text-sm font-medium text-hub-text hover:bg-[#1f533a]" type="button">Done</button>
       </div>
     </div>
   </div>
@@ -362,6 +362,8 @@
       openTerminalTaskIDs: new Set(),
       taskFullscreenOpen: false,
       agentAuthBusy: false,
+      agentAuthInteracted: false,
+      agentAuthChallengeKey: "",
     };
     let agentAuthRefreshTimer = null;
 
@@ -475,9 +477,29 @@
       }
     }
 
+    function updateAgentAuthDoneVisibility() {
+      if (!agentAuthVerify) return;
+      const visible = state.agentAuth.required &&
+        !state.agentAuth.ready &&
+        state.agentAuthInteracted;
+      agentAuthVerify.classList.toggle("hidden", !visible);
+    }
+
+    function markAgentAuthInteraction() {
+      if (state.agentAuthInteracted) return;
+      state.agentAuthInteracted = true;
+      updateAgentAuthDoneVisibility();
+    }
+
     function applyAgentAuthGate(auth) {
       state.agentAuth = normalizeAgentAuth(auth);
       const gateVisible = state.agentAuth.required && !state.agentAuth.ready;
+      const challengeKey = `${state.agentAuth.deviceCode}|${state.agentAuth.authURL}`;
+
+      if (state.agentAuthChallengeKey !== challengeKey) {
+        state.agentAuthChallengeKey = challengeKey;
+        state.agentAuthInteracted = false;
+      }
 
       if (agentAuthGate) {
         agentAuthGate.classList.toggle("hidden", !gateVisible);
@@ -502,9 +524,7 @@
         agentAuthCopy.classList.toggle("hidden", !state.agentAuth.deviceCode);
       }
 
-      if (agentAuthVerify) {
-        agentAuthVerify.classList.toggle("hidden", state.agentAuth.ready);
-      }
+      updateAgentAuthDoneVisibility();
       if (localPromptSubmit) {
         const submitDisabled = state.agentAuthBusy || (state.agentAuth.required && !state.agentAuth.ready);
         localPromptSubmit.disabled = submitDisabled;
@@ -513,6 +533,7 @@
     }
 
     async function copyAgentAuthCode() {
+      markAgentAuthInteraction();
       const code = String(state.agentAuth.deviceCode || "").trim();
       const url = String(state.agentAuth.authURL || "").trim();
       const value = code || url;
@@ -2312,6 +2333,9 @@
     builderPromptInput.addEventListener("paste", handlePromptImagePaste);
     builderImagePasteTarget.addEventListener("paste", handlePromptImagePaste);
     builderImagesClear.addEventListener("click", clearPromptImages);
+    if (agentAuthURL) {
+      agentAuthURL.addEventListener("click", markAgentAuthInteraction);
+    }
     if (agentAuthCopy) {
       agentAuthCopy.addEventListener("click", copyAgentAuthCode);
     }

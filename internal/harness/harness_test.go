@@ -1738,6 +1738,33 @@ func TestRunCommandStreamRunnerMergesCapturedOutput(t *testing.T) {
 	}
 }
 
+func TestRunCodexReturnsErrorWhenCodexReportsFailure(t *testing.T) {
+	t.Parallel()
+
+	targetDir := t.TempDir()
+	prompt := "make home page pink"
+	firstCmd := codexCommand(targetDir, prompt)
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{
+			cmd: firstCmd,
+			res: execx.Result{
+				Stdout: "Failure: I could not start any local repository command.",
+				Stderr: "Error details:\n- Something went wrong",
+			},
+		},
+	}}
+
+	h := New(fake)
+	err := h.runCodex(context.Background(), agentruntime.Default(), targetDir, prompt, codexRunOptions{}, "")
+	if err == nil {
+		t.Fatal("runCodex() error = nil, want codex reported failure error")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "codex reported failure") {
+		t.Fatalf("runCodex() error = %v, want codex reported failure marker", err)
+	}
+}
+
 func TestShouldRetryCodexWithoutSandbox(t *testing.T) {
 	t.Parallel()
 
@@ -1786,6 +1813,22 @@ func TestShouldRetryCodexWithoutSandbox(t *testing.T) {
 				t.Fatalf("shouldRetryCodexWithoutSandbox(...) = %v, want %v", got, tt.want)
 			}
 		})
+	}
+}
+
+func TestCodexReportedFailure(t *testing.T) {
+	t.Parallel()
+
+	if failed, detail := codexReportedFailure(execx.Result{
+		Stdout: "Failure: I could not start any local repository command.",
+	}); !failed || !strings.HasPrefix(detail, "Failure:") {
+		t.Fatalf("codexReportedFailure(failure line) = (%v, %q), want (true, 'Failure:...')", failed, detail)
+	}
+
+	if failed, detail := codexReportedFailure(execx.Result{
+		Stdout: "All good. No changes needed.",
+	}); failed || detail != "" {
+		t.Fatalf("codexReportedFailure(success text) = (%v, %q), want (false, \"\")", failed, detail)
 	}
 }
 

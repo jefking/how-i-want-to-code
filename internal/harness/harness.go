@@ -1150,11 +1150,21 @@ func (h Harness) runCodexWithHeartbeat(
 	for {
 		select {
 		case run := <-done:
+			if run.err == nil {
+				if failed, detail := codexReportedFailure(run.res); failed {
+					return run.res, fmt.Errorf("codex reported failure: %s", detail)
+				}
+			}
 			return run.res, run.err
 		case <-ticker.C:
 			h.logf("stage=codex status=running elapsed_s=%d", int(time.Since(start).Seconds()))
 		case <-ctx.Done():
 			run := <-done
+			if run.err == nil {
+				if failed, detail := codexReportedFailure(run.res); failed {
+					return run.res, fmt.Errorf("codex reported failure: %s", detail)
+				}
+			}
 			if run.err != nil {
 				return run.res, run.err
 			}
@@ -1200,6 +1210,24 @@ func shouldRetryCodexWithoutSandbox(res execx.Result, err error) bool {
 		return true
 	}
 	return false
+}
+
+func codexReportedFailure(res execx.Result) (bool, string) {
+	combined := strings.TrimSpace(strings.Join([]string{res.Stdout, res.Stderr}, "\n"))
+	if combined == "" {
+		return false, ""
+	}
+	lines := splitOutputLines(combined)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		if strings.HasPrefix(strings.ToLower(trimmed), "failure:") {
+			return true, trimmed
+		}
+	}
+	return false, ""
 }
 func resolveTargetDir(repoDir, targetSubdir string) (string, error) {
 	targetDir := filepath.Join(repoDir, filepath.Clean(targetSubdir))
