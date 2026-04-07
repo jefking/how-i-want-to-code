@@ -1329,6 +1329,19 @@ body.task-fullscreen-open #task-fullscreen-toggle {
 }
 
 @media (max-width: 640px) {
+  .prompt-actions {
+    gap: 6px;
+  }
+
+  .prompt-action-paste {
+    flex-basis: 100%;
+  }
+
+  .prompt-action-button {
+    flex: 1 1 0;
+    min-inline-size: 0;
+  }
+
   .app {
     padding: 20px 14px 14px;
   }
@@ -1353,20 +1366,6 @@ body.task-fullscreen-open #task-fullscreen-toggle {
   .status-item-metrics .status-value {
     white-space: normal;
   }
-
-  .prompt-actions {
-    gap: 6px;
-  }
-
-  .prompt-action-paste {
-    flex-basis: 100%;
-  }
-
-  .prompt-action-button {
-    flex: 1 1 0;
-    min-inline-size: 0;
-  }
-
   .prompt-action-paste,
   .prompt-action-button {
     padding-left: 8px;
