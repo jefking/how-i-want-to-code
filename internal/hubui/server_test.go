@@ -185,13 +185,16 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to include full screen task toggle handler")
 	}
 	if !strings.Contains(markup, "function fullscreenTasks(") {
-		t.Fatalf("expected index html to exclude the main pseudo-task from full screen mode")
+		t.Fatalf("expected index html to include full screen task list renderer")
 	}
 	if !strings.Contains(markup, "function isMinimizedTask(") {
 		t.Fatalf("expected index html to include completed-task minimization handler")
 	}
-	if !strings.Contains(markup, "if (task.request_id === MAIN_TASK_ID) return true;") {
-		t.Fatalf("expected index html to collapse the main thread task by default")
+	if strings.Contains(markup, "MAIN_TASK_ID") || strings.Contains(markup, "MAIN_TASK_LABEL") {
+		t.Fatalf("expected index html to remove the tasks history pseudo-task constants")
+	}
+	if strings.Contains(markup, "default thread") {
+		t.Fatalf("expected index html to remove default thread pseudo-task rendering")
 	}
 	if !strings.Contains(markup, `"task-collapsed"`) {
 		t.Fatalf("expected index html to include collapsed task class usage")

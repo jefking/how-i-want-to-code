@@ -245,8 +245,6 @@
   </div>
 
   <script>
-    const MAIN_TASK_ID = "__main__";
-    const MAIN_TASK_LABEL = "main";
     const TASK_PROMPT_PREVIEW_MAX = 30;
     const DISMISSED_TASKS_KEY = "hubui.dismissedTaskIds";
     const REPO_HISTORY_KEY = "hubui.repoHistory.v1";
@@ -1144,9 +1142,6 @@
 
     function taskDisplayLabel(task) {
       const id = task?.display_id || task?.request_id || "";
-      if (!task || task.request_id === MAIN_TASK_ID) {
-        return id;
-      }
       const preview = taskPromptPreview(task);
       if (!preview) {
         return id;
@@ -1191,7 +1186,7 @@
     }
 
     function isCompletedTask(task) {
-      if (!task || task.request_id === MAIN_TASK_ID) {
+      if (!task) {
         return false;
       }
       return COMPLETED_STATUSES.has(task.status || "");
@@ -1199,7 +1194,6 @@
 
     function isMinimizedTask(task) {
       if (!task) return false;
-      if (task.request_id === MAIN_TASK_ID) return true;
       return isCompletedTask(task);
     }
 
@@ -1316,7 +1310,7 @@
     }
 
     function canRerunTask(task) {
-      if (!task || task.request_id === MAIN_TASK_ID) {
+      if (!task) {
         return false;
       }
       if (!isCompletedTask(task)) {
@@ -1363,24 +1357,6 @@
       }
     }
 
-    function extractField(line, key) {
-      if (!line || !key) return "";
-      const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-      const match = line.match(new RegExp(`(?:^|\\s)${escaped}=([^\\s]+)`));
-      return match ? match[1] : "";
-    }
-
-    function decodeB64(value) {
-      if (!value) return "";
-      try {
-        const raw = atob(value);
-        const bytes = Uint8Array.from(raw, (c) => c.charCodeAt(0));
-        return new TextDecoder().decode(bytes);
-      } catch (_err) {
-        return "";
-      }
-    }
-
     function parseTaskTimestamp(iso) {
       const ts = new Date(String(iso || "")).getTime();
       if (!Number.isFinite(ts)) return 0;
@@ -1415,42 +1391,6 @@
     }
 
     function displayTasks(snapshot) {
-      const events = snapshot.events || [];
-      const mainLogs = [];
-      let startedAt = "";
-
-      for (const event of events) {
-        if (event.request_id) continue;
-
-        if (!startedAt && event.time) {
-          startedAt = event.time;
-        }
-
-        const line = event.line || "";
-        const stream = extractField(line, "stream") || "meta";
-        const b64 = extractField(line, "b64");
-        const decoded = decodeB64(b64);
-
-        mainLogs.push({
-          time: event.time || snapshot.generated_at,
-          stream,
-          text: decoded || line,
-        });
-      }
-
-      const mainTask = {
-        request_id: MAIN_TASK_ID,
-        display_id: MAIN_TASK_LABEL,
-        status: mainLogs.length ? "active" : "idle",
-        stage: "default thread",
-        skill: "-",
-        repo: "-",
-        repos: [],
-        started_at: startedAt || snapshot.generated_at,
-        updated_at: mainLogs.length ? mainLogs[mainLogs.length - 1].time : snapshot.generated_at,
-        logs: mainLogs,
-      };
-
       const taskItems = (snapshot.tasks || []).filter((task) => {
         if (!task || !task.request_id) {
           return false;
@@ -1461,11 +1401,11 @@
         return !isCompletedTask(task);
       });
 
-      return [mainTask, ...sortTasksByActivity(taskItems)];
+      return sortTasksByActivity(taskItems);
     }
 
     function fullscreenTasks(snapshot) {
-      return displayTasks(snapshot).filter((task) => task && task.request_id !== MAIN_TASK_ID);
+      return displayTasks(snapshot);
     }
 
     function taskPreviewLines(task) {
@@ -1488,7 +1428,7 @@
     }
 
     function taskProgressIndex(task) {
-      if (!task || task.request_id === MAIN_TASK_ID) {
+      if (!task) {
         return 0;
       }
 
@@ -1517,7 +1457,7 @@
     }
 
     function renderTaskProgress(task) {
-      if (!task || task.request_id === MAIN_TASK_ID || isCompletedTask(task)) {
+      if (!task || isCompletedTask(task)) {
         return null;
       }
 
@@ -1579,7 +1519,7 @@
       if (!node) return;
       clearTaskResult(node);
 
-      if (!task || task.request_id === MAIN_TASK_ID) {
+      if (!task) {
         return;
       }
 
