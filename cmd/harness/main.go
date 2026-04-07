@@ -41,7 +41,8 @@ When a task fails:
 Completion requirements:
 - Only create a new branch when starting from 'main'; if you're fixing an existing non-'main' branch, stay on it.
 - Start every new branch and every PR title with 'moltenhub-'.
-- Keep working until there is a PR for your changes and required CI/CD checks are green.
+- Keep working until there is a PR for your changes and required CI/CD checks are green, unless you can verify the request is already satisfied with no required code/workflow/docs changes.
+- If no file changes are required, return a clear no-op result with concrete evidence instead of forcing an empty PR.
 - If CI/CD fails, continue fixing code/tests/workflows until checks pass.
 - If you changed multiple repositories, ensure each changed repository has its own branch and PR.
 - Optimize for the highest-quality PR you can produce with focused, production-ready changes.`
@@ -732,6 +733,11 @@ var failureFollowUpNonRemediableMarkers = []string{
 	"invalid api key",
 	"invalid_authentication",
 	"authentication error",
+	"no delta from",
+	"no commits between",
+	"head sha can't be blank",
+	"base sha can't be blank",
+	"head ref must be a branch",
 }
 
 func shouldQueueFailureFollowUp(failedResult harness.Result) (bool, string) {
