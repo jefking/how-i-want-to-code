@@ -692,7 +692,7 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 	}
 
 	payload := map[string]any{
-		"type":       cfg.Skill.DispatchType,
+		"type":       firstNonEmpty(cfg.Skill.DispatchType, defaultRuntimeDispatchType),
 		"skill":      firstNonEmpty(cfg.Skill.Name, dispatch.Skill),
 		"request_id": failureFollowUpRequestID(dispatch.RequestID),
 		"config":     runConfig,

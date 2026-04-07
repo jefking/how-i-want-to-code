@@ -546,12 +546,22 @@ func TestDispatchResultPayloadIncludesTopLevelFailureMessage(t *testing.T) {
 func TestHandleDispatchInvokesOnDispatchFailed(t *testing.T) {
 	t.Parallel()
 
-	publishRequests := 0
+	var (
+		publishRequests int
+		publishedMsgs   []map[string]any
+	)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/v1/openclaw/messages/publish" {
 			t.Fatalf("unexpected path: %s", r.URL.Path)
 		}
+		defer r.Body.Close()
+		var body map[string]any
+		if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+			t.Fatalf("decode publish body: %v", err)
+		}
+		message, _ := body["message"].(map[string]any)
 		publishRequests++
+		publishedMsgs = append(publishedMsgs, message)
 		w.WriteHeader(http.StatusAccepted)
 		_, _ = w.Write([]byte(`{"ok":true,"result":{"status":"queued"}}`))
 	}))
@@ -605,8 +615,17 @@ func TestHandleDispatchInvokesOnDispatchFailed(t *testing.T) {
 		t.Fatal("timed out waiting for OnDispatchFailed callback")
 	}
 
-	if publishRequests != 1 {
-		t.Fatalf("publish requests = %d, want 1", publishRequests)
+	if publishRequests != 2 {
+		t.Fatalf("publish requests = %d, want 2", publishRequests)
+	}
+	if got := fmt.Sprint(publishedMsgs[0]["status"]); got != "error" {
+		t.Fatalf("first publish status = %q, want error", got)
+	}
+	if got := fmt.Sprint(publishedMsgs[1]["type"]); got != "skill_request" {
+		t.Fatalf("follow-up type = %q, want skill_request", got)
+	}
+	if got := fmt.Sprint(publishedMsgs[1]["request_id"]); got != "req-fail-failure-review" {
+		t.Fatalf("follow-up request_id = %q, want req-fail-failure-review", got)
 	}
 }
 
@@ -615,7 +634,7 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 
 	var (
 		mu             sync.Mutex
-		publishedMsg   map[string]any
+		publishedMsgs  []map[string]any
 		publishRequest int
 	)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -632,7 +651,7 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 
 		mu.Lock()
 		publishRequest++
-		publishedMsg = message
+		publishedMsgs = append(publishedMsgs, message)
 		mu.Unlock()
 
 		w.WriteHeader(http.StatusAccepted)
@@ -701,17 +720,20 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if publishRequest != 1 {
-		t.Fatalf("publish requests = %d, want 1", publishRequest)
+	if publishRequest != 2 {
+		t.Fatalf("publish requests = %d, want 2", publishRequest)
 	}
-	if got := fmt.Sprint(publishedMsg["status"]); got != "error" {
-		t.Fatalf("message.status = %v, want error", publishedMsg["status"])
+	if got := fmt.Sprint(publishedMsgs[0]["status"]); got != "error" {
+		t.Fatalf("message.status = %v, want error", publishedMsgs[0]["status"])
 	}
-	if got := fmt.Sprint(publishedMsg["message"]); !strings.Contains(got, "Failure: task failed. Error details: dispatch acquire: dispatch controller is closed") {
+	if got := fmt.Sprint(publishedMsgs[0]["message"]); !strings.Contains(got, "Failure: task failed. Error details: dispatch acquire: dispatch controller is closed") {
 		t.Fatalf("message.message = %q", got)
 	}
-	if got := fmt.Sprint(publishedMsg["error"]); !strings.Contains(got, "dispatch acquire: dispatch controller is closed") {
+	if got := fmt.Sprint(publishedMsgs[0]["error"]); !strings.Contains(got, "dispatch acquire: dispatch controller is closed") {
 		t.Fatalf("message.error = %q", got)
+	}
+	if got := fmt.Sprint(publishedMsgs[1]["request_id"]); got != "req-closed-controller-failure-review" {
+		t.Fatalf("follow-up request_id = %q, want req-closed-controller-failure-review", got)
 	}
 }
 
