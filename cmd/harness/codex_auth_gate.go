@@ -150,7 +150,8 @@ func (g *codexAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthState
 
 	tmpDir, err := os.MkdirTemp("", "moltenhub-codex-auth-*")
 	if err != nil {
-		return g.Status(context.Background())
+		snap, _ := g.Status(context.Background())
+		return snap, fmt.Errorf("create codex device auth temp dir: %w", err)
 	}
 
 	procCtx, cancel := context.WithCancel(g.baseCtx)
@@ -161,13 +162,15 @@ func (g *codexAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthState
 	if err != nil {
 		_ = os.RemoveAll(tmpDir)
 		cancel()
-		return g.Status(context.Background())
+		snap, _ := g.Status(context.Background())
+		return snap, fmt.Errorf("open codex device auth stdout: %w", err)
 	}
 	stderrPipe, err := cmd.StderrPipe()
 	if err != nil {
 		_ = os.RemoveAll(tmpDir)
 		cancel()
-		return g.Status(context.Background())
+		snap, _ := g.Status(context.Background())
+		return snap, fmt.Errorf("open codex device auth stderr: %w", err)
 	}
 	if err := cmd.Start(); err != nil {
 		_ = os.RemoveAll(tmpDir)

@@ -2,6 +2,7 @@ package hubui
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"net/http/httptest"
@@ -141,5 +142,117 @@ func TestLibraryEndpointMethodAndLoaderVariants(t *testing.T) {
 	srv.Handler().ServeHTTP(resp, req)
 	if resp.Code != http.StatusInternalServerError {
 		t.Fatalf("GET /api/library (loader error) status = %d, want 500", resp.Code)
+	}
+}
+
+func TestAgentAuthEndpointsDefaultAndMethodHandling(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/api/agent-auth")
+	if err != nil {
+		t.Fatalf("GET /api/agent-auth error = %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/agent-auth status = %d, want 200", resp.StatusCode)
+	}
+	var body map[string]any
+	if err := json.NewDecoder(resp.Body).Decode(&body); err != nil {
+		t.Fatalf("decode /api/agent-auth: %v", err)
+	}
+	if ok, _ := body["ok"].(bool); !ok {
+		t.Fatalf("ok = %#v, want true", body["ok"])
+	}
+
+	startResp, err := http.Post(ts.URL+"/api/agent-auth/start-device", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth/start-device error = %v", err)
+	}
+	defer startResp.Body.Close()
+	if startResp.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("POST /api/agent-auth/start-device status = %d, want 501", startResp.StatusCode)
+	}
+
+	verifyResp, err := http.Post(ts.URL+"/api/agent-auth/verify", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth/verify error = %v", err)
+	}
+	defer verifyResp.Body.Close()
+	if verifyResp.StatusCode != http.StatusNotImplemented {
+		t.Fatalf("POST /api/agent-auth/verify status = %d, want 501", verifyResp.StatusCode)
+	}
+
+	methodResp, err := http.Post(ts.URL+"/api/agent-auth", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth error = %v", err)
+	}
+	defer methodResp.Body.Close()
+	if methodResp.StatusCode != http.StatusMethodNotAllowed {
+		t.Fatalf("POST /api/agent-auth status = %d, want 405", methodResp.StatusCode)
+	}
+}
+
+func TestAgentAuthEndpointsWithCallbacks(t *testing.T) {
+	t.Parallel()
+
+	want := AgentAuthState{
+		Harness:    "codex",
+		Required:   true,
+		Ready:      false,
+		State:      "pending_device_auth",
+		Message:    "waiting",
+		AuthURL:    "https://auth.openai.com/codex/device",
+		DeviceCode: "ABCD-EFGH",
+	}
+
+	srv := NewServer("", NewBroker())
+	srv.AgentAuthStatus = func(context.Context) (AgentAuthState, error) {
+		return want, nil
+	}
+	srv.StartAgentAuth = func(context.Context) (AgentAuthState, error) {
+		return want, nil
+	}
+	srv.VerifyAgentAuth = func(context.Context) (AgentAuthState, error) {
+		return AgentAuthState{
+			Harness:  "codex",
+			Required: true,
+			Ready:    true,
+			State:    "ready",
+			Message:  "ready",
+		}, nil
+	}
+
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	statusResp, err := http.Get(ts.URL + "/api/agent-auth")
+	if err != nil {
+		t.Fatalf("GET /api/agent-auth error = %v", err)
+	}
+	defer statusResp.Body.Close()
+	if statusResp.StatusCode != http.StatusOK {
+		t.Fatalf("GET /api/agent-auth status = %d, want 200", statusResp.StatusCode)
+	}
+
+	startResp, err := http.Post(ts.URL+"/api/agent-auth/start-device", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth/start-device error = %v", err)
+	}
+	defer startResp.Body.Close()
+	if startResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/agent-auth/start-device status = %d, want 200", startResp.StatusCode)
+	}
+
+	verifyResp, err := http.Post(ts.URL+"/api/agent-auth/verify", "application/json", nil)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth/verify error = %v", err)
+	}
+	defer verifyResp.Body.Close()
+	if verifyResp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/agent-auth/verify status = %d, want 200", verifyResp.StatusCode)
 	}
 }
