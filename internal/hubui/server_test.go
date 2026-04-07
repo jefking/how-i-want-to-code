@@ -175,6 +175,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function renderTaskProgress(") {
 		t.Fatalf("expected index html to include renderTaskProgress handler")
 	}
+	if !strings.Contains(markup, "function formatTaskBranch(") {
+		t.Fatalf("expected index html to include branch formatter for task metadata")
+	}
 	if !strings.Contains(markup, "function toggleTaskOutput(") {
 		t.Fatalf("expected index html to include task output toggle handler")
 	}
@@ -185,13 +188,16 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to include full screen task toggle handler")
 	}
 	if !strings.Contains(markup, "function fullscreenTasks(") {
-		t.Fatalf("expected index html to exclude the main pseudo-task from full screen mode")
+		t.Fatalf("expected index html to include full screen task list renderer")
 	}
 	if !strings.Contains(markup, "function isMinimizedTask(") {
 		t.Fatalf("expected index html to include completed-task minimization handler")
 	}
-	if !strings.Contains(markup, "if (task.request_id === MAIN_TASK_ID) return true;") {
-		t.Fatalf("expected index html to collapse the main thread task by default")
+	if strings.Contains(markup, "MAIN_TASK_ID") || strings.Contains(markup, "MAIN_TASK_LABEL") {
+		t.Fatalf("expected index html to remove the tasks history pseudo-task constants")
+	}
+	if strings.Contains(markup, "default thread") {
+		t.Fatalf("expected index html to remove default thread pseudo-task rendering")
 	}
 	if !strings.Contains(markup, `"task-collapsed"`) {
 		t.Fatalf("expected index html to include collapsed task class usage")
@@ -265,6 +271,24 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "setTerminalOutputOpen(task.request_id, nextOpen);") {
 		t.Fatalf("expected index html to open full terminal output from task Open Output action")
 	}
+	if strings.Contains(markup, "Output hidden. Use Open Output to preview.") {
+		t.Fatalf("expected index html to remove collapsed task output placeholder copy")
+	}
+	if strings.Contains(markup, "stage.textContent = `stage:") {
+		t.Fatalf("expected index html to remove stage metadata line from task cards")
+	}
+	if !strings.Contains(markup, "branch.textContent = `branch: ${formatTaskBranch(task)}`;") {
+		t.Fatalf("expected index html to render branch metadata beneath repos")
+	}
+	if strings.Contains(markup, "return `${id} | ${preview}`;") {
+		t.Fatalf("expected index html to remove request id prefix from task display title")
+	}
+	if !strings.Contains(markup, "return \"(prompt unavailable)\";") {
+		t.Fatalf("expected index html to provide prompt-only task titles with fallback text")
+	}
+	if !strings.Contains(markup, "id.title = prompt;") {
+		t.Fatalf("expected index html task title tooltip to contain prompt text only")
+	}
 	if !strings.Contains(markup, `id="local-conn-text"`) {
 		t.Fatalf("expected index html to include local connection indicator")
 	}
@@ -282,6 +306,18 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `setIndicator(hubConnItem, hubConnDot, hubConnText, "Molten Hub", online, text);`) {
 		t.Fatalf("expected index html to render hub indicator label as Molten Hub")
+	}
+	if !strings.Contains(markup, "function applyHubDotMode(") {
+		t.Fatalf("expected index html to include hub transport dot mode handler")
+	}
+	if !strings.Contains(markup, "conn.hub_transport") {
+		t.Fatalf("expected index html to read hub transport mode from connection state")
+	}
+	if !strings.Contains(markup, "Connected via WebSocket") {
+		t.Fatalf("expected index html to include websocket connection copy")
+	}
+	if !strings.Contains(markup, "Connected via HTTP long polling") {
+		t.Fatalf("expected index html to include HTTP long-polling connection copy")
 	}
 	if !strings.Contains(markup, `id="prompt-visibility-toggle"`) {
 		t.Fatalf("expected index html to include studio visibility toggle")
@@ -319,8 +355,14 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="builder-image-paste-target"`) {
 		t.Fatalf("expected index html to include screenshot paste target")
 	}
+	if !strings.Contains(markup, `w-[85%]`) {
+		t.Fatalf("expected index html to constrain screenshot paste target width to 85 percent")
+	}
 	if !strings.Contains(markup, `id="builder-image-list"`) {
 		t.Fatalf("expected index html to include screenshot attachment list")
+	}
+	if strings.Contains(markup, ">Screenshots<") {
+		t.Fatalf("expected index html to remove the screenshots title label")
 	}
 	if strings.Contains(markup, "No screenshots attached.") {
 		t.Fatalf("expected index html to hide screenshot empty-state copy until images are attached")
@@ -334,11 +376,14 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if strings.Contains(markup, "Paste PNG screenshots here or directly into the prompt field. Attached images are sent to Codex during startup.") {
 		t.Fatalf("expected index html to remove verbose screenshot helper copy")
 	}
-	if !strings.Contains(markup, `class="prompt-actions flex items-center justify-end gap-2.5"`) {
+	if !strings.Contains(markup, `class="prompt-actions flex items-center gap-2.5"`) {
 		t.Fatalf("expected index html to render prompt actions without flex wrapping")
 	}
-	if !strings.Contains(markup, `id="local-prompt-submit" class="prompt-submit ml-auto`) {
-		t.Fatalf("expected index html to keep the Run button right-aligned in prompt actions")
+	if !strings.Contains(markup, `id="builder-images-clear"`) {
+		t.Fatalf("expected index html to render screenshot Clear button in prompt actions")
+	}
+	if !strings.Contains(markup, `id="local-prompt-submit" class="prompt-submit`) {
+		t.Fatalf("expected index html to keep the Run button in prompt actions")
 	}
 	if !strings.Contains(markup, `const QUEUED_STATUS_TIMEOUT_MS = 8_000;`) {
 		t.Fatalf("expected index html to include queued status timeout constant")
@@ -350,9 +395,10 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to clear queued status after timeout")
 	}
 	statusIdx := strings.Index(markup, `id="local-prompt-status"`)
+	clearIdx := strings.Index(markup, `id="builder-images-clear"`)
 	runIdx := strings.Index(markup, `id="local-prompt-submit"`)
-	if statusIdx == -1 || runIdx == -1 || statusIdx > runIdx {
-		t.Fatalf("expected queued status text to render to the left of the Run button")
+	if statusIdx == -1 || clearIdx == -1 || runIdx == -1 || statusIdx > clearIdx || clearIdx > runIdx {
+		t.Fatalf("expected queued status, Clear, and Run to render in left-to-right order")
 	}
 	if !strings.Contains(markup, `id="builder-repo-input" class="prompt-control prompt-input"`) || !strings.Contains(markup, `id="builder-target-subdir" class="prompt-control prompt-input"`) {
 		t.Fatalf("expected index html to include builder repo and target subdir inputs")
@@ -499,6 +545,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".status-item-metrics") {
 		t.Fatalf("expected stylesheet to include metrics pill styles")
+	}
+	if !strings.Contains(css, ".dot.http") {
+		t.Fatalf("expected stylesheet to include HTTP long-poll dot styles")
+	}
+	if !strings.Contains(css, ".dot.disconnected") {
+		t.Fatalf("expected stylesheet to include disconnected dot styles")
 	}
 	if strings.Contains(css, "cursor:") {
 		t.Fatalf("expected stylesheet to avoid custom cursor styles")
