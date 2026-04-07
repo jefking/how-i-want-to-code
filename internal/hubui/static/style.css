@@ -551,6 +551,10 @@ select.prompt-control {
 }
 
 .prompt-input-action-wrap .prompt-input {
+  padding-right: 12px;
+}
+
+.prompt-input-action-wrap[data-has-action="true"] .prompt-input {
   padding-right: 38px;
 }
 
@@ -572,6 +576,17 @@ select.prompt-control {
   font-weight: 800;
   line-height: 1;
   transition: border-color 0.12s ease, background-color 0.12s ease, color 0.12s ease;
+}
+
+.prompt-input-action[hidden] {
+  display: none;
+}
+
+.prompt-input-action-icon {
+  display: block;
+  font-size: 0.95rem;
+  line-height: 1;
+  transform: translateY(-0.5px);
 }
 
 .prompt-input-action:hover:not(:disabled),

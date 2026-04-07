@@ -443,6 +443,11 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="builder-base-branch-clear"`) {
 		t.Fatalf("expected index html to include branch clear action")
 	}
+	if !strings.Contains(markup, `data-has-action="false"`) ||
+		!strings.Contains(markup, `aria-hidden="true"`) ||
+		!strings.Contains(markup, `hidden`) {
+		t.Fatalf("expected index html to hide the branch clear action while already on main")
+	}
 	if !strings.Contains(markup, `class="prompt-grid"`) ||
 		!strings.Contains(markup, `id="builder-repo-history-field" class="prompt-field prompt-field-repo-history"`) ||
 		!strings.Contains(markup, `class="prompt-field prompt-field-repository"`) ||
@@ -450,7 +455,10 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		!strings.Contains(markup, `class="prompt-field prompt-field-target-subdir"`) {
 		t.Fatalf("expected index html to include the builder row with explicit field layout classes")
 	}
-	if !strings.Contains(markup, "function syncBaseBranchClearState(") || !strings.Contains(markup, "builderBaseBranchClear.addEventListener(\"click\", resetBaseBranchToMain);") {
+	if !strings.Contains(markup, "function syncBaseBranchClearState(") ||
+		!strings.Contains(markup, "builderBaseBranchClear.hidden = isMain;") ||
+		!strings.Contains(markup, "branchActionWrap.dataset.hasAction = isMain ? \"false\" : \"true\";") ||
+		!strings.Contains(markup, "builderBaseBranchClear.addEventListener(\"click\", resetBaseBranchToMain);") {
 		t.Fatalf("expected index html to include branch clear behavior")
 	}
 	if !strings.Contains(markup, "function resetBuilderTargetSubdir(") || !strings.Contains(markup, "builderTargetSubdir.value = \".\";") {
