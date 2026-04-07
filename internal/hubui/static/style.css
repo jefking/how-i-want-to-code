@@ -636,11 +636,14 @@ select.prompt-control {
   box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.7);
 }
 
+.prompt-action-button {
+  width: auto;
+  display: inline-flex;
+}
+
 .prompt-action-button,
 .task-terminal-toggle,
 .task-fullscreen-toggle {
-  width: auto;
-  display: inline-flex;
   align-items: center;
   justify-content: center;
   flex: 0 0 auto;
