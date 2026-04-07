@@ -201,12 +201,12 @@ func extractConfigValue(msg map[string]any) (any, bool) {
 	paths := [][]string{
 		{"config"},
 		{"input"},
-		{"payload"},
-		{"data"},
 		{"payload", "config"},
 		{"payload", "input"},
 		{"data", "config"},
 		{"data", "input"},
+		{"payload"},
+		{"data"},
 	}
 	for _, path := range paths {
 		if value, ok := valueAtPath(msg, path...); ok {

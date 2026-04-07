@@ -315,13 +315,19 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 12px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
 		t.Fatalf("expected studio form content to scroll instead of clipping controls")
 	}
-	if !strings.Contains(css, ".prompt-actions {\n  display: flex;\n  align-items: stretch;\n  flex-wrap: wrap;\n  gap: 10px;\n}") {
+	if !strings.Contains(css, ".prompt-actions {\n  display: flex;\n  align-items: center;\n  flex-wrap: wrap;\n  gap: 10px;\n}") {
 		t.Fatalf("expected prompt actions to use wrapping layout for Safari-safe sizing")
+	}
+	if !strings.Contains(css, ".prompt-action-paste {\n  display: flex;\n  align-items: center;\n  flex: 0 1 30%;\n  width: 30%;\n  max-width: 30%;") {
+		t.Fatalf("expected screenshot paste target to stay at 30%% width on desktop")
 	}
 	if !strings.Contains(css, ".prompt-action-button {\n  width: auto;\n  display: inline-flex;") {
 		t.Fatalf("expected action buttons to avoid full-width auto-column overflow")
 	}
-	if !strings.Contains(css, "@media (max-width: 640px) {\n  .prompt-actions {\n    gap: 6px;\n  }\n\n  .prompt-action-paste {\n    flex-basis: 100%;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }") {
+	if !strings.Contains(css, ".submit-status-inline {\n  display: inline-flex;\n  align-items: center;\n  flex: 1 1 0;\n  min-width: 140px;\n  margin-right: auto;\n}") {
+		t.Fatalf("expected inline status to sit between the paste target and action buttons")
+	}
+	if !strings.Contains(css, "@media (max-width: 640px) {\n  .prompt-actions {\n    gap: 6px;\n  }\n\n  .prompt-action-paste {\n    flex: 1 1 100%;\n    width: 100%;\n    max-width: none;\n  }\n\n  .submit-status-inline {\n    flex: 1 1 100%;\n    width: 100%;\n    min-width: 0;\n    margin-right: 0;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }") {
 		t.Fatalf("expected mobile layout to keep Studio action controls fully visible")
 	}
 }

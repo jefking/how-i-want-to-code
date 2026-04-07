@@ -425,8 +425,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	pasteIdx := strings.Index(markup, `id="builder-image-paste-target"`)
 	clearIdx := strings.Index(markup, `id="builder-images-clear"`)
 	runIdx := strings.Index(markup, `id="local-prompt-submit"`)
-	if statusIdx == -1 || pasteIdx == -1 || clearIdx == -1 || runIdx == -1 || statusIdx > pasteIdx || pasteIdx > clearIdx || clearIdx > runIdx {
-		t.Fatalf("expected queued status and Paste/Clear/Run controls to render in left-to-right order")
+	if statusIdx == -1 || pasteIdx == -1 || clearIdx == -1 || runIdx == -1 || pasteIdx > statusIdx || statusIdx > clearIdx || clearIdx > runIdx {
+		t.Fatalf("expected Paste/status/Clear/Run controls to render in left-to-right order")
 	}
 	if !strings.Contains(markup, `id="builder-repo-input" class="prompt-control prompt-input"`) || !strings.Contains(markup, `id="builder-target-subdir" class="prompt-control prompt-input"`) {
 		t.Fatalf("expected index html to include builder repo and target subdir inputs")
