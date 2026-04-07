@@ -28,20 +28,26 @@ func ParseSkillDispatch(msg map[string]any, expectedType, expectedSkill string) 
 		stringAt(msg, "type"),
 		stringAt(msg, "event"),
 		stringAt(msg, "kind"),
+		stringAt(msg, "messageType"),
 		stringAt(msg, "message_type"),
 		stringAtPath(msg, "payload", "type"),
 		stringAtPath(msg, "payload", "event"),
+		stringAtPath(msg, "payload", "messageType"),
 		stringAtPath(msg, "data", "type"),
 		stringAtPath(msg, "data", "event"),
+		stringAtPath(msg, "data", "messageType"),
 	)
 	skillName := firstNonEmpty(
 		stringAt(msg, "skill"),
+		stringAt(msg, "skillName"),
 		stringAt(msg, "skill_name"),
 		stringAt(msg, "name"),
 		stringAtPath(msg, "payload", "skill"),
+		stringAtPath(msg, "payload", "skillName"),
 		stringAtPath(msg, "payload", "skill_name"),
 		stringAtPath(msg, "payload", "name"),
 		stringAtPath(msg, "data", "skill"),
+		stringAtPath(msg, "data", "skillName"),
 		stringAtPath(msg, "data", "skill_name"),
 		stringAtPath(msg, "data", "name"),
 	)
@@ -57,12 +63,15 @@ func ParseSkillDispatch(msg map[string]any, expectedType, expectedSkill string) 
 
 	dispatch := SkillDispatch{
 		RequestID: firstNonEmpty(
+			stringAt(msg, "requestId"),
 			stringAt(msg, "request_id"),
 			stringAt(msg, "id"),
 			stringAt(msg, "message_id"),
 			stringAt(msg, "delivery_id"),
+			stringAtPath(msg, "payload", "requestId"),
 			stringAtPath(msg, "payload", "request_id"),
 			stringAtPath(msg, "payload", "id"),
+			stringAtPath(msg, "data", "requestId"),
 			stringAtPath(msg, "data", "request_id"),
 			stringAtPath(msg, "data", "id"),
 		),
@@ -80,8 +89,10 @@ func ParseSkillDispatch(msg map[string]any, expectedType, expectedSkill string) 
 			stringAt(msg, "from_agent_uri"),
 			stringAt(msg, "from_agent_uuid"),
 			stringAt(msg, "from_agent_id"),
+			stringAtPath(msg, "payload", "replyTo"),
 			stringAtPath(msg, "payload", "reply_to"),
 			stringAtPath(msg, "payload", "from"),
+			stringAtPath(msg, "data", "replyTo"),
 			stringAtPath(msg, "data", "reply_to"),
 			stringAtPath(msg, "data", "from"),
 		),
@@ -173,7 +184,7 @@ func normalizeRunConfigMap(v any) (map[string]any, error) {
 	if err := normalizeRunConfigAliases(parsed); err != nil {
 		return nil, err
 	}
-	if taskName := firstNonEmpty(stringAt(parsed, "library_task_name")); taskName != "" {
+	if taskName := firstNonEmpty(stringAt(parsed, "libraryTaskName"), stringAt(parsed, "library_task_name")); taskName != "" {
 		return expandLibraryTaskRunConfig(parsed, taskName)
 	}
 	return parsed, nil
@@ -211,12 +222,12 @@ func extractConfigValue(msg map[string]any) (any, bool) {
 }
 
 func looksLikeRunConfigMap(v map[string]any) bool {
-	if firstNonEmpty(stringAt(v, "library_task_name")) != "" {
-		repo := firstNonEmpty(stringAt(v, "repo"), stringAt(v, "repo_url"))
+	if firstNonEmpty(stringAt(v, "libraryTaskName"), stringAt(v, "library_task_name")) != "" {
+		repo := firstNonEmpty(stringAt(v, "repo"), stringAt(v, "repoURL"), stringAt(v, "repo_url"))
 		return repo != "" || hasSingleNonEmptyStringArray(v["repos"])
 	}
 	prompt := firstNonEmpty(stringAt(v, "prompt"))
-	repo := firstNonEmpty(stringAt(v, "repo"), stringAt(v, "repo_url"))
+	repo := firstNonEmpty(stringAt(v, "repo"), stringAt(v, "repoURL"), stringAt(v, "repo_url"))
 	return prompt != "" && (repo != "" || hasNonEmptyStringArray(v["repos"]))
 }
 
@@ -231,11 +242,11 @@ func requiredSkillPayloadSchema(dispatchType, skillName string, libraryTaskNames
 	}
 
 	return map[string]any{
-		"dispatch_envelope": map[string]any{
+		"dispatchEnvelope": map[string]any{
 			"type":  dispatchType,
 			"skill": skillName,
 		},
-		"accepted_payload_paths": []string{
+		"acceptedPayloadPaths": []string{
 			"config",
 			"input",
 			"payload.config",
@@ -243,21 +254,25 @@ func requiredSkillPayloadSchema(dispatchType, skillName string, libraryTaskNames
 			"data.config",
 			"data.input",
 		},
-		"run_config_schema": map[string]any{
+		"runConfigSchema": map[string]any{
 			"type":                 "object",
 			"additionalProperties": true,
 			"oneOf": []map[string]any{
 				{"required": []string{"repo"}},
+				{"required": []string{"repoURL"}},
 				{"required": []string{"repo_url"}},
 				{"required": []string{"repos"}},
 			},
 			"anyOf": []map[string]any{
 				{"required": []string{"prompt"}},
+				{"required": []string{"libraryTaskName"}},
 				{"required": []string{"library_task_name"}},
 			},
 			"properties": map[string]any{
-				"version":  propertyStringEnum("v1"),
-				"repo":     propertyNonEmptyString(),
+				"version": propertyStringEnum("v1"),
+				"repo":    propertyNonEmptyString(),
+				"repoURL": propertyNonEmptyString(),
+				// Legacy alias support.
 				"repo_url": propertyNonEmptyString(),
 				"repos": map[string]any{
 					"type":     "array",
@@ -267,8 +282,10 @@ func requiredSkillPayloadSchema(dispatchType, skillName string, libraryTaskNames
 						"minLength": 1,
 					},
 				},
+				"baseBranch":    propertyNonEmptyString(),
 				"base_branch":   propertyNonEmptyString(),
 				"branch":        propertyNonEmptyString(),
+				"targetSubdir":  propertyNonEmptyString(),
 				"target_subdir": propertyNonEmptyString(),
 				"prompt":        propertyNonEmptyString(),
 				"images": map[string]any{
@@ -277,14 +294,20 @@ func requiredSkillPayloadSchema(dispatchType, skillName string, libraryTaskNames
 						"type": "object",
 						"properties": map[string]any{
 							"name":        propertyNonEmptyString(),
+							"mediaType":   propertyNonEmptyString(),
 							"media_type":  propertyNonEmptyString(),
+							"dataBase64":  propertyNonEmptyString(),
 							"data_base64": propertyNonEmptyString(),
 						},
 					},
 				},
+				"libraryTaskName":   propertyStringEnum(libraryTaskNames...),
 				"library_task_name": propertyStringEnum(libraryTaskNames...),
+				"commitMessage":     propertyNonEmptyString(),
 				"commit_message":    propertyNonEmptyString(),
+				"prTitle":           propertyNonEmptyString(),
 				"pr_title":          propertyNonEmptyString(),
+				"prBody":            propertyNonEmptyString(),
 				"pr_body":           propertyNonEmptyString(),
 				"labels": map[string]any{
 					"type": "array",
@@ -292,6 +315,7 @@ func requiredSkillPayloadSchema(dispatchType, skillName string, libraryTaskNames
 						"type": "string",
 					},
 				},
+				"githubHandle":  propertyNonEmptyString(),
 				"github_handle": propertyNonEmptyString(),
 				"reviewers": map[string]any{
 					"type": "array",
@@ -387,19 +411,41 @@ func normalizeRunConfigAliases(m map[string]any) error {
 	if m == nil {
 		return fmt.Errorf("run config payload must be a JSON object")
 	}
-	if firstNonEmpty(stringAt(m, "base_branch")) == "" {
+
+	assignAliasString(m, "repoURL", "repo_url")
+	assignAliasString(m, "baseBranch", "base_branch")
+	assignAliasString(m, "targetSubdir", "target_subdir")
+	assignAliasString(m, "libraryTaskName", "library_task_name")
+	assignAliasString(m, "commitMessage", "commit_message")
+	assignAliasString(m, "prTitle", "pr_title")
+	assignAliasString(m, "prBody", "pr_body")
+	assignAliasString(m, "githubHandle", "github_handle")
+
+	if firstNonEmpty(stringAt(m, "baseBranch")) == "" {
 		if branch := firstNonEmpty(stringAt(m, "branch")); branch != "" {
-			m["base_branch"] = branch
+			m["baseBranch"] = branch
 		}
 	}
-	if firstNonEmpty(stringAt(m, "prompt")) != "" && firstNonEmpty(stringAt(m, "library_task_name")) != "" {
-		return fmt.Errorf("run config payload cannot include both prompt and library_task_name")
+
+	if images, ok := m["images"].([]any); ok {
+		for _, rawImage := range images {
+			imageMap, ok := rawImage.(map[string]any)
+			if !ok {
+				continue
+			}
+			assignAliasString(imageMap, "mediaType", "media_type")
+			assignAliasString(imageMap, "dataBase64", "data_base64")
+		}
+	}
+
+	if firstNonEmpty(stringAt(m, "prompt")) != "" && firstNonEmpty(stringAt(m, "libraryTaskName"), stringAt(m, "library_task_name")) != "" {
+		return fmt.Errorf("run config payload cannot include both prompt and libraryTaskName")
 	}
 	return nil
 }
 
 func expandLibraryTaskRunConfig(m map[string]any, taskName string) (map[string]any, error) {
-	repo := firstNonEmpty(stringAt(m, "repo"), stringAt(m, "repo_url"))
+	repo := firstNonEmpty(stringAt(m, "repo"), stringAt(m, "repoURL"), stringAt(m, "repo_url"))
 	if repo == "" {
 		repos := nonEmptyStringArray(m["repos"])
 		if len(repos) > 1 {
@@ -414,7 +460,7 @@ func expandLibraryTaskRunConfig(m map[string]any, taskName string) (map[string]a
 	if err != nil {
 		return nil, fmt.Errorf("load library catalog: %w", err)
 	}
-	cfg, err := catalog.ExpandRunConfig(taskName, repo, firstNonEmpty(stringAt(m, "base_branch"), stringAt(m, "branch")))
+	cfg, err := catalog.ExpandRunConfig(taskName, repo, firstNonEmpty(stringAt(m, "baseBranch"), stringAt(m, "base_branch"), stringAt(m, "branch")))
 	if err != nil {
 		return nil, err
 	}
@@ -459,6 +505,21 @@ func nonEmptyStringArray(v any) []string {
 		return out
 	default:
 		return nil
+	}
+}
+
+func assignAliasString(m map[string]any, canonicalKey, aliasKey string) {
+	if m == nil {
+		return
+	}
+	canonical := firstNonEmpty(stringAt(m, canonicalKey))
+	alias := firstNonEmpty(stringAt(m, aliasKey))
+	if canonical == "" && alias != "" {
+		m[canonicalKey] = alias
+		return
+	}
+	if canonical != "" && alias == "" {
+		m[aliasKey] = canonical
 	}
 }
 

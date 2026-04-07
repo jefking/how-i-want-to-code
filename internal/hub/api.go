@@ -250,14 +250,14 @@ func (c APIClient) PublishResult(ctx context.Context, token string, payload map[
 		body["to_agent_uri"] = toAgentURI
 	} else if toAgentUUID := firstString(payload["to_agent_uuid"]); toAgentUUID != "" {
 		body["to_agent_uuid"] = toAgentUUID
-	} else if routeTarget := firstString(payload["to"], payload["reply_to"]); routeTarget != "" {
+	} else if routeTarget := firstString(payload["to"], payload["replyTo"], payload["reply_to"]); routeTarget != "" {
 		if looksLikeAgentURI(routeTarget) {
 			body["to_agent_uri"] = routeTarget
 		} else {
 			body["to_agent_uuid"] = routeTarget
 		}
 	}
-	if requestID := firstString(payload["request_id"]); requestID != "" {
+	if requestID := firstString(payload["requestId"], payload["request_id"]); requestID != "" {
 		body["client_msg_id"] = requestID
 	}
 

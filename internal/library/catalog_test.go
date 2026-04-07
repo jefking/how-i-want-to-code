@@ -14,9 +14,9 @@ func TestLoadCatalogReadsJSONTasks(t *testing.T) {
 	dir := t.TempDir()
 	data := `{
   "security-review": {
-    "display_name": "Security Review",
+    "displayName": "Security Review",
     "description": "Audit security boundaries.",
-    "target_subdir": ".",
+    "targetSubdir": ".",
     "prompt": "Review the repository."
   }
 }`
@@ -55,7 +55,7 @@ func TestLoadCatalogSupportsMultipleKeyedTasksInOneFile(t *testing.T) {
     "prompt": "Review the repository."
   },
   "unit-test-coverage": {
-    "target_subdir": ".",
+    "targetSubdir": ".",
     "prompt": "Raise coverage."
   }
 }`
@@ -82,7 +82,7 @@ func TestLoadCatalogSupportsLegacySingleTaskShape(t *testing.T) {
 	data := `{
   "name": "security-review",
   "description": "Audit security boundaries.",
-  "target_subdir": ".",
+  "targetSubdir": ".",
   "prompt": "Review the repository."
 }`
 	if err := os.WriteFile(filepath.Join(dir, "security-review.json"), []byte(data), 0o644); err != nil {

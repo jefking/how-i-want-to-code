@@ -224,11 +224,11 @@ func TestPublishResultUsesOpenClawEnvelope(t *testing.T) {
 
 	client := NewAPIClient(ts.URL + "/v1")
 	payload := map[string]any{
-		"type":       "skill_result",
-		"request_id": "req-7",
-		"reply_to":   "agent-123",
-		"status":     "ok",
-		"result":     map[string]any{"ok": true},
+		"type":      "skill_result",
+		"requestId": "req-7",
+		"replyTo":   "agent-123",
+		"status":    "ok",
+		"result":    map[string]any{"ok": true},
 	}
 	if err := client.PublishResult(context.Background(), "token", payload); err != nil {
 		t.Fatalf("PublishResult() error = %v", err)
@@ -274,11 +274,11 @@ func TestPublishResultUsesURIReplyTarget(t *testing.T) {
 
 	client := NewAPIClient(ts.URL + "/v1")
 	payload := map[string]any{
-		"type":       "skill_result",
-		"request_id": "req-uri",
-		"reply_to":   "https://na.hub.molten.bot/acme/sender",
-		"status":     "error",
-		"result":     map[string]any{"error": "bad payload"},
+		"type":      "skill_result",
+		"requestId": "req-uri",
+		"replyTo":   "https://na.hub.molten.bot/acme/sender",
+		"status":    "error",
+		"result":    map[string]any{"error": "bad payload"},
 	}
 	if err := client.PublishResult(context.Background(), "token", payload); err != nil {
 		t.Fatalf("PublishResult() error = %v", err)

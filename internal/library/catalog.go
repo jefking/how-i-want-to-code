@@ -18,22 +18,22 @@ const DefaultDir = "library"
 // TaskDefinition is one callable library entry loaded from ./library/*.json.
 type TaskDefinition struct {
 	Name          string   `json:"name"`
-	DisplayName   string   `json:"display_name"`
+	DisplayName   string   `json:"displayName"`
 	Description   string   `json:"description"`
-	TargetSubdir  string   `json:"target_subdir"`
+	TargetSubdir  string   `json:"targetSubdir"`
 	Prompt        string   `json:"prompt"`
-	CommitMessage string   `json:"commit_message"`
-	PRTitle       string   `json:"pr_title"`
-	PRBody        string   `json:"pr_body"`
+	CommitMessage string   `json:"commitMessage"`
+	PRTitle       string   `json:"prTitle"`
+	PRBody        string   `json:"prBody"`
 	Labels        []string `json:"labels"`
-	GitHubHandle  string   `json:"github_handle"`
+	GitHubHandle  string   `json:"githubHandle"`
 	Reviewers     []string `json:"reviewers"`
 }
 
 // TaskSummary is the public UI/runtime registration view of one library task.
 type TaskSummary struct {
 	Name        string `json:"name"`
-	DisplayName string `json:"display_name,omitempty"`
+	DisplayName string `json:"displayName,omitempty"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -43,16 +43,86 @@ type Catalog struct {
 	byName map[string]TaskDefinition
 }
 
+type rawTaskDefinition struct {
+	Name               string   `json:"name"`
+	DisplayName        string   `json:"displayName"`
+	DisplayNameSnake   string   `json:"display_name"`
+	Description        string   `json:"description"`
+	TargetSubdir       string   `json:"targetSubdir"`
+	TargetSubdirSnake  string   `json:"target_subdir"`
+	Prompt             string   `json:"prompt"`
+	CommitMessage      string   `json:"commitMessage"`
+	CommitMessageSnake string   `json:"commit_message"`
+	PRTitle            string   `json:"prTitle"`
+	PRTitleSnake       string   `json:"pr_title"`
+	PRBody             string   `json:"prBody"`
+	PRBodySnake        string   `json:"pr_body"`
+	Labels             []string `json:"labels"`
+	GitHubHandle       string   `json:"githubHandle"`
+	GitHubHandleSnake  string   `json:"github_handle"`
+	Reviewers          []string `json:"reviewers"`
+}
+
+func (t *TaskDefinition) UnmarshalJSON(data []byte) error {
+	if t == nil {
+		return fmt.Errorf("task definition is nil")
+	}
+
+	var rawFields map[string]json.RawMessage
+	if err := json.Unmarshal(data, &rawFields); err != nil {
+		return err
+	}
+	for key := range rawFields {
+		if _, ok := taskDefinitionFieldNames[key]; ok {
+			continue
+		}
+		return fmt.Errorf("json: unknown field %q", key)
+	}
+
+	var raw rawTaskDefinition
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	t.Name = strings.TrimSpace(raw.Name)
+	t.DisplayName = firstNonEmpty(raw.DisplayName, raw.DisplayNameSnake)
+	t.Description = strings.TrimSpace(raw.Description)
+	t.TargetSubdir = firstNonEmpty(raw.TargetSubdir, raw.TargetSubdirSnake)
+	t.Prompt = strings.TrimSpace(raw.Prompt)
+	t.CommitMessage = firstNonEmpty(raw.CommitMessage, raw.CommitMessageSnake)
+	t.PRTitle = firstNonEmpty(raw.PRTitle, raw.PRTitleSnake)
+	t.PRBody = firstNonEmpty(raw.PRBody, raw.PRBodySnake)
+	if len(raw.Labels) > 0 {
+		t.Labels = append([]string(nil), raw.Labels...)
+	} else {
+		t.Labels = nil
+	}
+	t.GitHubHandle = firstNonEmpty(raw.GitHubHandle, raw.GitHubHandleSnake)
+	if len(raw.Reviewers) > 0 {
+		t.Reviewers = append([]string(nil), raw.Reviewers...)
+	} else {
+		t.Reviewers = nil
+	}
+
+	return nil
+}
+
 var taskDefinitionFieldNames = map[string]struct{}{
 	"name":           {},
+	"displayName":    {},
 	"display_name":   {},
 	"description":    {},
+	"targetSubdir":   {},
 	"target_subdir":  {},
 	"prompt":         {},
+	"commitMessage":  {},
 	"commit_message": {},
+	"prTitle":        {},
 	"pr_title":       {},
+	"prBody":         {},
 	"pr_body":        {},
 	"labels":         {},
+	"githubHandle":   {},
 	"github_handle":  {},
 	"reviewers":      {},
 }
@@ -324,4 +394,13 @@ func isCatalogDir(path string) bool {
 		}
 	}
 	return false
+}
+
+func firstNonEmpty(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }

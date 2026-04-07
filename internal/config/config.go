@@ -19,26 +19,119 @@ const prBodyFooter = "If you would like to connect agents together checkout [Mol
 // Config is the v1 public contract for a harness run.
 type Config struct {
 	Version       string        `json:"version"`
-	RepoURL       string        `json:"repo_url"`
+	RepoURL       string        `json:"repoURL"`
 	Repo          string        `json:"repo"`
 	Repos         []string      `json:"repos"`
-	BaseBranch    string        `json:"base_branch"`
-	TargetSubdir  string        `json:"target_subdir"`
+	BaseBranch    string        `json:"baseBranch"`
+	TargetSubdir  string        `json:"targetSubdir"`
 	Prompt        string        `json:"prompt"`
 	Images        []PromptImage `json:"images,omitempty"`
-	CommitMessage string        `json:"commit_message"`
-	PRTitle       string        `json:"pr_title"`
-	PRBody        string        `json:"pr_body"`
+	CommitMessage string        `json:"commitMessage"`
+	PRTitle       string        `json:"prTitle"`
+	PRBody        string        `json:"prBody"`
 	Labels        []string      `json:"labels"`
-	GitHubHandle  string        `json:"github_handle"`
+	GitHubHandle  string        `json:"githubHandle"`
 	Reviewers     []string      `json:"reviewers"`
 }
 
 // PromptImage captures one prompt image attachment.
 type PromptImage struct {
 	Name       string `json:"name,omitempty"`
-	MediaType  string `json:"media_type,omitempty"`
-	DataBase64 string `json:"data_base64,omitempty"`
+	MediaType  string `json:"mediaType,omitempty"`
+	DataBase64 string `json:"dataBase64,omitempty"`
+}
+
+type rawConfig struct {
+	Version            string        `json:"version"`
+	RepoURL            string        `json:"repoURL"`
+	RepoURLSnake       string        `json:"repo_url"`
+	Repo               string        `json:"repo"`
+	Repos              []string      `json:"repos"`
+	BaseBranch         string        `json:"baseBranch"`
+	BaseBranchSnake    string        `json:"base_branch"`
+	Branch             string        `json:"branch"`
+	TargetSubdir       string        `json:"targetSubdir"`
+	TargetSubdirSnake  string        `json:"target_subdir"`
+	Prompt             string        `json:"prompt"`
+	Images             []PromptImage `json:"images"`
+	CommitMessage      string        `json:"commitMessage"`
+	CommitMessageSnake string        `json:"commit_message"`
+	PRTitle            string        `json:"prTitle"`
+	PRTitleSnake       string        `json:"pr_title"`
+	PRBody             string        `json:"prBody"`
+	PRBodySnake        string        `json:"pr_body"`
+	Labels             []string      `json:"labels"`
+	GitHubHandle       string        `json:"githubHandle"`
+	GitHubHandleSnake  string        `json:"github_handle"`
+	Reviewers          []string      `json:"reviewers"`
+}
+
+func (c *Config) UnmarshalJSON(data []byte) error {
+	if c == nil {
+		return fmt.Errorf("config is nil")
+	}
+
+	var raw rawConfig
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	c.Version = strings.TrimSpace(raw.Version)
+	c.RepoURL = firstNonEmptyTrim(raw.RepoURL, raw.RepoURLSnake)
+	c.Repo = strings.TrimSpace(raw.Repo)
+	if len(raw.Repos) > 0 {
+		c.Repos = append([]string(nil), raw.Repos...)
+	} else {
+		c.Repos = nil
+	}
+	c.BaseBranch = firstNonEmptyTrim(raw.BaseBranch, raw.BaseBranchSnake, raw.Branch)
+	c.TargetSubdir = firstNonEmptyTrim(raw.TargetSubdir, raw.TargetSubdirSnake)
+	c.Prompt = strings.TrimSpace(raw.Prompt)
+	if len(raw.Images) > 0 {
+		c.Images = append([]PromptImage(nil), raw.Images...)
+	} else {
+		c.Images = nil
+	}
+	c.CommitMessage = firstNonEmptyTrim(raw.CommitMessage, raw.CommitMessageSnake)
+	c.PRTitle = firstNonEmptyTrim(raw.PRTitle, raw.PRTitleSnake)
+	c.PRBody = firstNonEmptyTrim(raw.PRBody, raw.PRBodySnake)
+	if len(raw.Labels) > 0 {
+		c.Labels = append([]string(nil), raw.Labels...)
+	} else {
+		c.Labels = nil
+	}
+	c.GitHubHandle = firstNonEmptyTrim(raw.GitHubHandle, raw.GitHubHandleSnake)
+	if len(raw.Reviewers) > 0 {
+		c.Reviewers = append([]string(nil), raw.Reviewers...)
+	} else {
+		c.Reviewers = nil
+	}
+
+	return nil
+}
+
+type rawPromptImage struct {
+	Name            string `json:"name"`
+	MediaType       string `json:"mediaType"`
+	MediaTypeSnake  string `json:"media_type"`
+	DataBase64      string `json:"dataBase64"`
+	DataBase64Snake string `json:"data_base64"`
+}
+
+func (p *PromptImage) UnmarshalJSON(data []byte) error {
+	if p == nil {
+		return fmt.Errorf("prompt image is nil")
+	}
+
+	var raw rawPromptImage
+	if err := json.Unmarshal(data, &raw); err != nil {
+		return err
+	}
+
+	p.Name = strings.TrimSpace(raw.Name)
+	p.MediaType = firstNonEmptyTrim(raw.MediaType, raw.MediaTypeSnake)
+	p.DataBase64 = firstNonEmptyTrim(raw.DataBase64, raw.DataBase64Snake)
+	return nil
 }
 
 // Load reads and validates a JSON/JSONC config from disk.
@@ -116,7 +209,7 @@ func (c Config) Validate() error {
 	}
 	repos := c.RepoList()
 	if len(repos) == 0 {
-		return fmt.Errorf("one of repo, repo_url, or repos[] is required")
+		return fmt.Errorf("one of repo, repoURL, or repos[] is required")
 	}
 	for _, repo := range repos {
 		if err := validateRepoRef(repo); err != nil {
@@ -124,10 +217,10 @@ func (c Config) Validate() error {
 		}
 	}
 	if strings.TrimSpace(c.BaseBranch) == "" {
-		return fmt.Errorf("base_branch is required")
+		return fmt.Errorf("baseBranch is required")
 	}
 	if strings.TrimSpace(c.TargetSubdir) == "" {
-		return fmt.Errorf("target_subdir is required")
+		return fmt.Errorf("targetSubdir is required")
 	}
 	if err := validateSubdir(c.TargetSubdir); err != nil {
 		return err
@@ -141,13 +234,13 @@ func (c Config) Validate() error {
 		}
 	}
 	if strings.TrimSpace(c.CommitMessage) == "" {
-		return fmt.Errorf("commit_message is required")
+		return fmt.Errorf("commitMessage is required")
 	}
 	if strings.TrimSpace(c.PRTitle) == "" {
-		return fmt.Errorf("pr_title is required")
+		return fmt.Errorf("prTitle is required")
 	}
 	if strings.TrimSpace(c.PRBody) == "" {
-		return fmt.Errorf("pr_body is required")
+		return fmt.Errorf("prBody is required")
 	}
 	return nil
 }
@@ -188,13 +281,13 @@ func normalizePromptImages(images []PromptImage) []PromptImage {
 
 func validatePromptImage(image PromptImage, index int) error {
 	if image.DataBase64 == "" {
-		return fmt.Errorf("images[%d].data_base64 is required", index)
+		return fmt.Errorf("images[%d].dataBase64 is required", index)
 	}
 	if image.MediaType != "" && !strings.HasPrefix(strings.ToLower(image.MediaType), "image/") {
-		return fmt.Errorf("images[%d].media_type must be an image MIME type", index)
+		return fmt.Errorf("images[%d].mediaType must be an image MIME type", index)
 	}
 	if _, err := base64.StdEncoding.DecodeString(image.DataBase64); err != nil {
-		return fmt.Errorf("images[%d].data_base64 is invalid base64: %w", index, err)
+		return fmt.Errorf("images[%d].dataBase64 is invalid base64: %w", index, err)
 	}
 	return nil
 }
@@ -202,16 +295,16 @@ func validatePromptImage(image PromptImage, index int) error {
 func validateSubdir(subdir string) error {
 	clean := filepath.Clean(subdir)
 	if clean == "" {
-		return fmt.Errorf("target_subdir must be a relative path")
+		return fmt.Errorf("targetSubdir must be a relative path")
 	}
 	if filepath.IsAbs(clean) {
-		return fmt.Errorf("target_subdir must be relative")
+		return fmt.Errorf("targetSubdir must be relative")
 	}
 	if strings.HasPrefix(clean, "..") {
-		return fmt.Errorf("target_subdir cannot escape repository root")
+		return fmt.Errorf("targetSubdir cannot escape repository root")
 	}
 	if strings.Contains(clean, ".."+string(filepath.Separator)) {
-		return fmt.Errorf("target_subdir cannot contain parent traversals")
+		return fmt.Errorf("targetSubdir cannot contain parent traversals")
 	}
 	return nil
 }
@@ -466,4 +559,13 @@ func normalizeReviewer(value string) string {
 	value = strings.TrimSpace(value)
 	value = strings.TrimPrefix(value, "@")
 	return strings.TrimSpace(value)
+}
+
+func firstNonEmptyTrim(values ...string) string {
+	for _, value := range values {
+		if trimmed := strings.TrimSpace(value); trimmed != "" {
+			return trimmed
+		}
+	}
+	return ""
 }
