@@ -874,15 +874,26 @@
       renderPromptImages();
     }
 
-    function clearPromptImages() {
+    function clearPromptImages(syncRaw = true) {
       setPromptImages([]);
-      if (state.promptMode === "json") {
-        try {
-          syncRawFromMode("builder");
-        } catch (_err) {
-          // Leave raw editor unchanged if builder is incomplete.
-        }
+      if (!syncRaw || state.promptMode !== "json") {
+        return;
       }
+      try {
+        syncRawFromMode("builder");
+      } catch (_err) {
+        // Leave raw editor unchanged if builder is incomplete.
+      }
+    }
+
+    function clearSubmittedPromptDraft() {
+      builderPromptInput.value = "";
+      localPromptInput.value = "";
+    }
+
+    function clearSubmittedPromptState() {
+      clearSubmittedPromptDraft();
+      clearPromptImages(false);
     }
 
     function readFileAsDataURL(file) {
@@ -1202,11 +1213,6 @@
         compact: JSON.stringify(payload),
         pretty: JSON.stringify(payload, null, 2),
       };
-    }
-
-    function clearSubmittedPromptDraft() {
-      builderPromptInput.value = "";
-      localPromptInput.value = "";
     }
 
     function renderRepoHistorySelect(historyField, select, input) {
@@ -2281,8 +2287,7 @@
         } catch (_err) {
           // Ignore repo history extraction failures.
         }
-        clearSubmittedPromptDraft();
-        clearPromptImages();
+        clearSubmittedPromptState();
         setLocalPromptStatus("ok", `Queued request ${requestID}`);
       } catch (err) {
         setLocalPromptStatus("error", `Submit failed: ${err.message}`);

@@ -483,8 +483,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function handlePromptImagePaste(") {
 		t.Fatalf("expected index html to include screenshot paste handler")
 	}
-	if !strings.Contains(markup, "clearPromptImages();") {
-		t.Fatalf("expected index html to clear attached screenshots after a successful submit")
+	if !strings.Contains(markup, "function clearPromptImages(syncRaw = true)") {
+		t.Fatalf("expected index html to allow screenshot clearing without forcing raw prompt resync")
 	}
 	if !strings.Contains(markup, "function clearSubmittedPromptDraft(") {
 		t.Fatalf("expected index html to include submitted prompt clearing helper")
@@ -492,8 +492,14 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "builderPromptInput.value = \"\";") || !strings.Contains(markup, "localPromptInput.value = \"\";") {
 		t.Fatalf("expected index html to clear builder and raw prompt inputs after submit")
 	}
-	if !strings.Contains(markup, "clearSubmittedPromptDraft();") {
-		t.Fatalf("expected index html to clear the submitted prompt draft after a successful queue")
+	if !strings.Contains(markup, "function clearSubmittedPromptState(") {
+		t.Fatalf("expected index html to include queued-submit cleanup helper")
+	}
+	if !strings.Contains(markup, "clearPromptImages(false);") {
+		t.Fatalf("expected index html to clear attached screenshots after a successful submit without repopulating raw JSON")
+	}
+	if !strings.Contains(markup, "clearSubmittedPromptState();") {
+		t.Fatalf("expected index html to clear the submitted prompt state after a successful queue")
 	}
 	if !strings.Contains(markup, `window.__HUB_UI_CONFIG__ = {"automaticMode":false};`) {
 		t.Fatalf("expected index html to include default UI config")
