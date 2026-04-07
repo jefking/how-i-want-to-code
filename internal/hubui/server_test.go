@@ -148,6 +148,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `href="/static/style.css"`) {
 		t.Fatalf("expected index html to include external stylesheet link")
 	}
+	if !strings.Contains(markup, `<title>Molten Hub Code</title>`) {
+		t.Fatalf("expected index html to set app title to Molten Hub Code")
+	}
+	if !strings.Contains(markup, `>Molten Hub Code</div>`) {
+		t.Fatalf("expected index html to render app heading as Molten Hub Code")
+	}
 	if !strings.Contains(markup, `src="https://molten.bot/logo.svg"`) {
 		t.Fatalf("expected index html to include moltenhub logo")
 	}
