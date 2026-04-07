@@ -8,5 +8,5 @@ services:
       - 3232:7777
     shm_size: "8gb"
     volumes:
-      - ./.moltenhub/moltenbot000:/workspace/
-    command: ["harness", "hub", "--init", "/workspace/init.json", "--ui-listen", ":7777"]
+      - ./.moltenhub/config:/workspace/config
+    command: ["with-config"]

@@ -77,12 +77,12 @@ MOLTEN_HUB_TOKEN=agent_or_bind_token
 Run with Docker Compose (`docker-compose.yml`):
 
 ```bash
-mkdir -p moltenhub
-cp templates/run.example.json moltenhub/config.json
+mkdir -p .moltenhub/config
+cp templates/run.example.json .moltenhub/config/config.json
 docker compose up
 ```
 
-`docker compose` uses a persistent bind mount at `./moltenhub -> /workspace/config` and starts `with-config`, which auto-selects:
+`docker compose` uses a persistent bind mount at `./.moltenhub/config -> /workspace/config` and starts `with-config`, which auto-selects:
 
 ```bash
 # run mode when config exists
