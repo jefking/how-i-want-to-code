@@ -597,6 +597,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, "body.task-fullscreen-open #task-fullscreen-toggle") {
 		t.Fatalf("expected stylesheet to pin the full screen toggle in the viewport while full screen is open")
 	}
+	if !strings.Contains(css, "top: max(16px, env(safe-area-inset-top));") || !strings.Contains(css, "right: max(16px, env(safe-area-inset-right));") {
+		t.Fatalf("expected stylesheet to keep the full screen close control clear of viewport edges")
+	}
+	if !strings.Contains(css, "background: rgba(15, 27, 51, 0.92);") || !strings.Contains(css, "color: #fff;") {
+		t.Fatalf("expected stylesheet to give the full screen close control high-contrast styling")
+	}
 	if !strings.Contains(css, ".task-fullscreen") {
 		t.Fatalf("expected stylesheet to include full screen task layout styles")
 	}

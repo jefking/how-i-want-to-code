@@ -13,6 +13,7 @@ import (
 
 	"github.com/jef/moltenhub-code/internal/config"
 	"github.com/jef/moltenhub-code/internal/execx"
+	"github.com/jef/moltenhub-code/internal/failurefollowup"
 	"github.com/jef/moltenhub-code/internal/harness"
 	"github.com/jef/moltenhub-code/internal/library"
 )
@@ -30,24 +31,8 @@ type Daemon struct {
 const wsFallbackWindow = 30 * time.Second
 const dispatchDedupTTL = 2 * time.Hour
 const agentStatusUpdateTimeout = 5 * time.Second
-const failureFollowUpPromptBase = "Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."
-const failureFollowUpExecutionContract = `Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.
-
-When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.
-
-When a task fails:
-- Queue a follow-up task dedicated to reviewing the logs and fixing all underlying issues in this codebase.
-- Pass the relevant failing file/folder log path(s) into that follow-up task context.
-- Use this follow-up run config payload shape:
-  {"repos":["<same_repo_as_failed_task>"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."}
-
-Completion requirements:
-- Only create a new branch when starting from 'main'; if you're fixing an existing non-'main' branch, stay on it.
-- Start every new branch and every PR title with 'moltenhub-'.
-- Keep working until there is a PR for your changes and required CI/CD checks are green.
-- If CI/CD fails, continue fixing code/tests/workflows until checks pass.
-- If you changed multiple repositories, ensure each changed repository has its own branch and PR.
-- Optimize for the highest-quality PR you can produce with focused, production-ready changes.`
+const failureFollowUpPromptBase = failurefollowup.RequiredPrompt
+const failureFollowUpNoPathGuidance = "No workspace or log path was captured before the failure. Investigate the task history and runtime error details first."
 
 // NewDaemon returns a hub daemon with defaults.
 func NewDaemon(runner execx.Runner) Daemon {
@@ -734,7 +719,8 @@ func failureFollowUpPrompt(dispatch SkillDispatch, res harness.Result) string {
 	b.WriteString(failureFollowUpPromptBase)
 	b.WriteString("\n\nRelevant failing log path(s):")
 	if len(paths) == 0 {
-		b.WriteString("\n- No workspace or log path was captured before the failure. Investigate the task history and runtime error details first.")
+		b.WriteString("\n- ")
+		b.WriteString(failureFollowUpNoPathGuidance)
 	} else {
 		for _, path := range paths {
 			b.WriteString("\n- ")
@@ -746,7 +732,7 @@ func failureFollowUpPrompt(dispatch SkillDispatch, res harness.Result) string {
 		b.WriteString(contextBlock)
 	}
 	b.WriteString("\n\n")
-	b.WriteString(failureFollowUpExecutionContract)
+	b.WriteString(failurefollowup.ExecutionContract)
 	return b.String()
 }
 
