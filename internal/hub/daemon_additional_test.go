@@ -21,6 +21,7 @@ type stubMoltenHubAPI struct {
 	token string
 
 	pullFn func(ctx context.Context, timeoutMs int) (PulledOpenClawMessage, bool, error)
+	recordFn func(context.Context) error
 
 	mu        sync.Mutex
 	acked     []string
@@ -39,6 +40,12 @@ func (s *stubMoltenHubAPI) ResolveAgentToken(context.Context, InitConfig) (strin
 func (s *stubMoltenHubAPI) SyncProfile(context.Context, InitConfig) error   { return nil }
 func (s *stubMoltenHubAPI) UpdateAgentStatus(context.Context, string) error { return nil }
 func (s *stubMoltenHubAPI) MarkOpenClawOffline(context.Context, string, string) error {
+	return nil
+}
+func (s *stubMoltenHubAPI) RecordGitHubTaskCompleteActivity(ctx context.Context) error {
+	if s.recordFn != nil {
+		return s.recordFn(ctx)
+	}
 	return nil
 }
 func (s *stubMoltenHubAPI) RegisterRuntime(context.Context, InitConfig, []library.TaskSummary) error {
@@ -309,6 +316,35 @@ func TestFailureFollowUpPromptIncludesWorkspaceAndTargetPath(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "/tmp/run-123/repo/internal/hub") {
 		t.Fatalf("prompt missing repo target dir: %q", prompt)
+	}
+}
+
+func TestRecordGitHubTaskCompleteActivityLogsWarningOnFailure(t *testing.T) {
+	t.Parallel()
+
+	var logs []string
+	d := NewDaemon(nil)
+	d.Logf = func(format string, args ...any) {
+		logs = append(logs, fmt.Sprintf(format, args...))
+	}
+
+	api := &stubMoltenHubAPI{
+		token: "t",
+		recordFn: func(context.Context) error {
+			return errors.New("metadata rejected")
+		},
+	}
+
+	d.recordGitHubTaskCompleteActivity(context.Background(), api, "req-17")
+
+	if len(logs) != 1 {
+		t.Fatalf("logs = %d, want 1", len(logs))
+	}
+	if !strings.Contains(logs[0], "action=record_github_task_complete") {
+		t.Fatalf("log = %q", logs[0])
+	}
+	if !strings.Contains(logs[0], "req-17") {
+		t.Fatalf("log missing request id: %q", logs[0])
 	}
 }
 
