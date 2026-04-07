@@ -522,7 +522,7 @@ func TestDispatchResultPayloadIncludesTopLevelFailureMessage(t *testing.T) {
 	if got := payload["error"]; got != "codex: process exited with status 1" {
 		t.Fatalf("error = %#v", got)
 	}
-	if got := payload["message"]; got != "Task failed. Error details: codex: process exited with status 1" {
+	if got := payload["message"]; got != "Failure: task failed. Error details: codex: process exited with status 1" {
 		t.Fatalf("message = %#v", got)
 	}
 	failure, _ := payload["failure"].(map[string]any)
@@ -532,7 +532,7 @@ func TestDispatchResultPayloadIncludesTopLevelFailureMessage(t *testing.T) {
 	if got := failure["status"]; got != "failed" {
 		t.Fatalf("failure.status = %#v", got)
 	}
-	if got := failure["message"]; got != "Task failed. Error details: codex: process exited with status 1" {
+	if got := failure["message"]; got != "Failure: task failed. Error details: codex: process exited with status 1" {
 		t.Fatalf("failure.message = %#v", got)
 	}
 	if got := failure["error"]; got != "codex: process exited with status 1" {
@@ -704,7 +704,7 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 	if got := fmt.Sprint(publishedMsg["status"]); got != "error" {
 		t.Fatalf("message.status = %v, want error", publishedMsg["status"])
 	}
-	if got := fmt.Sprint(publishedMsg["message"]); !strings.Contains(got, "Task failed. Error details: dispatch acquire: dispatch controller is closed") {
+	if got := fmt.Sprint(publishedMsg["message"]); !strings.Contains(got, "Failure: task failed. Error details: dispatch acquire: dispatch controller is closed") {
 		t.Fatalf("message.message = %q", got)
 	}
 	if got := fmt.Sprint(publishedMsg["error"]); !strings.Contains(got, "dispatch acquire: dispatch controller is closed") {

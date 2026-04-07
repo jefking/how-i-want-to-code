@@ -221,3 +221,29 @@ func TestResolveCatalogDirFallsBackToSourceTreeWhenWorkingDirChanges(t *testing.
 		t.Fatalf("resolveCatalogDir(%q) = %q, want existing catalog dir", DefaultDir, resolved)
 	}
 }
+
+func TestDefaultCatalogIncludesReduceCodebaseCentralizeClassesTask(t *testing.T) {
+	t.Parallel()
+
+	catalog, err := LoadCatalog(DefaultDir)
+	if err != nil {
+		t.Fatalf("LoadCatalog(%q) error = %v", DefaultDir, err)
+	}
+
+	task, ok := catalog.byName["reduce-codebase-centralize-classes"]
+	if !ok {
+		t.Fatalf("default catalog missing %q task", "reduce-codebase-centralize-classes")
+	}
+	if !strings.Contains(strings.ToLower(task.Prompt), "reduce the codebase") {
+		t.Fatalf("prompt = %q, want reduce-codebase guidance", task.Prompt)
+	}
+	if !strings.Contains(strings.ToLower(task.Prompt), "centralize duplicated classes") {
+		t.Fatalf("prompt = %q, want class centralization guidance", task.Prompt)
+	}
+	if !strings.Contains(strings.ToLower(task.Prompt), "avoid regressions") {
+		t.Fatalf("prompt = %q, want regression-prevention guidance", task.Prompt)
+	}
+	if got, want := task.PRTitle, "moltenhub-reduce-codebase-centralize-classes"; got != want {
+		t.Fatalf("PRTitle = %q, want %q", got, want)
+	}
+}
