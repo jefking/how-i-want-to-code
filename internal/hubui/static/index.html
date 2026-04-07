@@ -874,15 +874,26 @@
       renderPromptImages();
     }
 
-    function clearPromptImages() {
+    function clearPromptImages(syncRaw = true) {
       setPromptImages([]);
-      if (state.promptMode === "json") {
-        try {
-          syncRawFromMode("builder");
-        } catch (_err) {
-          // Leave raw editor unchanged if builder is incomplete.
-        }
+      if (!syncRaw || state.promptMode !== "json") {
+        return;
       }
+      try {
+        syncRawFromMode("builder");
+      } catch (_err) {
+        // Leave raw editor unchanged if builder is incomplete.
+      }
+    }
+
+    function clearSubmittedPromptDraft() {
+      builderPromptInput.value = "";
+      localPromptInput.value = "";
+    }
+
+    function clearSubmittedPromptState() {
+      clearSubmittedPromptDraft();
+      clearPromptImages(false);
     }
 
     function readFileAsDataURL(file) {
@@ -1204,28 +1215,20 @@
       };
     }
 
-    function clearSubmittedPromptDraft() {
-      builderPromptInput.value = "";
-      localPromptInput.value = "";
-    }
-
     function resetBuilderTargetSubdir() {
       builderTargetSubdir.value = ".";
     }
 
     function clearBuilderPromptDraft() {
-      builderPromptInput.value = "";
+      clearSubmittedPromptState();
       resetBuilderTargetSubdir();
       resetBaseBranchToMain();
-      clearPromptImages();
       if (state.promptMode === "json") {
-        localPromptInput.value = "";
         localPromptInput.focus();
         return;
       }
       builderPromptInput.focus();
     }
-
     function renderRepoHistorySelect(historyField, select, input) {
       if (!historyField || !select || !input) {
         return;
@@ -2298,8 +2301,7 @@
         } catch (_err) {
           // Ignore repo history extraction failures.
         }
-        clearSubmittedPromptDraft();
-        clearPromptImages();
+        clearSubmittedPromptState();
         setLocalPromptStatus("ok", `Queued request ${requestID}`);
       } catch (err) {
         setLocalPromptStatus("error", `Submit failed: ${err.message}`);
