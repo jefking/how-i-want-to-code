@@ -6,3 +6,6 @@ harness
 .env
 .env.*
 !.env.example
+.codex
+.moltenhub
+./templates
