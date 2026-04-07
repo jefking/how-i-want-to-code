@@ -3,16 +3,10 @@ services:
     build:
       context: .
       dockerfile: Dockerfile
-      args:
-        AGENT_HARNESS: ${AGENT_HARNESS:-codex}
-        AGENT_NPM_PACKAGE: ${AGENT_NPM_PACKAGE:-}
-        AGENT_COMMAND: ${AGENT_COMMAND:-}
     image: moltenhub-code:local
     ports:
       - 3232:7777
-    env_file:
-      - .env
+    shm_size: "8gb"
     volumes:
-      - ./moltenhub:/workspace/config
-      - ./.moltenhub:/workspace/.moltenhub
-    command: ["harness", "hub", "--init", "/workspace/config/init.json", "--ui-listen", ":7777"]
+      - ./.moltenhub/moltenbot000:/workspace/
+    command: ["harness", "hub", "--init", "/workspace/init.json", "--ui-listen", ":7777"]

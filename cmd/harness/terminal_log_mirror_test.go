@@ -77,8 +77,11 @@ func TestTaskLogMirrorWritesAggregateAndTaskLogs(t *testing.T) {
 
 	assertLogFileContent(t, filepath.Join(root, logFileName), lines)
 	assertLogFileContent(t, filepath.Join(root, "local", "1712345678", "000111", logFileName), []string{lines[0]})
+	assertLogFileContent(t, filepath.Join(root, "local", "1712345678", "000111", legacyTaskLogFileName), []string{lines[0]})
 	assertLogFileContent(t, filepath.Join(root, "task", "005", logFileName), []string{lines[1]})
+	assertLogFileContent(t, filepath.Join(root, "task", "005", legacyTaskLogFileName), []string{lines[1]})
 	assertLogFileContent(t, filepath.Join(root, fallbackLogSubdir, logFileName), []string{lines[2]})
+	assertLogFileContent(t, filepath.Join(root, fallbackLogSubdir, legacyTaskLogFileName), []string{lines[2]})
 }
 
 func TestTaskLogMirrorResetsExistingRootOnInit(t *testing.T) {
@@ -111,6 +114,11 @@ func TestTaskLogMirrorResetsExistingRootOnInit(t *testing.T) {
 		filepath.Join(root, "local", "1712345678", "000222", logFileName),
 		[]string{"dispatch request_id=local-1712345678-000222 stage=codex status=start"},
 	)
+	assertLogFileContent(
+		t,
+		filepath.Join(root, "local", "1712345678", "000222", legacyTaskLogFileName),
+		[]string{"dispatch request_id=local-1712345678-000222 stage=codex status=start"},
+	)
 }
 
 func TestTaskLogMirrorEvictsOldTaskFilesAndContinuesWriting(t *testing.T) {
@@ -138,7 +146,17 @@ func TestTaskLogMirrorEvictsOldTaskFilesAndContinuesWriting(t *testing.T) {
 	)
 	assertLogFileContent(
 		t,
+		filepath.Join(root, "req", "000", legacyTaskLogFileName),
+		[]string{"dispatch request_id=req-000 status=start"},
+	)
+	assertLogFileContent(
+		t,
 		filepath.Join(root, "req", fmt.Sprintf("%03d", total-1), logFileName),
+		[]string{fmt.Sprintf("dispatch request_id=req-%03d status=start", total-1)},
+	)
+	assertLogFileContent(
+		t,
+		filepath.Join(root, "req", fmt.Sprintf("%03d", total-1), legacyTaskLogFileName),
 		[]string{fmt.Sprintf("dispatch request_id=req-%03d status=start", total-1)},
 	)
 }

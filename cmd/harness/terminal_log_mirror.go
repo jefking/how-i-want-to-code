@@ -9,11 +9,12 @@ import (
 )
 
 const (
-	logDirectoryName    = ".log"
-	logFileName         = "terminal.log"
-	fallbackLogSubdir   = "main"
-	maxLogFileOpenMode  = 0o644
-	maxOpenTaskLogFiles = 128
+	logDirectoryName      = ".log"
+	logFileName           = "terminal.log"
+	legacyTaskLogFileName = "term"
+	fallbackLogSubdir     = "main"
+	maxLogFileOpenMode    = 0o644
+	maxOpenTaskLogFiles   = 128
 )
 
 type terminalLogSink interface {
@@ -93,11 +94,14 @@ func (m *taskLogMirror) WriteLine(line string) {
 		_, _ = m.aggregate.WriteString(trimmed + "\n")
 	}
 
-	taskFile, err := m.taskLogFileLocked(taskLogSubdirForLine(trimmed))
-	if err != nil {
-		return
+	subdir := taskLogSubdirForLine(trimmed)
+	for _, fileName := range []string{logFileName, legacyTaskLogFileName} {
+		taskFile, err := m.taskLogFileLocked(subdir, fileName)
+		if err != nil {
+			continue
+		}
+		_, _ = taskFile.WriteString(trimmed + "\n")
 	}
-	_, _ = taskFile.WriteString(trimmed + "\n")
 }
 
 func (m *taskLogMirror) Close() error {
@@ -126,8 +130,8 @@ func (m *taskLogMirror) Close() error {
 	return firstErr
 }
 
-func (m *taskLogMirror) taskLogFileLocked(subdir string) (*os.File, error) {
-	taskFilePath, err := m.taskLogFilePathLocked(subdir)
+func (m *taskLogMirror) taskLogFileLocked(subdir, fileName string) (*os.File, error) {
+	taskFilePath, err := m.taskLogFilePathLocked(subdir, fileName)
 	if err != nil {
 		return nil, err
 	}
@@ -163,10 +167,14 @@ func (m *taskLogMirror) closeOldestTaskFileLocked() {
 	}
 }
 
-func (m *taskLogMirror) taskLogFilePathLocked(subdir string) (string, error) {
+func (m *taskLogMirror) taskLogFilePathLocked(subdir, fileName string) (string, error) {
 	subdir = strings.TrimSpace(subdir)
 	if subdir == "" {
 		subdir = fallbackLogSubdir
+	}
+	fileName = strings.TrimSpace(fileName)
+	if fileName == "" {
+		fileName = logFileName
 	}
 
 	dirPath := filepath.Join(m.rootDir, subdir)
@@ -174,7 +182,7 @@ func (m *taskLogMirror) taskLogFilePathLocked(subdir string) (string, error) {
 		return "", err
 	}
 
-	return filepath.Join(dirPath, logFileName), nil
+	return filepath.Join(dirPath, fileName), nil
 }
 
 func taskLogSubdirForLine(line string) string {

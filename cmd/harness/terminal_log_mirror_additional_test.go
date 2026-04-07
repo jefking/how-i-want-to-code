@@ -47,7 +47,7 @@ func TestTaskLogFilePathUsesFallbackSubdirForBlankInput(t *testing.T) {
 	}
 	mirror := &taskLogMirror{rootDir: root}
 
-	path, err := mirror.taskLogFilePathLocked("   ")
+	path, err := mirror.taskLogFilePathLocked("   ", "")
 	if err != nil {
 		t.Fatalf("taskLogFilePathLocked() error = %v", err)
 	}

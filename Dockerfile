@@ -25,6 +25,7 @@ ENV DEBIAN_FRONTEND=noninteractive
 ENV GIT_TERMINAL_PROMPT=0
 ENV HARNESS_AGENT_HARNESS=${AGENT_HARNESS}
 ENV HARNESS_AGENT_COMMAND=${AGENT_COMMAND}
+ENV HARNESS_AGENTS_SEED_PATH=/opt/moltenhub/library/AGENTS.md
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -53,6 +54,7 @@ RUN useradd --create-home --shell /bin/sh app \
 WORKDIR /workspace
 
 COPY --from=build /out/harness /usr/local/bin/harness
+COPY library/AGENTS.md /opt/moltenhub/library/AGENTS.md
 COPY docker/entrypoint.sh /usr/local/bin/entrypoint
 COPY docker/with-config.sh /usr/local/bin/with-config
 RUN chmod +x /usr/local/bin/harness /usr/local/bin/entrypoint /usr/local/bin/with-config

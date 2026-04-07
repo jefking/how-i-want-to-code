@@ -238,6 +238,24 @@
     </div>
   </div>
 
+  <div id="agent-auth-gate" class="fixed inset-0 z-[95] hidden items-center justify-center bg-[#040911]/85 p-4 backdrop-blur-sm" aria-live="polite">
+    <div class="flex min-h-[220px] w-full max-w-xl flex-col p-2">
+      <h2 class="text-[2rem] font-semibold leading-tight text-hub-text">Authorize Codex to get started</h2>
+
+      <div id="agent-auth-details" class="mt-5 hidden space-y-3">
+        <div class="flex flex-wrap items-center gap-2.5">
+          <div id="agent-auth-code" class="font-mono text-[1.15rem] tracking-[0.22em] text-hub-text"></div>
+          <button id="agent-auth-copy" class="rounded-md border border-white/20 bg-white/5 px-2.5 py-1.5 text-xs font-medium text-hub-text hover:bg-white/10" type="button">Copy</button>
+        </div>
+        <a id="agent-auth-url" class="block break-all text-[1.05rem] text-[#8dc6ff] underline decoration-dotted underline-offset-2" href="" target="_blank" rel="noopener noreferrer"></a>
+      </div>
+
+      <div class="mt-auto flex justify-end pt-4">
+        <button id="agent-auth-verify" class="hidden rounded-lg border border-hub-border bg-[#173d2b] px-3 py-2 text-sm font-medium text-hub-text hover:bg-[#1f533a]" type="button">Done</button>
+      </div>
+    </div>
+  </div>
+
   <script>
     const DISMISSED_TASKS_KEY = "hubui.dismissedTaskIds";
     const REPO_HISTORY_KEY = "hubui.repoHistory.v1";
@@ -258,6 +276,23 @@
       const config = raw && typeof raw === "object" ? raw : {};
       return {
         automaticMode: Boolean(config.automaticMode),
+      };
+    }
+
+    function normalizeAgentAuth(raw) {
+      const auth = raw && typeof raw === "object" ? raw : {};
+      const required = Boolean(auth.required);
+      const ready = Boolean(auth.ready);
+      const state = String(auth.state || (ready ? "ready" : "needs_device_auth")).trim() || (ready ? "ready" : "needs_device_auth");
+      return {
+        required,
+        ready,
+        harness: String(auth.harness || "").trim(),
+        state,
+        message: String(auth.message || "").trim(),
+        authURL: String(auth.auth_url || auth.authURL || "").trim(),
+        deviceCode: String(auth.device_code || auth.deviceCode || "").trim(),
+        updatedAt: String(auth.updated_at || auth.updatedAt || "").trim(),
       };
     }
 
@@ -310,6 +345,7 @@
 
     const state = {
       ui: normalizeUIConfig(window.__HUB_UI_CONFIG__),
+      agentAuth: normalizeAgentAuth({ required: false, ready: true, state: "ready" }),
       snapshot: null,
       selectedTaskId: "",
       dismissedTaskIDs: loadDismissedTaskIDs(),
@@ -325,7 +361,11 @@
       expandedTaskOutputIDs: new Set(),
       openTerminalTaskIDs: new Set(),
       taskFullscreenOpen: false,
+      agentAuthBusy: false,
+      agentAuthInteracted: false,
+      agentAuthChallengeKey: "",
     };
+    let agentAuthRefreshTimer = null;
 
     const localConnItem = document.getElementById("local-conn-item");
     const localConnDot = document.getElementById("local-conn-dot");
@@ -385,6 +425,12 @@
     const rightCol = document.querySelector(".right-col");
     const promptWrap = document.querySelector(".prompt-wrap");
     const promptVisibilityToggle = document.getElementById("prompt-visibility-toggle");
+    const agentAuthGate = document.getElementById("agent-auth-gate");
+    const agentAuthDetails = document.getElementById("agent-auth-details");
+    const agentAuthURL = document.getElementById("agent-auth-url");
+    const agentAuthCode = document.getElementById("agent-auth-code");
+    const agentAuthCopy = document.getElementById("agent-auth-copy");
+    const agentAuthVerify = document.getElementById("agent-auth-verify");
 
     function setIndicator(itemNode, dot, textNode, label, online, text) {
       const message = `${label}: ${text}`;
@@ -400,6 +446,190 @@
 
     function setLocalConnection(online, text) {
       setIndicator(localConnItem, localConnDot, localConnText, "Local", online, text);
+    }
+
+    function scheduleAgentAuthRefresh() {
+      if (agentAuthRefreshTimer !== null) {
+        clearTimeout(agentAuthRefreshTimer);
+        agentAuthRefreshTimer = null;
+      }
+      const needsChallenge = state.agentAuth.required && !state.agentAuth.ready &&
+        (!state.agentAuth.authURL || !state.agentAuth.deviceCode);
+      if (!needsChallenge) {
+        return;
+      }
+      agentAuthRefreshTimer = window.setTimeout(() => {
+        agentAuthRefreshTimer = null;
+        loadAgentAuthStatus();
+      }, 700);
+    }
+
+    function setAgentAuthBusy(busy) {
+      state.agentAuthBusy = Boolean(busy);
+      if (agentAuthCopy) {
+        agentAuthCopy.disabled = state.agentAuthBusy;
+      }
+      if (agentAuthVerify) {
+        agentAuthVerify.disabled = state.agentAuthBusy;
+      }
+      if (localPromptSubmit) {
+        localPromptSubmit.disabled = state.agentAuthBusy || (state.agentAuth.required && !state.agentAuth.ready);
+      }
+    }
+
+    function updateAgentAuthDoneVisibility() {
+      if (!agentAuthVerify) return;
+      const visible = state.agentAuth.required &&
+        !state.agentAuth.ready &&
+        state.agentAuthInteracted;
+      agentAuthVerify.classList.toggle("hidden", !visible);
+    }
+
+    function markAgentAuthInteraction() {
+      if (state.agentAuthInteracted) return;
+      state.agentAuthInteracted = true;
+      updateAgentAuthDoneVisibility();
+    }
+
+    function applyAgentAuthGate(auth) {
+      state.agentAuth = normalizeAgentAuth(auth);
+      const gateVisible = state.agentAuth.required && !state.agentAuth.ready;
+      const challengeKey = `${state.agentAuth.deviceCode}|${state.agentAuth.authURL}`;
+
+      if (state.agentAuthChallengeKey !== challengeKey) {
+        state.agentAuthChallengeKey = challengeKey;
+        state.agentAuthInteracted = false;
+      }
+
+      if (agentAuthGate) {
+        agentAuthGate.classList.toggle("hidden", !gateVisible);
+        agentAuthGate.classList.toggle("flex", gateVisible);
+      }
+
+      const hasChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode);
+      if (agentAuthDetails) {
+        agentAuthDetails.classList.toggle("hidden", !hasChallenge);
+      }
+      if (agentAuthURL) {
+        agentAuthURL.textContent = state.agentAuth.authURL || "";
+        agentAuthURL.href = state.agentAuth.authURL || "#";
+        agentAuthURL.classList.toggle("pointer-events-none", !state.agentAuth.authURL);
+        agentAuthURL.classList.toggle("hidden", !state.agentAuth.authURL);
+      }
+      if (agentAuthCode) {
+        agentAuthCode.textContent = state.agentAuth.deviceCode || "";
+        agentAuthCode.classList.toggle("hidden", !state.agentAuth.deviceCode);
+      }
+      if (agentAuthCopy) {
+        agentAuthCopy.classList.toggle("hidden", !state.agentAuth.deviceCode);
+      }
+
+      updateAgentAuthDoneVisibility();
+      if (localPromptSubmit) {
+        const submitDisabled = state.agentAuthBusy || (state.agentAuth.required && !state.agentAuth.ready);
+        localPromptSubmit.disabled = submitDisabled;
+      }
+      scheduleAgentAuthRefresh();
+    }
+
+    async function copyAgentAuthCode() {
+      markAgentAuthInteraction();
+      const code = String(state.agentAuth.deviceCode || "").trim();
+      const url = String(state.agentAuth.authURL || "").trim();
+      const value = code || url;
+      if (!value || !agentAuthCopy) return;
+
+      const setCopiedLabel = () => {
+        const original = agentAuthCopy.textContent;
+        agentAuthCopy.textContent = "Copied";
+        window.setTimeout(() => {
+          if (agentAuthCopy) {
+            agentAuthCopy.textContent = original || "Copy";
+          }
+        }, 1200);
+      };
+
+      try {
+        if (navigator.clipboard && typeof navigator.clipboard.writeText === "function") {
+          await navigator.clipboard.writeText(value);
+          setCopiedLabel();
+          return;
+        }
+      } catch (_err) {
+        // Fall back to a temporary textarea if clipboard API is unavailable.
+      }
+
+      const probe = document.createElement("textarea");
+      probe.value = value;
+      probe.setAttribute("readonly", "readonly");
+      probe.style.position = "absolute";
+      probe.style.left = "-9999px";
+      document.body.appendChild(probe);
+      probe.select();
+      try {
+        document.execCommand("copy");
+        setCopiedLabel();
+      } finally {
+        document.body.removeChild(probe);
+      }
+    }
+
+    async function requestAgentAuth(path, method) {
+      const response = await fetch(path, { method, cache: "no-store" });
+      let body = null;
+      try {
+        body = await response.json();
+      } catch (_err) {
+        body = null;
+      }
+      if (!response.ok) {
+        const apiErr = body && typeof body.error === "string" ? body.error : `auth http ${response.status}`;
+        throw new Error(apiErr);
+      }
+      return normalizeAgentAuth(body?.auth);
+    }
+
+    async function loadAgentAuthStatus() {
+      try {
+        const auth = await requestAgentAuth("/api/agent-auth", "GET");
+        applyAgentAuthGate(auth);
+      } catch (err) {
+        applyAgentAuthGate({
+          required: true,
+          ready: false,
+          state: "error",
+          message: "",
+        });
+      }
+    }
+
+    async function startAgentDeviceAuth() {
+      setAgentAuthBusy(true);
+      try {
+        const auth = await requestAgentAuth("/api/agent-auth/start-device", "POST");
+        applyAgentAuthGate(auth);
+      } catch (err) {
+        return;
+      } finally {
+        setAgentAuthBusy(false);
+      }
+    }
+
+    async function verifyAgentDeviceAuth() {
+      setAgentAuthBusy(true);
+      try {
+        const auth = await requestAgentAuth("/api/agent-auth/verify", "POST");
+        applyAgentAuthGate(auth);
+        if (auth.ready) {
+          setLocalPromptStatus("ok", "Codex auth is ready.");
+        } else if (auth.state === "needs_device_auth") {
+          await startAgentDeviceAuth();
+        }
+      } catch (err) {
+        return;
+      } finally {
+        setAgentAuthBusy(false);
+      }
     }
 
     function applyHubDotMode(mode) {
@@ -1965,6 +2195,7 @@
 
     async function loadInitial() {
       try {
+        await loadAgentAuthStatus();
         await loadLibraryTasks();
         const response = await fetch("/api/state", { cache: "no-store" });
         if (!response.ok) {
@@ -2000,6 +2231,10 @@
 
     async function submitLocalPrompt(event) {
       event.preventDefault();
+      if (state.agentAuth.required && !state.agentAuth.ready) {
+        setLocalPromptStatus("error", "Codex auth is required. Complete the authorization screen first.");
+        return;
+      }
       let normalized = null;
       try {
         normalized = currentPromptPayload();
@@ -2098,6 +2333,13 @@
     builderPromptInput.addEventListener("paste", handlePromptImagePaste);
     builderImagePasteTarget.addEventListener("paste", handlePromptImagePaste);
     builderImagesClear.addEventListener("click", clearPromptImages);
+    if (agentAuthURL) {
+      agentAuthURL.addEventListener("click", markAgentAuthInteraction);
+    }
+    if (agentAuthCopy) {
+      agentAuthCopy.addEventListener("click", copyAgentAuthCode);
+    }
+    agentAuthVerify.addEventListener("click", verifyAgentDeviceAuth);
     promptVisibilityToggle.addEventListener("click", togglePromptVisibility);
     taskTerminalToggle.addEventListener("click", () => {
       toggleTerminalOutput(state.selectedTaskId);
@@ -2162,6 +2404,7 @@
     }
     setPromptMode(state.promptMode);
     applyPromptVisibility();
+    applyAgentAuthGate(state.agentAuth);
     loadInitial();
     startStream();
   </script>

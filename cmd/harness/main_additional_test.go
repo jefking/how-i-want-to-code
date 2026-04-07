@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/http/httptest"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -75,6 +76,52 @@ func TestHubExitCodeMappings(t *testing.T) {
 	}
 }
 
+func TestShouldFallbackToLocalOnlyMode(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name     string
+		uiListen string
+		err      error
+		want     bool
+	}{
+		{
+			name:     "auth failure with ui enabled falls back",
+			uiListen: "127.0.0.1:7777",
+			err:      fmt.Errorf("hub auth: pull status=401"),
+			want:     true,
+		},
+		{
+			name:     "auth failure with ui disabled does not fall back",
+			uiListen: "",
+			err:      fmt.Errorf("hub auth: pull status=401"),
+			want:     false,
+		},
+		{
+			name:     "non-auth error does not fall back",
+			uiListen: "127.0.0.1:7777",
+			err:      fmt.Errorf("something else"),
+			want:     false,
+		},
+		{
+			name:     "nil error does not fall back",
+			uiListen: "127.0.0.1:7777",
+			err:      nil,
+			want:     false,
+		},
+	}
+
+	for _, tt := range tests {
+		tt := tt
+		t.Run(tt.name, func(t *testing.T) {
+			t.Parallel()
+			if got := shouldFallbackToLocalOnlyMode(tt.uiListen, tt.err); got != tt.want {
+				t.Fatalf("shouldFallbackToLocalOnlyMode(%q, %v) = %v, want %v", tt.uiListen, tt.err, got, tt.want)
+			}
+		})
+	}
+}
+
 func TestJoinPRURLsAndCountChangedRepos(t *testing.T) {
 	t.Parallel()
 
@@ -135,6 +182,47 @@ func TestTaskLogDirAndTaskLogPathsValidateInputs(t *testing.T) {
 	}
 	if got := taskLogPaths("", "req-1"); got != nil {
 		t.Fatalf("taskLogPaths(empty root) = %v, want nil", got)
+	}
+
+	paths := taskLogPaths("/tmp/.log", "local-1712345678-000001")
+	want := []string{
+		filepath.Join("/tmp/.log", "local", "1712345678", "000001"),
+		filepath.Join("/tmp/.log", "local", "1712345678", "000001", legacyTaskLogFileName),
+		filepath.Join("/tmp/.log", "local", "1712345678", "000001", logFileName),
+	}
+	if got, wantJoined := strings.Join(paths, "\n"), strings.Join(want, "\n"); got != wantJoined {
+		t.Fatalf("taskLogPaths(...) = %q, want %q", got, wantJoined)
+	}
+}
+
+func TestShouldQueueFailureFollowUpSkipsNonRemediableErrors(t *testing.T) {
+	t.Parallel()
+
+	ok, reason := shouldQueueFailureFollowUp(harness.Result{
+		Err: errors.New("codex: ERROR: Quota exceeded. Check your plan and billing details."),
+	})
+	if ok {
+		t.Fatalf("shouldQueueFailureFollowUp(quota exceeded) = true, want false")
+	}
+	if !strings.Contains(reason, "quota exceeded") {
+		t.Fatalf("reason = %q, want marker containing quota exceeded", reason)
+	}
+
+	ok, reason = shouldQueueFailureFollowUp(harness.Result{
+		Err: errors.New("codex: unexpected status 401 Unauthorized: Missing bearer or basic authentication in header"),
+	})
+	if ok {
+		t.Fatalf("shouldQueueFailureFollowUp(auth failure) = true, want false")
+	}
+	if !strings.Contains(reason, "401 unauthorized") {
+		t.Fatalf("reason = %q, want marker containing 401 unauthorized", reason)
+	}
+
+	ok, reason = shouldQueueFailureFollowUp(harness.Result{
+		Err: errors.New("clone: run git [clone ...]: exit status 128"),
+	})
+	if !ok {
+		t.Fatalf("shouldQueueFailureFollowUp(clone failure) = false, want true (reason=%q)", reason)
 	}
 }
 

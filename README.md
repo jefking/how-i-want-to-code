@@ -1,6 +1,6 @@
 # MoltenHub Code
 
-Turn one prompt into review-ready pull requests across your repos, with automatic CI remediation when checks fail.
+Turn a prompt into review-ready pull requests.
 
 MoltenHub Code is a small Go harness that runs an agent CLI (Codex, Claude, or Auggie) against one or more repositories, opens PRs, and waits for required checks.
 It supports single runs, parallel local runs, and a persistent MoltenHub listener with a local monitoring UI.
@@ -55,7 +55,7 @@ Supported harness values:
 
 Pass secrets at container runtime, not at build time. `.env` is excluded from Docker build context via `.dockerignore` so tokens are never copied into image layers.
 
-Create a local env file:
+Optional `.env` flow:
 
 ```bash
 cp .env.example .env
@@ -66,10 +66,13 @@ cp .env.example .env
 ```dotenv
 GITHUB_TOKEN=ghp_xxx
 OPENAI_API_KEY=sk_xxx
-ANTHROPIC_API_KEY=sk-ant-xxx
-AUGMENT_API_TOKEN=xxx
-AGENT_HARNESS=codex
+MOLTEN_HUB_TOKEN=agent_or_bind_token
 ```
+
+`init.json` flow (no `.env` required for hub mode):
+
+- Add `github_token` to satisfy `gh` auth setup
+- Add `openai_api_key` when using the Codex harness
 
 Run with Docker Compose (`docker-compose.yml`):
 
@@ -100,6 +103,12 @@ cp templates/init.example.json moltenhub/init.json
 docker compose up
 ```
 
+For `init.json`-only startup, ensure the container user can read the file:
+
+```bash
+chmod 644 moltenhub/init.json
+```
+
 GitHub Actions publish flow:
 
 - `deploy-vnext` runs automatically on pushes to `main` (including PR merges) and publishes:
@@ -126,8 +135,15 @@ docker run --rm -it \
 Container startup pre-registers auth before any agent stage:
 
 - maps `GITHUB_TOKEN` to `GH_TOKEN` for `gh` commands
+- if `GITHUB_TOKEN`/`GH_TOKEN` are not set, it reads `github_token` from init JSON and exports it
 - runs `gh auth status` and `gh auth setup-git`
 - configures GitHub URL rewrites so `git@github.com:*` and `ssh://git@github.com/*` can use PAT-backed HTTPS
+- for Codex, it reads `openai_api_key` from init JSON when `OPENAI_API_KEY` is unset and performs `codex login --with-api-key`
+- when Codex auth is still missing, the UI now shows an authorization pre-screen:
+  - startup checks `codex login status` from an empty temp working directory
+  - it automatically launches `codex login --device-auth` and surfaces URL/code in the pre-screen
+  - `Done` re-checks readiness before allowing Studio submissions
+- if remote Hub auth fails (`401`) and the UI is enabled, harness now remains in local-only mode so you can still complete Codex device auth and run local Studio tasks
 
 Single run:
 
@@ -231,6 +247,12 @@ Key fields:
 
 After first successful activation, runtime auth is persisted to `./.moltenhub/config.json`, so `bind_token` and `handle` are not required in `init.json` for subsequent runs.
 Runtime config keys `sessionKey` and `timeoutMs` are optional; missing values default to `main` and `20000`.
+
+Local-only behavior:
+
+- If `bind_token`/`agent_token` are missing and no persisted runtime token exists, `harness hub` now starts in local-only mode instead of exiting with auth error.
+- In local-only mode, the monitor UI and `/api/local-prompt` remain available for local runs, and remote Hub transport is skipped.
+- If local-only mode is used with `--ui-listen ""`, startup exits with an auth/config error because there is no remote or local submission channel.
 
 Runtime-owned fields:
 

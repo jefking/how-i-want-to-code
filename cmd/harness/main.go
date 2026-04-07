@@ -219,12 +219,20 @@ func runHub(args []string) int {
 		logger.Print(line)
 		monitorBroker.IngestLog(line)
 	}
+
+	runtimeCfg, runtimeErr := agentruntime.Resolve(cfg.AgentHarness, cfg.AgentCommand)
+	var codexAuth *codexAuthGate
+
 	localSubmitDeduper := newLocalSubmissionDeduper(localSubmissionDedupTTL)
 	localTaskController := newLocalTaskController()
 	var localDispatchSeq uint64
 
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer stop()
+
+	if runtimeErr == nil && runtimeCfg.Harness == agentruntime.HarnessCodex {
+		codexAuth = newCodexAuthGate(ctx, runner, runtimeCfg.Command, daemonLogger)
+	}
 
 	if ok := runHubBootDiagnostics(ctx, runner, daemonLogger, cfg); !ok {
 		writeStderrLine(logger, "error: hub endpoint ping precheck failed; ensure <hub-host>/ping returns 2xx before connecting")
@@ -244,6 +252,19 @@ func runHub(args []string) int {
 	var queueFailureFollowUp func(failedRequestID string, failedResult harness.Result, failedRunCfg config.Config)
 	var enqueueLocalRun func(reqCtx context.Context, runCfg config.Config, allowFailureFollowUp bool, source string) (string, error)
 	enqueueLocalRun = func(reqCtx context.Context, runCfg config.Config, allowFailureFollowUp bool, source string) (string, error) {
+		if codexAuth != nil {
+			authState, authErr := codexAuth.Status(reqCtx)
+			if authErr != nil {
+				return "", fmt.Errorf("check codex auth status: %w", authErr)
+			}
+			if authState.Required && !authState.Ready {
+				return "", fmt.Errorf(
+					"agent auth required: %s",
+					firstNonEmptyString(authState.Message, "complete Codex device authorization in the UI"),
+				)
+			}
+		}
+
 		runCfg = applyDefaultAgentRuntimeConfig(runCfg, cfg)
 		source = strings.TrimSpace(source)
 		if source == "" {
@@ -393,6 +414,15 @@ func runHub(args []string) int {
 		return requestID, nil
 	}
 	queueFailureFollowUp = func(failedRequestID string, failedResult harness.Result, failedRunCfg config.Config) {
+		if ok, reason := shouldQueueFailureFollowUp(failedResult); !ok {
+			daemonLogger(
+				"dispatch status=warn action=skip_failure_followup request_id=%s err=%q",
+				failedRequestID,
+				fmt.Sprintf("non-remediable failure detected: %s", reason),
+			)
+			return
+		}
+
 		followUpCfg := failureFollowUpRunConfig(failedRequestID, failedResult, failedRunCfg, logRoot)
 		if len(followUpCfg.RepoList()) == 0 {
 			daemonLogger(
@@ -422,6 +452,11 @@ func runHub(args []string) int {
 		uiServer := hubui.NewServer(*uiListen, monitorBroker)
 		uiServer.AutomaticMode = *uiAutomatic
 		uiServer.Logf = logger.Printf
+		if codexAuth != nil {
+			uiServer.AgentAuthStatus = codexAuth.Status
+			uiServer.StartAgentAuth = codexAuth.StartDeviceAuth
+			uiServer.VerifyAgentAuth = codexAuth.Verify
+		}
 		uiServer.SubmitLocalPrompt = func(reqCtx context.Context, body []byte) (string, error) {
 			runCfg, err := hub.ParseRunConfigJSON(body)
 			if err != nil {
@@ -469,6 +504,24 @@ func runHub(args []string) int {
 		}()
 	}
 
+	if !hubCredentialsConfigured(cfg, func() (hub.RuntimeConfig, error) {
+		return hub.LoadRuntimeConfig("")
+	}) {
+		daemonLogger(
+			"hub.auth status=local_only detail=%q",
+			"No bind_token/agent_token configured; skipping remote hub connection. Use the local UI/API to submit tasks.",
+		)
+		if strings.TrimSpace(*uiListen) == "" {
+			writeStderrLine(
+				logger,
+				"error: hub auth not configured and UI disabled; set bind_token/agent_token (or persisted runtime config) or enable --ui-listen",
+			)
+			return harness.ExitAuth
+		}
+		<-ctx.Done()
+		return harness.ExitSuccess
+	}
+
 	daemon := hub.NewDaemon(runner)
 	daemon.Logf = daemonLogger
 	daemon.DispatchController = dispatchController
@@ -484,6 +537,14 @@ func runHub(args []string) int {
 	}
 
 	if err := daemon.Run(ctx, cfg); err != nil {
+		if shouldFallbackToLocalOnlyMode(*uiListen, err) {
+			daemonLogger(
+				"hub.auth status=local_only detail=%q",
+				"Remote hub auth failed; continuing in local-only mode. Use the local UI/API to submit tasks.",
+			)
+			<-ctx.Done()
+			return harness.ExitSuccess
+		}
 		writeStderrLine(logger, fmt.Sprintf("error: %v", err))
 		return hubExitCode(err)
 	}
@@ -600,6 +661,35 @@ func failureFollowUpRunConfig(
 	}
 }
 
+var failureFollowUpNonRemediableMarkers = []string{
+	"quota exceeded",
+	"insufficient_quota",
+	"billing",
+	"401 unauthorized",
+	"missing bearer or basic authentication",
+	"invalid api key",
+	"invalid_authentication",
+	"authentication error",
+}
+
+func shouldQueueFailureFollowUp(failedResult harness.Result) (bool, string) {
+	if failedResult.Err == nil {
+		return false, "failed task did not include an error"
+	}
+
+	errText := strings.ToLower(strings.TrimSpace(failedResult.Err.Error()))
+	if errText == "" {
+		return false, "failed task error was empty"
+	}
+
+	for _, marker := range failureFollowUpNonRemediableMarkers {
+		if strings.Contains(errText, marker) {
+			return false, marker
+		}
+	}
+	return true, ""
+}
+
 func failureFollowUpRepos(failedResult harness.Result, failedRunCfg config.Config) []string {
 	for _, repo := range failedRunCfg.RepoList() {
 		repo = strings.TrimSpace(repo)
@@ -646,6 +736,7 @@ func taskLogPaths(logRoot, requestID string) []string {
 	}
 	return []string{
 		logDir,
+		filepath.Join(logDir, legacyTaskLogFileName),
 		filepath.Join(logDir, logFileName),
 	}
 }
@@ -713,6 +804,13 @@ func hubExitCode(err error) int {
 	default:
 		return harness.ExitPreflight
 	}
+}
+
+func shouldFallbackToLocalOnlyMode(uiListen string, err error) bool {
+	if strings.TrimSpace(uiListen) == "" || err == nil {
+		return false
+	}
+	return hubExitCode(err) == harness.ExitAuth
 }
 
 func joinPRURLs(results []harness.RepoResult) string {
