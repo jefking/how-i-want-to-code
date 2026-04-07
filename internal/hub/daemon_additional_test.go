@@ -20,7 +20,7 @@ import (
 type stubMoltenHubAPI struct {
 	token string
 
-	pullFn func(ctx context.Context, timeoutMs int) (PulledOpenClawMessage, bool, error)
+	pullFn   func(ctx context.Context, timeoutMs int) (PulledOpenClawMessage, bool, error)
 	recordFn func(context.Context) error
 
 	mu        sync.Mutex
@@ -283,8 +283,17 @@ func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *test
 	if !strings.Contains(prompt, failureFollowUpPromptBase) {
 		t.Fatalf("follow-up prompt = %q", prompt)
 	}
-	if !strings.Contains(prompt, "No workspace or log path was captured before the failure.") {
+	if !strings.Contains(prompt, failureFollowUpNoPathGuidance) {
 		t.Fatalf("follow-up prompt missing empty-path guidance: %q", prompt)
+	}
+	if !strings.Contains(prompt, "Observed failure context:") {
+		t.Fatalf("follow-up prompt missing failure context: %q", prompt)
+	}
+	if !strings.Contains(prompt, `- error="preflight: runner exploded"`) {
+		t.Fatalf("follow-up prompt missing error details: %q", prompt)
+	}
+	if !strings.Contains(prompt, "Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.") {
+		t.Fatalf("follow-up prompt missing execution contract: %q", prompt)
 	}
 }
 
@@ -316,6 +325,15 @@ func TestFailureFollowUpPromptIncludesWorkspaceAndTargetPath(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "/tmp/run-123/repo/internal/hub") {
 		t.Fatalf("prompt missing repo target dir: %q", prompt)
+	}
+	if !strings.Contains(prompt, "Observed failure context:") {
+		t.Fatalf("prompt missing failure context: %q", prompt)
+	}
+	if !strings.Contains(prompt, "- repos=git@github.com:acme/repo.git") {
+		t.Fatalf("prompt missing repo context: %q", prompt)
+	}
+	if !strings.Contains(prompt, "When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.") {
+		t.Fatalf("prompt missing response contract: %q", prompt)
 	}
 }
 

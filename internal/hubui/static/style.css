@@ -1257,11 +1257,18 @@ select.prompt-control {
 }
 
 .task-fullscreen-close {
-  width: 30px;
-  height: 30px;
+  width: 44px;
+  height: 44px;
+  min-inline-size: 44px;
+  min-height: 44px;
   padding: 0;
-  border-radius: 10px;
-  font-size: 0.86rem;
+  border-radius: 14px;
+  border-color: rgba(15, 27, 51, 0.2);
+  color: #fff;
+  background: rgba(15, 27, 51, 0.92);
+  box-shadow: 0 16px 36px rgba(10, 44, 102, 0.22);
+  font-size: 1.08rem;
+  font-weight: 900;
   letter-spacing: 0;
   text-transform: none;
   line-height: 1;
@@ -1269,9 +1276,16 @@ select.prompt-control {
 
 body.task-fullscreen-open #task-fullscreen-toggle {
   position: fixed;
-  top: 12px;
-  right: 12px;
+  top: max(16px, env(safe-area-inset-top));
+  right: max(16px, env(safe-area-inset-right));
   z-index: 90;
+}
+
+.task-fullscreen-close:hover,
+.task-fullscreen-close:focus-visible {
+  color: #fff;
+  border-color: rgba(15, 27, 51, 0.28);
+  background: rgba(15, 27, 51, 0.98);
 }
 
 .task-fullscreen-body {

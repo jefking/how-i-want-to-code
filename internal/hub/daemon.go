@@ -13,6 +13,7 @@ import (
 
 	"github.com/jef/moltenhub-code/internal/config"
 	"github.com/jef/moltenhub-code/internal/execx"
+	"github.com/jef/moltenhub-code/internal/failurefollowup"
 	"github.com/jef/moltenhub-code/internal/harness"
 	"github.com/jef/moltenhub-code/internal/library"
 )
@@ -30,7 +31,8 @@ type Daemon struct {
 const wsFallbackWindow = 30 * time.Second
 const dispatchDedupTTL = 2 * time.Hour
 const agentStatusUpdateTimeout = 5 * time.Second
-const failureFollowUpPromptBase = "Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."
+const failureFollowUpPromptBase = failurefollowup.RequiredPrompt
+const failureFollowUpNoPathGuidance = "No workspace or log path was captured before the failure. Investigate the task history and runtime error details first."
 
 // NewDaemon returns a hub daemon with defaults.
 func NewDaemon(runner execx.Runner) Daemon {
@@ -713,8 +715,19 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 
 func failureFollowUpPrompt(runCfg config.Config, res harness.Result) string {
 	paths := failureLogPaths(runCfg, res)
+	contextBlock := failureFollowUpFailureContext(runCfg, res)
 	if len(paths) == 0 {
-		return failureFollowUpPromptBase + "\n\nNo workspace or log path was captured before the failure. Investigate the task history and runtime error details first."
+		var b strings.Builder
+		b.WriteString(failureFollowUpPromptBase)
+		b.WriteString("\n\n")
+		b.WriteString(failureFollowUpNoPathGuidance)
+		if contextBlock != "" {
+			b.WriteString("\n\n")
+			b.WriteString(contextBlock)
+		}
+		b.WriteString("\n\n")
+		b.WriteString(failurefollowup.ExecutionContract)
+		return b.String()
 	}
 
 	var b strings.Builder
@@ -724,7 +737,39 @@ func failureFollowUpPrompt(runCfg config.Config, res harness.Result) string {
 		b.WriteString("\n- ")
 		b.WriteString(path)
 	}
+	if contextBlock != "" {
+		b.WriteString("\n\n")
+		b.WriteString(contextBlock)
+	}
+	b.WriteString("\n\n")
+	b.WriteString(failurefollowup.ExecutionContract)
 	return b.String()
+}
+
+func failureFollowUpFailureContext(runCfg config.Config, res harness.Result) string {
+	lines := []string{
+		"Observed failure context:",
+		fmt.Sprintf("- exit_code=%d", res.ExitCode),
+	}
+	if res.Err != nil {
+		lines = append(lines, fmt.Sprintf("- error=%q", res.Err.Error()))
+	}
+	if workspaceDir := strings.TrimSpace(res.WorkspaceDir); workspaceDir != "" {
+		lines = append(lines, fmt.Sprintf("- workspace_dir=%s", workspaceDir))
+	}
+	if branch := strings.TrimSpace(res.Branch); branch != "" {
+		lines = append(lines, fmt.Sprintf("- branch=%s", branch))
+	}
+	if prURL := strings.TrimSpace(res.PRURL); prURL != "" {
+		lines = append(lines, fmt.Sprintf("- pr_url=%s", prURL))
+	}
+	if repos := runCfg.RepoList(); len(repos) > 0 {
+		lines = append(lines, fmt.Sprintf("- repos=%s", strings.Join(repos, ",")))
+	}
+	if len(lines) == 1 {
+		return ""
+	}
+	return strings.Join(lines, "\n")
 }
 
 func failureLogPaths(runCfg config.Config, res harness.Result) []string {
