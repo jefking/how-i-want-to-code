@@ -120,6 +120,7 @@ body.task-fullscreen-open {
   letter-spacing: 0.05em;
   text-transform: uppercase;
   transition: border-color .12s ease, color .12s ease, transform .12s ease, opacity .12s ease;
+  flex-shrink: 0;
 }
 
 .prompt-visibility-toggle:hover {
@@ -379,18 +380,22 @@ body.task-fullscreen-open {
   gap: 16px;
 }
 
-.right-col.automatic-mode {
-  grid-template-rows: minmax(240px, 38%) minmax(320px, 1fr);
+.right-col.prompt-collapsed {
+  grid-template-rows: min-content minmax(220px, 32%) minmax(260px, 1fr);
 }
 
-.prompt-wrap.hidden {
-  display: none;
+.prompt-wrap.prompt-collapsed {
+  min-height: 0;
 }
 
 .prompt-form {
   display: grid;
   gap: 10px;
   padding: 12px;
+}
+
+.prompt-form.hidden {
+  display: none;
 }
 
 .prompt-panel.hidden {
@@ -1075,8 +1080,8 @@ select.prompt-control {
   .right-col {
     grid-template-rows: minmax(250px, 40vh) minmax(220px, 34vh) minmax(260px, 46vh);
   }
-  .right-col.automatic-mode {
-    grid-template-rows: minmax(240px, 38vh) minmax(320px, 1fr);
+  .right-col.prompt-collapsed {
+    grid-template-rows: min-content minmax(220px, 34vh) minmax(260px, 46vh);
   }
   .task-fullscreen {
     padding: 12px;
