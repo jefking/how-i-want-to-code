@@ -78,12 +78,13 @@ func newCodexAuthGate(
 	}
 
 	ready, probeMessage, probeErr := g.probe(ctx)
+	autoStartDeviceAuth := false
 	g.mu.Lock()
-	defer g.mu.Unlock()
 	if probeErr != nil {
 		g.state = "error"
 		g.message = probeErr.Error()
 		g.updatedAt = time.Now().UTC()
+		g.mu.Unlock()
 		return g
 	}
 	if ready {
@@ -96,8 +97,19 @@ func newCodexAuthGate(
 		}
 	} else if strings.TrimSpace(probeMessage) != "" {
 		g.message = probeMessage
+		autoStartDeviceAuth = true
+	} else {
+		autoStartDeviceAuth = true
 	}
 	g.updatedAt = time.Now().UTC()
+	g.mu.Unlock()
+
+	if autoStartDeviceAuth {
+		if _, err := g.StartDeviceAuth(context.Background()); err != nil {
+			g.logf("hub.auth status=warn action=start_codex_device_auth err=%q", err)
+		}
+	}
+
 	return g
 }
 
