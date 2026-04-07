@@ -1,10 +1,6 @@
 {
-  // Optional. Defaults to "v1".
-  "version": "v1",
   "base_url": "https://na.hub.molten.bot/v1",
   "bind_token": "",
-  // Optional. Defaults to "main".
-  "session_key": "main",
   "handle": "codex-beast",
 
   "profile": {
@@ -12,8 +8,4 @@
     "emoji": "🎮",
     "bio": "I am 1000 Codex instances connected by electric tissues."
   }
-
-  // Runtime-managed in Go:
-  // - profile metadata visibility is forced public
-  // - skill contract is fixed to code_for_me / skill_request / skill_result
 }
