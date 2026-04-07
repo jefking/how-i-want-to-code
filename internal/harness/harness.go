@@ -421,7 +421,8 @@ func (h Harness) processChangedRepo(
 					defaultCIWorkflowPath,
 					attempt+1,
 				)
-				if _, dispatchErr := h.runCommand(ctx, "checks", workflowDispatchCommand(repo.Dir, repo.Branch)); dispatchErr != nil {
+				dispatchRes, dispatchErr := h.runCommand(ctx, "checks", workflowDispatchCommand(repo.Dir, repo.Branch))
+				if dispatchErr != nil {
 					h.logf(
 						"stage=checks status=warn action=workflow_dispatch reason=failed repo=%s repo_dir=%s branch=%s workflow=%s attempt=%d err=%q",
 						repo.URL,
@@ -440,6 +441,54 @@ func (h Harness) processChangedRepo(
 						defaultCIWorkflowPath,
 						attempt+1,
 					)
+					runID := extractWorkflowRunID(strings.Join([]string{dispatchRes.Stdout, dispatchRes.Stderr}, "\n"))
+					if runID == "" {
+						h.logf(
+							"stage=checks status=warn action=workflow_dispatch reason=missing_run_id repo=%s repo_dir=%s branch=%s workflow=%s attempt=%d",
+							repo.URL,
+							repo.RelDir,
+							repo.Branch,
+							defaultCIWorkflowPath,
+							attempt+1,
+						)
+					} else {
+						h.logf(
+							"stage=checks status=start action=workflow_watch repo=%s repo_dir=%s branch=%s run_id=%s workflow=%s attempt=%d",
+							repo.URL,
+							repo.RelDir,
+							repo.Branch,
+							runID,
+							defaultCIWorkflowPath,
+							attempt+1,
+						)
+						watchRes, watchErr := h.runCommand(ctx, "checks", workflowRunWatchCommand(repo.Dir, runID))
+						if watchErr == nil {
+							h.logf(
+								"stage=checks status=ok action=workflow_watch repo=%s repo_dir=%s branch=%s run_id=%s workflow=%s attempt=%d",
+								repo.URL,
+								repo.RelDir,
+								repo.Branch,
+								runID,
+								defaultCIWorkflowPath,
+								attempt+1,
+							)
+							return ExitSuccess, "", nil
+						}
+						h.logf(
+							"stage=checks status=warn action=workflow_watch reason=failed repo=%s repo_dir=%s branch=%s run_id=%s workflow=%s attempt=%d err=%q",
+							repo.URL,
+							repo.RelDir,
+							repo.Branch,
+							runID,
+							defaultCIWorkflowPath,
+							attempt+1,
+							watchErr,
+						)
+						checkRes = watchRes
+						checkErr = watchErr
+						checkSummary = summarizeCheckOutput(checkRes)
+						noChecksReported = isNoChecksReported(checkRes, checkErr)
+					}
 				}
 			}
 			if noReportRetry >= maxPRChecksNoReportRetries || !noChecksReported {
@@ -1101,10 +1150,19 @@ func sleepWithContext(ctx context.Context, d time.Duration) error {
 }
 
 var githubURL = regexp.MustCompile(`https://github\.com/[^\s"'\\}\]]+`)
+var githubActionsRunID = regexp.MustCompile(`https://github\.com/[^/]+/[^/]+/actions/runs/([0-9]+)`)
 
 func extractFirstURL(text string) string {
 	m := githubURL.FindString(text)
 	return strings.TrimSpace(m)
+}
+
+func extractWorkflowRunID(text string) string {
+	match := githubActionsRunID.FindStringSubmatch(text)
+	if len(match) < 2 {
+		return ""
+	}
+	return strings.TrimSpace(match[1])
 }
 
 func preflightCommands() []execx.Command {
@@ -1407,6 +1465,14 @@ func workflowDispatchCommand(repoDir, branch string) execx.Command {
 		Dir:  repoDir,
 		Name: "gh",
 		Args: []string{"workflow", "run", defaultCIWorkflowPath, "--ref", branch},
+	}
+}
+
+func workflowRunWatchCommand(repoDir, runID string) execx.Command {
+	return execx.Command{
+		Dir:  repoDir,
+		Name: "gh",
+		Args: []string{"run", "watch", runID, "--exit-status"},
 	}
 }
 

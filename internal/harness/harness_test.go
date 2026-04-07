@@ -602,6 +602,64 @@ func TestRunNoChecksReportedRetriesBeforePassing(t *testing.T) {
 	}
 }
 
+func TestRunNoChecksReportedDispatchWatchPasses(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := filepath.Join("/tmp", "temp", guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
+	repoDir := filepath.Join(runDir, "repo")
+	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
+	branch := "moltenhub-build-api"
+	prURL := "https://github.com/acme/repo/pull/42"
+	noChecks := "no checks reported on the 'moltenhub-build-api' branch"
+	runURL := "https://github.com/acme/repo/actions/runs/12345"
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: branchCommand(repoDir, branch)},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
+		{cmd: addCommand(repoDir)},
+		{cmd: commitCommand(repoDir, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDir, branch)},
+		{cmd: prCreateCommand(repoDir, cfg, branch), res: execx.Result{Stdout: prURL + "\n"}},
+		{cmd: prChecksCommand(repoDir, prURL), res: execx.Result{Stderr: noChecks + "\n"}, err: errors.New("checks unavailable")},
+		{cmd: workflowDispatchCommand(repoDir, branch), res: execx.Result{Stdout: runURL + "\n"}},
+		{cmd: workflowRunWatchCommand(repoDir, "12345")},
+	}}
+
+	sleepCalls := 0
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = testWorkspaceManager(guid)
+	h.TargetDirOK = func(path string) bool { return path == targetDir }
+	h.Sleep = func(_ context.Context, _ time.Duration) error {
+		sleepCalls++
+		return nil
+	}
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.ExitCode != ExitSuccess {
+		t.Fatalf("ExitCode = %d", res.ExitCode)
+	}
+	if sleepCalls != 0 {
+		t.Fatalf("sleepCalls = %d, want 0", sleepCalls)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
+	}
+}
+
 func TestRunNoChecksReportedAfterRetryWindowTriggersRemediation(t *testing.T) {
 	t.Parallel()
 
@@ -1315,10 +1373,48 @@ func TestCommandBuilders(t *testing.T) {
 		t.Fatalf("workflow dispatch command unexpected: %+v", workflowDispatch)
 	}
 
+	workflowWatch := workflowRunWatchCommand(repoDir, "12345")
+	wantWorkflowWatch := []string{"run", "watch", "12345", "--exit-status"}
+	if workflowWatch.Name != "gh" || workflowWatch.Dir != repoDir || !reflect.DeepEqual(workflowWatch.Args, wantWorkflowWatch) {
+		t.Fatalf("workflow watch command unexpected: %+v", workflowWatch)
+	}
+
 	pullRebase := pullRebaseCommand(repoDir, branch)
 	wantPullRebase := []string{"pull", "--rebase", "origin", branch}
 	if pullRebase.Name != "git" || pullRebase.Dir != repoDir || !reflect.DeepEqual(pullRebase.Args, wantPullRebase) {
 		t.Fatalf("pull rebase command unexpected: %+v", pullRebase)
+	}
+}
+
+func TestExtractWorkflowRunID(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		in   string
+		want string
+	}{
+		{
+			name: "extracts_run_id_from_url",
+			in:   "queued: https://github.com/acme/repo/actions/runs/1234567890",
+			want: "1234567890",
+		},
+		{
+			name: "returns_empty_when_missing_run_url",
+			in:   "queued workflow without URL",
+			want: "",
+		},
+	}
+
+	for _, tc := range cases {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+
+			if got := extractWorkflowRunID(tc.in); got != tc.want {
+				t.Fatalf("extractWorkflowRunID(%q) = %q, want %q", tc.in, got, tc.want)
+			}
+		})
 	}
 }
 
