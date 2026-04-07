@@ -24,12 +24,12 @@ func TestFromPromptFallback(t *testing.T) {
 	}
 }
 
-func TestBranchNameIncludesSlugTimeAndGuid(t *testing.T) {
+func TestBranchNameUsesStableSlug(t *testing.T) {
 	t.Parallel()
 
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	got := BranchName("Build API", now, "abcdef123456")
-	want := "moltenhub-build-api-20260402-150405-abcdef12"
+	want := "moltenhub-build-api"
 	if got != want {
 		t.Fatalf("BranchName() = %q, want %q", got, want)
 	}

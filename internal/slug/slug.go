@@ -30,15 +30,10 @@ func FromPrompt(prompt string) string {
 	return s
 }
 
-// BranchName builds a unique branch name with prompt slug, timestamp, and short guid.
+// BranchName builds a branch name with a stable prompt slug.
 func BranchName(prompt string, now time.Time, guid string) string {
 	slug := FromPrompt(prompt)
-	shortGUID := guid
-	if len(shortGUID) > 8 {
-		shortGUID = shortGUID[:8]
-	}
-	if shortGUID == "" {
-		shortGUID = "noguid"
-	}
-	return fmt.Sprintf("moltenhub-%s-%s-%s", slug, now.UTC().Format("20060102-150405"), shortGUID)
+	_ = now
+	_ = guid
+	return fmt.Sprintf("moltenhub-%s", slug)
 }
