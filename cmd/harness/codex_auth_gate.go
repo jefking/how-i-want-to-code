@@ -188,7 +188,7 @@ func (g *codexAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthState
 	g.procRunning = true
 	g.procCancel = cancel
 	g.state = "pending_device_auth"
-	g.message = "Waiting for device authorization. Open the link, enter the code, then click Done, Check Again."
+	g.message = "Waiting for device authorization. Use the link and code, then click Done."
 	g.updatedAt = time.Now().UTC()
 	snap := g.snapshotLocked()
 	g.mu.Unlock()
@@ -239,11 +239,11 @@ func (g *codexAuthGate) Verify(ctx context.Context) (hubui.AgentAuthState, error
 
 	if g.procRunning {
 		g.state = "pending_device_auth"
-		g.message = "Still waiting for authorization. Complete browser auth and click Done, Check Again."
+		g.message = "Still waiting for authorization. Complete browser auth, then click Done."
 	} else {
 		g.state = "needs_device_auth"
 		if strings.TrimSpace(probeMessage) == "" {
-			g.message = "Codex is not logged in. Start device auth to continue."
+			g.message = "Codex is not logged in. Device authorization is required."
 		} else {
 			g.message = probeMessage
 		}
@@ -288,7 +288,7 @@ func (g *codexAuthGate) ingestDeviceAuthLine(line string) {
 	}
 	if !g.ready {
 		g.state = "pending_device_auth"
-		g.message = "Open the link, enter the code, then click Done, Check Again."
+		g.message = "Use the link and code above, then click Done."
 	}
 	g.updatedAt = time.Now().UTC()
 }
@@ -318,7 +318,7 @@ func (g *codexAuthGate) waitDeviceAuth(cmd *exec.Cmd, tempDir string) {
 	}
 	if strings.TrimSpace(g.authURL) == "" || strings.TrimSpace(g.deviceCode) == "" {
 		g.state = "needs_device_auth"
-		g.message = "Device authorization did not complete. Start device auth again."
+		g.message = "Device authorization did not complete. Click Done to retry."
 		g.updatedAt = time.Now().UTC()
 	}
 }
@@ -360,7 +360,7 @@ func (g *codexAuthGate) probe(ctx context.Context) (bool, string, error) {
 		return true, normalizeCodexStatusMessage(combined), nil
 	}
 	if strings.Contains(fullLower, "not logged in") {
-		return false, "Codex is not logged in. Start device auth to continue.", nil
+		return false, "Codex is not logged in. Device authorization is required.", nil
 	}
 	if strings.Contains(fullLower, "executable file not found") || strings.Contains(fullLower, "command not found") {
 		return false, "", fmt.Errorf("codex CLI is not available on PATH")

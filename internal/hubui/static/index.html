@@ -429,7 +429,6 @@
     const agentAuthDetails = document.getElementById("agent-auth-details");
     const agentAuthURL = document.getElementById("agent-auth-url");
     const agentAuthCode = document.getElementById("agent-auth-code");
-    const agentAuthStart = document.getElementById("agent-auth-start");
     const agentAuthVerify = document.getElementById("agent-auth-verify");
     const agentAuthStatus = document.getElementById("agent-auth-status");
 
@@ -451,9 +450,6 @@
 
     function setAgentAuthBusy(busy) {
       state.agentAuthBusy = Boolean(busy);
-      if (agentAuthStart) {
-        agentAuthStart.disabled = state.agentAuthBusy;
-      }
       if (agentAuthVerify) {
         agentAuthVerify.disabled = state.agentAuthBusy;
       }
@@ -506,12 +502,9 @@
         agentAuthURL.classList.toggle("pointer-events-none", !state.agentAuth.authURL);
       }
       if (agentAuthCode) {
-        agentAuthCode.textContent = state.agentAuth.deviceCode || "Start device auth to generate a code.";
+        agentAuthCode.textContent = state.agentAuth.deviceCode || "Waiting for device code...";
       }
 
-      if (agentAuthStart) {
-        agentAuthStart.classList.toggle("hidden", state.agentAuth.ready);
-      }
       if (agentAuthVerify) {
         agentAuthVerify.classList.toggle("hidden", state.agentAuth.ready);
       }
@@ -540,6 +533,10 @@
       try {
         const auth = await requestAgentAuth("/api/agent-auth", "GET");
         applyAgentAuthGate(auth);
+        if (auth.required && !auth.ready && auth.state === "needs_device_auth") {
+          await startAgentDeviceAuth();
+          return;
+        }
         if (!auth.required || auth.ready) {
           setAgentAuthStatusText("", "");
         }
@@ -548,7 +545,7 @@
           required: true,
           ready: false,
           state: "error",
-          message: "Unable to verify Codex login status.",
+          message: "Unable to verify Codex authorization status.",
         });
         setAgentAuthStatusText(`Status check failed: ${err.message}`, "error");
       }
@@ -556,11 +553,15 @@
 
     async function startAgentDeviceAuth() {
       setAgentAuthBusy(true);
-      setAgentAuthStatusText("Starting device authorization...", "warn");
+      setAgentAuthStatusText("Preparing device authorization...", "warn");
       try {
         const auth = await requestAgentAuth("/api/agent-auth/start-device", "POST");
         applyAgentAuthGate(auth);
-        setAgentAuthStatusText("Open the link, enter the code, then click Done, Check Again.", "warn");
+        if (auth.authURL || auth.deviceCode) {
+          setAgentAuthStatusText("Use the link and code above, then click Done.", "warn");
+        } else {
+          setAgentAuthStatusText("Preparing device authorization...", "warn");
+        }
       } catch (err) {
         setAgentAuthStatusText(`Device auth failed: ${err.message}`, "error");
       } finally {
@@ -577,8 +578,10 @@
         if (auth.ready) {
           setAgentAuthStatusText("Codex authorization is ready.", "ok");
           setLocalPromptStatus("ok", "Codex auth is ready.");
+        } else if (auth.state === "needs_device_auth") {
+          await startAgentDeviceAuth();
         } else {
-          setAgentAuthStatusText("Still waiting for authorization. Complete browser auth and try again.", "warn");
+          setAgentAuthStatusText("Still waiting for authorization. Complete browser auth, then click Done.", "warn");
         }
       } catch (err) {
         setAgentAuthStatusText(`Verification failed: ${err.message}`, "error");
@@ -2288,7 +2291,6 @@
     builderPromptInput.addEventListener("paste", handlePromptImagePaste);
     builderImagePasteTarget.addEventListener("paste", handlePromptImagePaste);
     builderImagesClear.addEventListener("click", clearPromptImages);
-    agentAuthStart.addEventListener("click", startAgentDeviceAuth);
     agentAuthVerify.addEventListener("click", verifyAgentDeviceAuth);
     promptVisibilityToggle.addEventListener("click", togglePromptVisibility);
     taskTerminalToggle.addEventListener("click", () => {

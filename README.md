@@ -141,8 +141,8 @@ Container startup pre-registers auth before any agent stage:
 - for Codex, it reads `openai_api_key` from init JSON when `OPENAI_API_KEY` is unset and performs `codex login --with-api-key`
 - when Codex auth is still missing, the UI now shows an authorization pre-screen:
   - startup checks `codex login status` from an empty temp working directory
-  - `Start Device Auth` launches `codex login --device-auth` and surfaces URL/code in the pre-screen
-  - `Done, Check Again` re-checks readiness before allowing Studio submissions
+  - it automatically launches `codex login --device-auth` and surfaces URL/code in the pre-screen
+  - `Done` re-checks readiness before allowing Studio submissions
 - if remote Hub auth fails (`401`) and the UI is enabled, harness now remains in local-only mode so you can still complete Codex device auth and run local Studio tasks
 
 Single run:
