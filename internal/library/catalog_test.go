@@ -14,6 +14,7 @@ func TestLoadCatalogReadsJSONTasks(t *testing.T) {
 	dir := t.TempDir()
 	data := `{
   "security-review": {
+    "display_name": "Security Review",
     "description": "Audit security boundaries.",
     "target_subdir": ".",
     "prompt": "Review the repository."
@@ -32,6 +33,9 @@ func TestLoadCatalogReadsJSONTasks(t *testing.T) {
 	}
 	if got, want := catalog.Tasks[0].Name, "security-review"; got != want {
 		t.Fatalf("Name = %q, want %q", got, want)
+	}
+	if got, want := catalog.Tasks[0].DisplayName, "Security Review"; got != want {
+		t.Fatalf("DisplayName = %q, want %q", got, want)
 	}
 	if got, want := catalog.Tasks[0].TargetSubdir, "."; got != want {
 		t.Fatalf("TargetSubdir = %q, want %q", got, want)

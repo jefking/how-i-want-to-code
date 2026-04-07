@@ -17,6 +17,7 @@ const DefaultDir = "library"
 // TaskDefinition is one callable library entry loaded from ./library/*.json.
 type TaskDefinition struct {
 	Name          string   `json:"name"`
+	DisplayName   string   `json:"display_name"`
 	Description   string   `json:"description"`
 	TargetSubdir  string   `json:"target_subdir"`
 	Prompt        string   `json:"prompt"`
@@ -31,6 +32,7 @@ type TaskDefinition struct {
 // TaskSummary is the public UI/runtime registration view of one library task.
 type TaskSummary struct {
 	Name        string `json:"name"`
+	DisplayName string `json:"display_name,omitempty"`
 	Description string `json:"description,omitempty"`
 }
 
@@ -42,6 +44,7 @@ type Catalog struct {
 
 var taskDefinitionFieldNames = map[string]struct{}{
 	"name":           {},
+	"display_name":   {},
 	"description":    {},
 	"target_subdir":  {},
 	"prompt":         {},
@@ -105,6 +108,7 @@ func (c Catalog) Summaries() []TaskSummary {
 	for _, task := range c.Tasks {
 		out = append(out, TaskSummary{
 			Name:        task.Name,
+			DisplayName: task.DisplayName,
 			Description: task.Description,
 		})
 	}
@@ -216,6 +220,7 @@ func decodeTaskDefinition(path, key string, data []byte) (TaskDefinition, error)
 	}
 
 	task.Name = strings.TrimSpace(task.Name)
+	task.DisplayName = strings.TrimSpace(task.DisplayName)
 	task.Description = strings.TrimSpace(task.Description)
 	task.TargetSubdir = strings.TrimSpace(task.TargetSubdir)
 	task.Prompt = strings.TrimSpace(task.Prompt)

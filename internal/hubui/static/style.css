@@ -428,6 +428,74 @@ body.task-fullscreen-open {
   color: #eef6ff;
 }
 
+.library-task-list {
+  display: grid;
+  gap: 8px;
+  max-height: 210px;
+  overflow: auto;
+  padding-right: 2px;
+}
+
+.library-task-empty {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #0d1825;
+  color: var(--muted);
+  font-size: 0.76rem;
+  line-height: 1.35;
+  padding: 10px 12px;
+}
+
+.library-task-option {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  text-align: left;
+  border: 1px solid rgba(136, 162, 189, 0.34);
+  border-radius: 10px;
+  background: #0d1825;
+  color: #dbe6f2;
+  padding: 10px 12px;
+  transition: border-color .12s ease, background-color .12s ease, transform .12s ease;
+}
+
+.library-task-option:hover {
+  border-color: #8ecfff;
+  background: #122337;
+  transform: translateY(-1px);
+}
+
+.library-task-option.active {
+  border-color: #f6b36a;
+  background: #1a2a3e;
+  box-shadow: inset 0 0 0 1px rgba(246, 179, 106, 0.25);
+}
+
+.library-task-option:focus-visible {
+  outline: 1px solid #8ecfff;
+  outline-offset: 1px;
+}
+
+.library-task-option-title {
+  color: #e7f1fb;
+  font-size: 0.79rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.library-task-option-name {
+  color: var(--meta);
+  font-size: 0.69rem;
+  font-family: "IBM Plex Mono", "Consolas", monospace;
+  letter-spacing: 0.02em;
+}
+
+.library-task-option-description {
+  color: var(--muted);
+  font-size: 0.73rem;
+  line-height: 1.35;
+}
+
 .prompt-grid {
   display: flex;
   align-items: flex-end;

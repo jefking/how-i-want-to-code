@@ -238,11 +238,20 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="prompt-mode-builder"`) {
 		t.Fatalf("expected index html to include builder mode toggle")
 	}
+	if !strings.Contains(markup, `id="prompt-mode-library"`) {
+		t.Fatalf("expected index html to include library mode toggle")
+	}
+	if !strings.Contains(markup, `id="prompt-mode-json"`) {
+		t.Fatalf("expected index html to include json mode toggle")
+	}
 	if !strings.Contains(markup, `id="builder-repo-select"`) {
 		t.Fatalf("expected index html to include repo history select")
 	}
-	if !strings.Contains(markup, `id="builder-library-task"`) {
-		t.Fatalf("expected index html to include library task select")
+	if !strings.Contains(markup, `id="library-repo-select"`) {
+		t.Fatalf("expected index html to include library mode repo history select")
+	}
+	if !strings.Contains(markup, `id="library-task-list"`) {
+		t.Fatalf("expected index html to include library task list")
 	}
 	if !strings.Contains(markup, `id="builder-image-paste-target"`) {
 		t.Fatalf("expected index html to include screenshot paste target")
@@ -269,7 +278,7 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function syncBaseBranchClearState(") || !strings.Contains(markup, "builderBaseBranchClear.addEventListener(\"click\", resetBaseBranchToMain);") {
 		t.Fatalf("expected index html to include branch clear behavior")
 	}
-	if !strings.Contains(markup, `builderRepoHistoryField.classList.toggle("hidden", !hasSavedHistory);`) {
+	if !strings.Contains(markup, `historyField.classList.toggle("hidden", !hasSavedHistory);`) {
 		t.Fatalf("expected index html to hide repo history when there are no saved repos")
 	}
 	if !strings.Contains(markup, "function rememberRepos(") {
