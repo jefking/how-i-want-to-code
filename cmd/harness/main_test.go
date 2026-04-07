@@ -333,6 +333,26 @@ func TestFailureFollowUpReposUsesFailedRunRepoFirst(t *testing.T) {
 	}
 }
 
+func TestFailureFollowUpReposPrefersSingleRepoFromResult(t *testing.T) {
+	t.Parallel()
+
+	failedResult := harness.Result{
+		RepoResults: []harness.RepoResult{
+			{RepoURL: "git@github.com:acme/from-result.git"},
+			{RepoURL: "git@github.com:acme/from-result.git"},
+		},
+	}
+	failedRunCfg := config.Config{
+		Repos: []string{
+			"git@github.com:acme/from-config.git",
+			"git@github.com:acme/other-config.git",
+		},
+	}
+	if got, want := failureFollowUpRepos(failedResult, failedRunCfg), []string{"git@github.com:acme/from-result.git"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("failureFollowUpRepos() = %v, want %v", got, want)
+	}
+}
+
 func TestFailureFollowUpReposFallsBackToFailedResultRepo(t *testing.T) {
 	t.Parallel()
 
