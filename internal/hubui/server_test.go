@@ -262,6 +262,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="builder-image-list"`) {
 		t.Fatalf("expected index html to include screenshot attachment list")
 	}
+	if strings.Contains(markup, "No screenshots attached.") {
+		t.Fatalf("expected index html to hide screenshot empty-state copy until images are attached")
+	}
 	if !strings.Contains(markup, `id="local-prompt-submit"`) || !strings.Contains(markup, `>Run</button>`) {
 		t.Fatalf("expected index html to render the prompt studio submit button with label Run")
 	}
