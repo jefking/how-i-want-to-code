@@ -99,6 +99,8 @@ textarea {
 }
 
 .header {
+  position: relative;
+  z-index: 5;
   display: flex;
   align-items: center;
   justify-content: space-between;
@@ -188,7 +190,7 @@ textarea {
   position: absolute;
   right: 0;
   top: calc(100% + 8px);
-  z-index: 30;
+  z-index: 8;
   max-width: min(60vw, 320px);
   padding: 8px 10px;
   border: 1px solid var(--border-strong);
@@ -212,6 +214,12 @@ textarea {
   opacity: 1;
   visibility: visible;
   transform: translateY(0);
+}
+
+.status-item-compact:hover,
+.status-item-compact:focus-visible,
+.status-item-compact:focus-within {
+  z-index: 7;
 }
 
 .status-item-metrics {

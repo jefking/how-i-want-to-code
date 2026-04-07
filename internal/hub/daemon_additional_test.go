@@ -283,8 +283,20 @@ func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *test
 	if !strings.Contains(prompt, failureFollowUpPromptBase) {
 		t.Fatalf("follow-up prompt = %q", prompt)
 	}
+	if !strings.Contains(prompt, "Relevant failing log path(s):") {
+		t.Fatalf("follow-up prompt missing log path heading: %q", prompt)
+	}
 	if !strings.Contains(prompt, "No workspace or log path was captured before the failure.") {
 		t.Fatalf("follow-up prompt missing empty-path guidance: %q", prompt)
+	}
+	if !strings.Contains(prompt, "Observed failure context:") {
+		t.Fatalf("follow-up prompt missing failure context: %q", prompt)
+	}
+	if !strings.Contains(prompt, `- request_id=req-follow-up`) {
+		t.Fatalf("follow-up prompt missing request id: %q", prompt)
+	}
+	if !strings.Contains(prompt, `Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.`) {
+		t.Fatalf("follow-up prompt missing execution contract: %q", prompt)
 	}
 }
 
@@ -307,7 +319,10 @@ func TestFailureFollowUpPromptIncludesWorkspaceAndTargetPath(t *testing.T) {
 		}},
 	}
 
-	prompt := failureFollowUpPrompt(runCfg, result)
+	prompt := failureFollowUpPrompt(SkillDispatch{
+		RequestID: "req-123",
+		Config:    runCfg,
+	}, result)
 	if !strings.Contains(prompt, "/tmp/run-123") {
 		t.Fatalf("prompt missing workspace dir: %q", prompt)
 	}
@@ -316,6 +331,9 @@ func TestFailureFollowUpPromptIncludesWorkspaceAndTargetPath(t *testing.T) {
 	}
 	if !strings.Contains(prompt, "/tmp/run-123/repo/internal/hub") {
 		t.Fatalf("prompt missing repo target dir: %q", prompt)
+	}
+	if !strings.Contains(prompt, "Observed failure context:") {
+		t.Fatalf("prompt missing failure context: %q", prompt)
 	}
 }
 
