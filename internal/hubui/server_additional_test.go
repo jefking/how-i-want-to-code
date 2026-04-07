@@ -357,6 +357,12 @@ func TestHeaderStatusStylesStayReadable(t *testing.T) {
 	if !strings.Contains(css, ".status-item-compact {\n  position: relative;\n  justify-content: center;\n  gap: 0;\n  width: 38px;\n  min-width: 38px;\n  height: 38px;\n  min-height: 38px;") {
 		t.Fatalf("expected compact status dots to use the larger readable pill sizing")
 	}
+	if !strings.Contains(css, ".header {\n  position: relative;\n  z-index: 5;") {
+		t.Fatalf("expected header to create a higher stacking context above the studio panel")
+	}
+	if !strings.Contains(css, ".status-item-compact:hover,\n.status-item-compact:focus-visible,\n.status-item-compact:focus-within {\n  z-index: 7;\n}") {
+		t.Fatalf("expected connection status hover state to rise above adjacent panels")
+	}
 	if !strings.Contains(css, ".status-item-metrics {\n  gap: 12px;\n  padding-left: 12px;\n  padding-right: 14px;\n  min-height: 38px;") {
 		t.Fatalf("expected metrics pill to use stronger spacing and height")
 	}
