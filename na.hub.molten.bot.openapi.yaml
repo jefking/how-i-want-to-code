@@ -259,6 +259,8 @@ components:
       properties:
         session_key:
           type: string
+        sessionKey:
+          type: string
         reason:
           type: string
       additionalProperties: true

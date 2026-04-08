@@ -2462,3 +2462,50 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
     max-width: none;
   }
 }
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+    scroll-behavior: auto !important;
+  }
+
+  body::before,
+  body::after,
+  .snowfall-canvas,
+  .grain {
+    display: none !important;
+  }
+
+  .status-item,
+  .panel,
+  .task,
+  .event,
+  .theme-controls,
+  .task-fullscreen {
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+  }
+}
+
+@media (max-width: 900px) {
+  body::before,
+  body::after,
+  .glow,
+  .grain,
+  .snowfall-canvas {
+    display: none !important;
+  }
+
+  .status-item,
+  .panel,
+  .task,
+  .event,
+  .theme-controls,
+  .task-fullscreen {
+    backdrop-filter: none;
+    -webkit-backdrop-filter: none;
+  }
+}
