@@ -234,7 +234,9 @@ func (c APIClient) MarkOpenClawOffline(ctx context.Context, token, sessionKey, r
 
 	body := map[string]any{}
 	if strings.TrimSpace(sessionKey) != "" {
-		body["session_key"] = strings.TrimSpace(sessionKey)
+		normalizedSessionKey := strings.TrimSpace(sessionKey)
+		body["session_key"] = normalizedSessionKey
+		body["sessionKey"] = normalizedSessionKey
 	}
 	if strings.TrimSpace(reason) != "" {
 		body["reason"] = strings.TrimSpace(reason)

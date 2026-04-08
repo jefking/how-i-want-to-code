@@ -46,7 +46,7 @@
       }
     })();
   </script>
-  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.tailwindcss.com" defer></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="min-h-screen antialiased">
@@ -348,6 +348,8 @@
     const CLOSE_TASK_FADE_MS = 2000;
     const QUEUED_STATUS_TIMEOUT_MS = 8_000;
     const LOGO_ROTATION_INTERVAL_MS = 8_000;
+    const STREAM_RENDER_INTERVAL_MS = 120;
+    const MAX_TERMINAL_LINES = 500;
     const HUB_CONNECT_URL = "https://app.molten.bot/login";
     const COMPLETED_STATUSES = new Set(["ok", "no_changes", "error", "invalid", "duplicate", "stopped"]);
     const TASK_PROGRESS_STEPS = [
@@ -527,6 +529,8 @@
       agentAuthURLLogoBroken: false,
     };
     let agentAuthRefreshTimer = null;
+    let pendingStreamSnapshotText = "";
+    let streamRenderTimer = null;
 
     const localConnItem = document.getElementById("local-conn-item");
     const localConnDot = document.getElementById("local-conn-dot");
@@ -693,6 +697,11 @@
       const canvas = document.getElementById("snowfall-canvas");
       if (!canvas) return;
       if (window.matchMedia && window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+      if (window.matchMedia && window.matchMedia("(max-width: 900px)").matches) return;
+      const networkInfo = navigator.connection || navigator.mozConnection || navigator.webkitConnection;
+      if (networkInfo && networkInfo.saveData) return;
+      const cpuThreads = Number(navigator.hardwareConcurrency);
+      if (Number.isFinite(cpuThreads) && cpuThreads > 0 && cpuThreads <= 4) return;
       const ctx = canvas.getContext("2d", { alpha: true });
       if (!ctx) return;
 
@@ -701,8 +710,10 @@
       let bgGradient = null;
       let canvasW = 0;
       let canvasH = 0;
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      const density = 55;
+      const dpr = Math.min(window.devicePixelRatio || 1, 1.5);
+      const density = 36;
+      const targetFrameMS = 1000 / 30;
+      let resizeQueued = false;
 
       function buildSprite() {
         const SIZE = 64;
@@ -762,7 +773,12 @@
 
       let last = performance.now();
       function tick(now) {
-        const dt = Math.min(0.05, (now - last) / 1000);
+        const elapsed = now - last;
+        if (elapsed < targetFrameMS) {
+          rafID = window.requestAnimationFrame(tick);
+          return;
+        }
+        const dt = Math.min(0.05, elapsed / 1000);
         last = now;
         ctx.clearRect(0, 0, canvasW, canvasH);
         if (bgGradient) {
@@ -813,8 +829,17 @@
         }
       }
 
+      function queueResize() {
+        if (resizeQueued) return;
+        resizeQueued = true;
+        window.requestAnimationFrame(() => {
+          resizeQueued = false;
+          resize();
+        });
+      }
+
       resize();
-      window.addEventListener("resize", resize);
+      window.addEventListener("resize", queueResize, { passive: true });
       document.addEventListener("visibilitychange", onVisibilityChange);
       rafID = window.requestAnimationFrame(tick);
     }
@@ -3157,22 +3182,49 @@
       if (!selected) {
         headLabelNode.textContent = "Task output";
         clearTaskResult(resultNode);
+        terminalNode.dataset.renderSig = "";
         terminalNode.textContent = "";
         return;
       }
 
       const selectedLabel = taskDisplayLabel(selected);
+      const logs = Array.isArray(selected.logs) ? selected.logs : [];
+      const lastLog = logs.length ? logs[logs.length - 1] : null;
+      const renderSig = [
+        selected.request_id || "",
+        selectedLabel,
+        selected.status || "",
+        selected.stage || "",
+        logs.length,
+        lastLog?.time || "",
+        lastLog?.stream || "",
+        lastLog?.text || "",
+      ].join("|");
+      if (terminalNode.dataset.renderSig === renderSig) {
+        return;
+      }
+      terminalNode.dataset.renderSig = renderSig;
+
       headLabelNode.textContent = `${selectedLabel} | ${selected.status || "pending"} | ${selected.stage || "-"}`;
       renderTaskResult(selected, resultNode);
+      const wasPinnedToBottom = terminalNode.scrollTop + terminalNode.clientHeight >= terminalNode.scrollHeight - 24;
       terminalNode.replaceChildren();
 
-      if (!selected.logs?.length) {
+      if (!logs.length) {
         terminalNode.textContent = "No output captured yet.";
         return;
       }
 
+      const start = Math.max(0, logs.length - MAX_TERMINAL_LINES);
       const frag = document.createDocumentFragment();
-      for (const row of selected.logs) {
+      if (start > 0) {
+        const truncated = document.createElement("div");
+        truncated.className = "meta-line";
+        truncated.textContent = `... showing latest ${MAX_TERMINAL_LINES} of ${logs.length} lines ...`;
+        frag.appendChild(truncated);
+      }
+      for (let i = start; i < logs.length; i += 1) {
+        const row = logs[i];
         const line = document.createElement("div");
         const stream = row.stream || "meta";
         line.className = stream === "stderr" ? "stderr-line" : (stream === "stdout" ? "stdout-line" : "meta-line");
@@ -3180,7 +3232,9 @@
         frag.appendChild(line);
       }
       terminalNode.appendChild(frag);
-      terminalNode.scrollTop = terminalNode.scrollHeight;
+      if (wasPinnedToBottom) {
+        terminalNode.scrollTop = terminalNode.scrollHeight;
+      }
     }
 
     function renderFullscreenTerminal(snapshot) {
@@ -3240,6 +3294,29 @@
       }
     }
 
+    function flushPendingStreamSnapshot() {
+      streamRenderTimer = null;
+      const payload = pendingStreamSnapshotText;
+      pendingStreamSnapshotText = "";
+      if (!payload) {
+        return;
+      }
+      try {
+        const snapshot = JSON.parse(payload);
+        render(snapshot);
+      } catch (_err) {
+        // Ignore malformed event packets.
+      }
+    }
+
+    function queueStreamSnapshot(payload) {
+      pendingStreamSnapshotText = String(payload || "");
+      if (streamRenderTimer !== null) {
+        return;
+      }
+      streamRenderTimer = window.setTimeout(flushPendingStreamSnapshot, STREAM_RENDER_INTERVAL_MS);
+    }
+
     function startStream() {
       const stream = new EventSource("/api/stream");
 
@@ -3248,12 +3325,7 @@
       };
 
       stream.onmessage = (event) => {
-        try {
-          const snapshot = JSON.parse(event.data);
-          render(snapshot);
-        } catch (_err) {
-          // Ignore malformed event packets.
-        }
+        queueStreamSnapshot(event.data);
       };
 
       stream.onerror = () => {

@@ -1,10 +1,14 @@
 package hubui
 
 import (
+	"bufio"
 	"bytes"
+	"compress/gzip"
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -101,6 +105,157 @@ func TestHealthEndpointAndWriteJSONMarshalFailure(t *testing.T) {
 	writeJSON(rec, http.StatusOK, map[string]any{"bad": func() {}})
 	if rec.Code != http.StatusInternalServerError {
 		t.Fatalf("writeJSON(marshal failure) status = %d, want 500", rec.Code)
+	}
+}
+
+func TestIndexAndStaticCacheHeaders(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	indexResp, err := http.Get(ts.URL + "/")
+	if err != nil {
+		t.Fatalf("GET / error = %v", err)
+	}
+	defer indexResp.Body.Close()
+	if got, want := indexResp.Header.Get("Cache-Control"), "no-store"; got != want {
+		t.Fatalf("GET / cache-control = %q, want %q", got, want)
+	}
+
+	staticResp, err := http.Get(ts.URL + "/static/style.css")
+	if err != nil {
+		t.Fatalf("GET /static/style.css error = %v", err)
+	}
+	defer staticResp.Body.Close()
+	if got, want := staticResp.Header.Get("Cache-Control"), "public, max-age=3600"; got != want {
+		t.Fatalf("GET /static/style.css cache-control = %q, want %q", got, want)
+	}
+}
+
+func TestStreamEndpointCompactsEventsPayload(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("dispatch status=start request_id=req-stream-compact")
+	b.IngestLog("dispatch request_id=req-stream-compact stage=codex status=running")
+
+	srv := NewServer("", b)
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	resp, err := http.Get(ts.URL + "/api/stream")
+	if err != nil {
+		t.Fatalf("GET /api/stream error = %v", err)
+	}
+	defer resp.Body.Close()
+
+	reader := bufio.NewReader(resp.Body)
+	line, err := reader.ReadString('\n')
+	if err != nil {
+		t.Fatalf("read stream line: %v", err)
+	}
+	if !strings.HasPrefix(line, "data: ") {
+		t.Fatalf("first stream line = %q, want data frame", line)
+	}
+
+	var snap Snapshot
+	if err := json.Unmarshal([]byte(strings.TrimSpace(strings.TrimPrefix(line, "data: "))), &snap); err != nil {
+		t.Fatalf("decode stream snapshot: %v", err)
+	}
+	if got := len(snap.Events); got != 0 {
+		t.Fatalf("len(stream snapshot events) = %d, want 0 for compact payload", got)
+	}
+	if got := len(snap.Tasks); got == 0 {
+		t.Fatal("stream snapshot tasks missing")
+	}
+}
+
+func TestCompactStreamSnapshotTrimsTaskLogs(t *testing.T) {
+	t.Parallel()
+
+	logs := make([]TaskLog, maxStreamTaskLogs+9)
+	for i := range logs {
+		logs[i] = TaskLog{Text: fmt.Sprintf("line-%d", i)}
+	}
+
+	snap := compactStreamSnapshot(Snapshot{
+		Events: []Event{{ID: 1}},
+		Tasks: []Task{
+			{
+				RequestID: "req-1",
+				Logs:      logs,
+			},
+		},
+	})
+
+	if len(snap.Events) != 0 {
+		t.Fatalf("len(events) = %d, want 0", len(snap.Events))
+	}
+	if got, want := len(snap.Tasks[0].Logs), maxStreamTaskLogs; got != want {
+		t.Fatalf("len(task logs) = %d, want %d", got, want)
+	}
+	if got, want := snap.Tasks[0].Logs[0].Text, "line-9"; got != want {
+		t.Fatalf("first retained log = %q, want %q", got, want)
+	}
+}
+
+func TestHandlerGzipCompressionForIndexAndNoCompressionForSSE(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("dispatch status=start request_id=req-gzip")
+	srv := NewServer("", b)
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	indexReq, err := http.NewRequest(http.MethodGet, ts.URL+"/", nil)
+	if err != nil {
+		t.Fatalf("new index request: %v", err)
+	}
+	indexReq.Header.Set("Accept-Encoding", "gzip")
+	indexResp, err := (&http.Client{Transport: &http.Transport{DisableCompression: true}}).Do(indexReq)
+	if err != nil {
+		t.Fatalf("GET / with gzip accept: %v", err)
+	}
+	defer indexResp.Body.Close()
+
+	if got := indexResp.Header.Get("Content-Encoding"); got != "gzip" {
+		t.Fatalf("GET / content-encoding = %q, want gzip", got)
+	}
+	if vary := indexResp.Header.Get("Vary"); !strings.Contains(strings.ToLower(vary), "accept-encoding") {
+		t.Fatalf("GET / vary = %q, want Accept-Encoding", vary)
+	}
+
+	zr, err := gzip.NewReader(indexResp.Body)
+	if err != nil {
+		t.Fatalf("gzip reader: %v", err)
+	}
+	indexBody, err := io.ReadAll(zr)
+	if err != nil {
+		t.Fatalf("read gzip body: %v", err)
+	}
+	if err := zr.Close(); err != nil {
+		t.Fatalf("close gzip reader: %v", err)
+	}
+	if !strings.Contains(string(indexBody), "<!doctype html>") {
+		t.Fatalf("decompressed index body missing html doctype")
+	}
+
+	streamReq, err := http.NewRequest(http.MethodGet, ts.URL+"/api/stream", nil)
+	if err != nil {
+		t.Fatalf("new stream request: %v", err)
+	}
+	streamReq.Header.Set("Accept-Encoding", "gzip")
+	streamResp, err := (&http.Client{Transport: &http.Transport{DisableCompression: true}}).Do(streamReq)
+	if err != nil {
+		t.Fatalf("GET /api/stream with gzip accept: %v", err)
+	}
+	defer streamResp.Body.Close()
+
+	if got := streamResp.Header.Get("Content-Encoding"); got != "" {
+		t.Fatalf("GET /api/stream content-encoding = %q, want empty", got)
 	}
 }
 

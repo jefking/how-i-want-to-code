@@ -2,6 +2,7 @@ package hubui
 
 import (
 	"bytes"
+	"compress/gzip"
 	"context"
 	"embed"
 	"encoding/json"
@@ -23,6 +24,8 @@ var staticFiles embed.FS
 
 const maxLocalPromptBodyBytes = 16 << 20
 const maxAgentAuthConfigureBodyBytes = 1 << 20
+const streamSnapshotInterval = 120 * time.Millisecond
+const maxStreamTaskLogs = 500
 
 // Server provides an HTTP UI for live hub/task monitoring.
 type Server struct {
@@ -115,7 +118,8 @@ func (s Server) Handler() http.Handler {
 	if err != nil {
 		s.logf("hub.ui status=warn event=load_static_files err=%q", err)
 	} else {
-		mux.Handle("/static/", http.StripPrefix("/static/", http.FileServer(http.FS(staticFS))))
+		staticHandler := http.StripPrefix("/static/", http.FileServer(http.FS(staticFS)))
+		mux.Handle("/static/", withCacheControl(staticHandler, "public, max-age=3600"))
 	}
 	mux.HandleFunc("/", s.handleIndex)
 	mux.HandleFunc("/api/state", s.handleState)
@@ -128,7 +132,7 @@ func (s Server) Handler() http.Handler {
 	mux.HandleFunc("/api/agent-auth/configure", s.handleAgentAuthConfigure)
 	mux.HandleFunc("/api/tasks/", s.handleTaskAction)
 	mux.HandleFunc("/healthz", s.handleHealth)
-	return mux
+	return withGzip(mux)
 }
 
 func defaultAgentAuthState() AgentAuthState {
@@ -154,6 +158,7 @@ func (s Server) handleIndex(w http.ResponseWriter, r *http.Request) {
 	data = s.injectIndexConfig(data)
 
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
+	w.Header().Set("Cache-Control", "no-store")
 	_, _ = w.Write(data)
 }
 
@@ -238,9 +243,12 @@ func (s Server) handleStream(w http.ResponseWriter, r *http.Request) {
 
 	updates, cancel := s.Broker.Subscribe()
 	defer cancel()
+	lastSnapshotAt := time.Now()
+	var snapshotTimer *time.Timer
+	var snapshotTimerCh <-chan time.Time
 
 	writeSSESnapshot := func() bool {
-		payload, err := json.Marshal(s.Broker.Snapshot())
+		payload, err := json.Marshal(compactStreamSnapshot(s.Broker.Snapshot()))
 		if err != nil {
 			s.logf("hub.ui status=warn event=marshal_snapshot err=%q", err)
 			return true
@@ -249,8 +257,34 @@ func (s Server) handleStream(w http.ResponseWriter, r *http.Request) {
 			return false
 		}
 		flusher.Flush()
+		lastSnapshotAt = time.Now()
 		return true
 	}
+	stopSnapshotTimer := func() {
+		if snapshotTimer == nil {
+			return
+		}
+		if !snapshotTimer.Stop() {
+			select {
+			case <-snapshotTimer.C:
+			default:
+			}
+		}
+		snapshotTimer = nil
+		snapshotTimerCh = nil
+	}
+	scheduleSnapshot := func() {
+		if snapshotTimer != nil {
+			return
+		}
+		wait := streamSnapshotInterval - time.Since(lastSnapshotAt)
+		if wait < 0 {
+			wait = 0
+		}
+		snapshotTimer = time.NewTimer(wait)
+		snapshotTimerCh = snapshotTimer.C
+	}
+	defer stopSnapshotTimer()
 
 	if !writeSSESnapshot() {
 		return
@@ -264,6 +298,16 @@ func (s Server) handleStream(w http.ResponseWriter, r *http.Request) {
 		case <-r.Context().Done():
 			return
 		case <-updates:
+			if time.Since(lastSnapshotAt) >= streamSnapshotInterval {
+				stopSnapshotTimer()
+				if !writeSSESnapshot() {
+					return
+				}
+				continue
+			}
+			scheduleSnapshot()
+		case <-snapshotTimerCh:
+			stopSnapshotTimer()
 			if !writeSSESnapshot() {
 				return
 			}
@@ -727,6 +771,122 @@ func writeJSON(w http.ResponseWriter, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
 	_, _ = w.Write(body)
+}
+
+func compactStreamSnapshot(snapshot Snapshot) Snapshot {
+	snapshot.Events = nil
+	for i := range snapshot.Tasks {
+		logs := snapshot.Tasks[i].Logs
+		if len(logs) <= maxStreamTaskLogs {
+			continue
+		}
+		snapshot.Tasks[i].Logs = logs[len(logs)-maxStreamTaskLogs:]
+	}
+	return snapshot
+}
+
+func withCacheControl(next http.Handler, cacheControl string) http.Handler {
+	if next == nil {
+		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	}
+	cacheControl = strings.TrimSpace(cacheControl)
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if cacheControl != "" && (r.Method == http.MethodGet || r.Method == http.MethodHead) {
+			w.Header().Set("Cache-Control", cacheControl)
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
+func withGzip(next http.Handler) http.Handler {
+	if next == nil {
+		return http.HandlerFunc(func(http.ResponseWriter, *http.Request) {})
+	}
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if !requestWantsGzip(r) || !isCompressiblePath(r.URL.Path) || strings.HasPrefix(r.URL.Path, "/api/stream") {
+			next.ServeHTTP(w, r)
+			return
+		}
+		gz := gzip.NewWriter(w)
+		defer func() {
+			_ = gz.Close()
+		}()
+		next.ServeHTTP(&gzipResponseWriter{ResponseWriter: w, writer: gz}, r)
+	})
+}
+
+func requestWantsGzip(r *http.Request) bool {
+	if r == nil {
+		return false
+	}
+	return strings.Contains(strings.ToLower(r.Header.Get("Accept-Encoding")), "gzip")
+}
+
+func isCompressiblePath(path string) bool {
+	path = strings.ToLower(strings.TrimSpace(path))
+	if path == "" {
+		return false
+	}
+	if path == "/" || strings.HasPrefix(path, "/api/") {
+		return true
+	}
+	return strings.HasSuffix(path, ".css") ||
+		strings.HasSuffix(path, ".js") ||
+		strings.HasSuffix(path, ".html") ||
+		strings.HasSuffix(path, ".svg") ||
+		strings.HasSuffix(path, ".json")
+}
+
+type gzipResponseWriter struct {
+	http.ResponseWriter
+	writer      *gzip.Writer
+	wroteHeader bool
+}
+
+func (w *gzipResponseWriter) WriteHeader(statusCode int) {
+	if w.wroteHeader {
+		return
+	}
+	w.wroteHeader = true
+	headers := w.ResponseWriter.Header()
+	if strings.TrimSpace(headers.Get("Content-Encoding")) == "" {
+		headers.Set("Content-Encoding", "gzip")
+	}
+	addVaryHeader(headers, "Accept-Encoding")
+	headers.Del("Content-Length")
+	w.ResponseWriter.WriteHeader(statusCode)
+}
+
+func (w *gzipResponseWriter) Write(payload []byte) (int, error) {
+	if !w.wroteHeader {
+		w.WriteHeader(http.StatusOK)
+	}
+	return w.writer.Write(payload)
+}
+
+func (w *gzipResponseWriter) Flush() {
+	if w.writer != nil {
+		_ = w.writer.Flush()
+	}
+	if flusher, ok := w.ResponseWriter.(http.Flusher); ok {
+		flusher.Flush()
+	}
+}
+
+func addVaryHeader(header http.Header, value string) {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return
+	}
+	existing := header.Values("Vary")
+	for _, current := range existing {
+		for _, token := range strings.Split(current, ",") {
+			if strings.EqualFold(strings.TrimSpace(token), value) {
+				return
+			}
+		}
+	}
+	header.Add("Vary", value)
 }
 
 func (s Server) logf(format string, args ...any) {
