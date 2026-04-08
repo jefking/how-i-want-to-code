@@ -32,6 +32,9 @@ import (
 const failureFollowUpRequiredPrompt = failurefollowup.RequiredPrompt
 
 const hubBootRecommendation = "Recommended: connect this runtime to Molten Hub at https://molten.bot/hub so agents can dispatch work to it."
+const hubPingLocalOnlyDetail = "Hub endpoint ping precheck failed; continuing in local-only mode. Use the local UI/API to submit tasks."
+const hubPingRemoteContinueDetail = "Hub endpoint ping precheck failed; continuing remote startup because Hub credentials are configured and UI is disabled."
+const hubPingHeadlessNoopDetail = "Hub endpoint ping precheck failed with UI disabled and no Hub credentials configured; startup completed without remote transport."
 
 const hubBootDiagnosticTimeout = 10 * time.Second
 const hubPingDiagnosticTimeout = 5 * time.Second
@@ -244,9 +247,18 @@ func runHub(args []string) int {
 		authGate = newAgentAuthGate(ctx, runner, runtimeCfg, cfg, daemonLogger)
 	}
 
-	if ok := runHubBootDiagnostics(ctx, runner, daemonLogger, cfg); !ok {
-		writeStderrLine(logger, "error: hub endpoint ping precheck failed; ensure <hub-host>/ping returns 2xx before connecting")
-		return harness.ExitPreflight
+	runtimeCfgLoader := func() (hub.RuntimeConfig, error) {
+		return hub.LoadRuntimeConfig(cfg.RuntimeConfigPath)
+	}
+	hubConfigured := hubCredentialsConfigured(cfg, runtimeCfgLoader)
+	bootDiag := runHubBootDiagnosticsWithRuntimeLoaderDetailed(ctx, runner, daemonLogger, cfg, runtimeCfgLoader)
+	forceLocalOnlyMode := shouldRunHubInLocalOnlyMode(bootDiag.PingChecked, bootDiag.PingOK, *uiListen, hubConfigured)
+	if bootDiag.PingChecked && !bootDiag.PingOK {
+		if forceLocalOnlyMode {
+			daemonLogger("hub.auth status=local_only detail=%q", hubPingFailureDetail(hubPingLocalOnlyDetail, bootDiag.PingErr))
+		} else {
+			daemonLogger("boot.diagnosis status=warn requirement=moltenhub_ping detail=%q", hubPingFailureDetail(hubPingRemoteContinueDetail, bootDiag.PingErr))
+		}
 	}
 	maybeStartAgentAuth(ctx, runtimeCfg, authGate, daemonLogger)
 
@@ -528,9 +540,16 @@ func runHub(args []string) int {
 		}()
 	}
 
-	if !hubCredentialsConfigured(cfg, func() (hub.RuntimeConfig, error) {
-		return hub.LoadRuntimeConfig(cfg.RuntimeConfigPath)
-	}) {
+	if forceLocalOnlyMode {
+		if strings.TrimSpace(*uiListen) == "" {
+			daemonLogger("hub.auth status=local_only detail=%q", hubPingFailureDetail(hubPingHeadlessNoopDetail, bootDiag.PingErr))
+			return harness.ExitSuccess
+		}
+		<-ctx.Done()
+		return harness.ExitSuccess
+	}
+
+	if !hubConfigured {
 		daemonLogger(
 			"hub.auth status=local_only detail=%q",
 			"No bind_token/agent_token configured; skipping remote hub connection. Use the local UI/API to submit tasks.",
@@ -921,6 +940,27 @@ func shouldFallbackToLocalOnlyMode(uiListen string, err error) bool {
 	return hubExitCode(err) == harness.ExitAuth
 }
 
+func shouldRunHubInLocalOnlyMode(pingPrecheckChecked bool, pingPrecheckOK bool, uiListen string, hubConfigured bool) bool {
+	if !pingPrecheckChecked || pingPrecheckOK {
+		return false
+	}
+	if strings.TrimSpace(uiListen) != "" {
+		return true
+	}
+	return !hubConfigured
+}
+
+func hubPingFailureDetail(base string, pingErr error) string {
+	base = strings.TrimSpace(base)
+	if base == "" {
+		base = "Hub endpoint ping precheck failed."
+	}
+	if pingErr == nil {
+		return base
+	}
+	return fmt.Sprintf("%s Error: %v", base, pingErr)
+}
+
 func joinPRURLs(results []harness.RepoResult) string {
 	if len(results) == 0 {
 		return ""
@@ -955,10 +995,17 @@ func marshalRunConfigJSON(cfg config.Config) ([]byte, bool) {
 
 type runtimeConfigLoader func() (hub.RuntimeConfig, error)
 
+type hubBootDiagnosticsResult struct {
+	PingChecked bool
+	PingOK      bool
+	PingErr     error
+}
+
 func runHubBootDiagnostics(ctx context.Context, runner execx.Runner, logf func(string, ...any), cfg hub.InitConfig) bool {
-	return runHubBootDiagnosticsWithRuntimeLoader(ctx, runner, logf, cfg, func() (hub.RuntimeConfig, error) {
+	result := runHubBootDiagnosticsWithRuntimeLoaderDetailed(ctx, runner, logf, cfg, func() (hub.RuntimeConfig, error) {
 		return hub.LoadRuntimeConfig(cfg.RuntimeConfigPath)
 	})
+	return result.PingChecked && result.PingOK
 }
 
 func runHubBootDiagnosticsWithRuntimeLoader(
@@ -968,13 +1015,24 @@ func runHubBootDiagnosticsWithRuntimeLoader(
 	cfg hub.InitConfig,
 	loadRuntimeConfig runtimeConfigLoader,
 ) bool {
+	result := runHubBootDiagnosticsWithRuntimeLoaderDetailed(ctx, runner, logf, cfg, loadRuntimeConfig)
+	return result.PingChecked && result.PingOK
+}
+
+func runHubBootDiagnosticsWithRuntimeLoaderDetailed(
+	ctx context.Context,
+	runner execx.Runner,
+	logf func(string, ...any),
+	cfg hub.InitConfig,
+	loadRuntimeConfig runtimeConfigLoader,
+) hubBootDiagnosticsResult {
 	if runner == nil || logf == nil {
-		return false
+		return hubBootDiagnosticsResult{}
 	}
 	runtime, err := agentruntime.Resolve(cfg.AgentHarness, cfg.AgentCommand)
 	if err != nil {
 		logf("boot.diagnosis status=error requirement=agent_runtime err=%q", err)
-		return false
+		return hubBootDiagnosticsResult{}
 	}
 
 	checks := []struct {
@@ -998,7 +1056,9 @@ func runHubBootDiagnosticsWithRuntimeLoader(
 	logf("boot.diagnosis status=start checks=%s", strings.Join(checkNames, ","))
 
 	failedRequiredChecks := 0
+	pingChecked := false
 	pingOK := true
+	var pingFailureErr error
 	for _, check := range checks {
 		checkCtx, cancel := context.WithTimeout(ctx, hubBootDiagnosticTimeout)
 		res, err := runner.Run(checkCtx, check.cmd)
@@ -1030,14 +1090,18 @@ func runHubBootDiagnosticsWithRuntimeLoader(
 
 	pingURL, pingURLErr := hubPingURL(cfg.BaseURL)
 	if pingURLErr != nil {
+		pingChecked = true
 		pingOK = false
+		pingFailureErr = pingURLErr
 		logf("boot.diagnosis status=error requirement=moltenhub_ping err=%q", pingURLErr)
 	} else {
+		pingChecked = true
 		pingCtx, pingCancel := context.WithTimeout(ctx, hubPingDiagnosticTimeout)
 		pingDetail, pingErr := checkHubPing(pingCtx, pingURL)
 		pingCancel()
 		if pingErr != nil {
 			pingOK = false
+			pingFailureErr = pingErr
 			logf("boot.diagnosis status=error requirement=moltenhub_ping err=%q", pingErr)
 		} else {
 			logf("boot.diagnosis status=ok requirement=moltenhub_ping detail=%q", pingDetail)
@@ -1056,9 +1120,14 @@ func runHubBootDiagnosticsWithRuntimeLoader(
 		)
 	}
 
+	result := hubBootDiagnosticsResult{
+		PingChecked: pingChecked,
+		PingOK:      pingOK,
+		PingErr:     pingFailureErr,
+	}
 	if failedRequiredChecks == 0 {
 		logf("boot.diagnosis status=complete required_checks=ok")
-		return pingOK
+		return result
 	}
 	logf(
 		"boot.diagnosis status=warn required_checks=failed count=%d recommendation=%q",
@@ -1068,7 +1137,7 @@ func runHubBootDiagnosticsWithRuntimeLoader(
 			strings.TrimSpace(runtime.Command),
 		),
 	)
-	return pingOK
+	return result
 }
 
 func applyDefaultAgentRuntimeConfig(runCfg config.Config, initCfg hub.InitConfig) config.Config {

@@ -46,7 +46,7 @@ func TestRunMultiplexReturnsFirstSessionFailureExitCode(t *testing.T) {
 	}
 }
 
-func TestRunHubReturnsPreflightWhenBootDiagnosticsFail(t *testing.T) {
+func TestRunHubReturnsSuccessWhenPingPrecheckFailsInHeadlessNoHubMode(t *testing.T) {
 	origArgs := os.Args
 	t.Cleanup(func() { os.Args = origArgs })
 
@@ -60,7 +60,7 @@ func TestRunHubReturnsPreflightWhenBootDiagnosticsFail(t *testing.T) {
 	t.Setenv("PATH", "")
 	os.Args = []string{"harness", "hub", "--init", initPath, "--ui-listen", ""}
 
-	if code := run(); code != harness.ExitPreflight {
-		t.Fatalf("run() = %d, want %d", code, harness.ExitPreflight)
+	if code := run(); code != harness.ExitSuccess {
+		t.Fatalf("run() = %d, want %d", code, harness.ExitSuccess)
 	}
 }
