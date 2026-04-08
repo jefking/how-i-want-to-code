@@ -181,6 +181,46 @@ func SaveRuntimeConfigAuggieAuth(path string, initCfg InitConfig, augmentSession
 	return writeRuntimeConfigFile(path, encoded)
 }
 
+// SaveRuntimeConfigGitHubToken persists github_token to the runtime config JSON
+// while preserving other configuration fields.
+func SaveRuntimeConfigGitHubToken(path string, initCfg InitConfig, gitHubToken string) error {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		path = defaultRuntimeConfigPath()
+	}
+
+	gitHubToken = strings.TrimSpace(gitHubToken)
+	if gitHubToken == "" {
+		return fmt.Errorf("github token is required")
+	}
+
+	doc := map[string]any{}
+	data, err := os.ReadFile(path)
+	switch {
+	case err == nil:
+		if err := json.Unmarshal(data, &doc); err != nil {
+			return fmt.Errorf("parse runtime config: %w", err)
+		}
+	case errors.Is(err, os.ErrNotExist):
+		baseDoc, buildErr := runtimeConfigBaseDoc(initCfg)
+		if buildErr != nil {
+			return buildErr
+		}
+		doc = baseDoc
+	default:
+		return fmt.Errorf("read runtime config: %w", err)
+	}
+
+	doc["github_token"] = gitHubToken
+
+	encoded, err := json.MarshalIndent(doc, "", "  ")
+	if err != nil {
+		return fmt.Errorf("encode runtime config: %w", err)
+	}
+	encoded = append(encoded, '\n')
+	return writeRuntimeConfigFile(path, encoded)
+}
+
 func runtimeConfigBaseDoc(initCfg InitConfig) (map[string]any, error) {
 	initCfg.ApplyDefaults()
 	encoded, err := json.Marshal(initCfg)

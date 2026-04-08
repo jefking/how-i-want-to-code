@@ -469,7 +469,7 @@ func runHub(args []string) int {
 			uiServer.AgentAuthStatus = authGate.Status
 			uiServer.StartAgentAuth = authGate.StartDeviceAuth
 			uiServer.VerifyAgentAuth = authGate.Verify
-			if runtimeCfg.Harness == agentruntime.HarnessAuggie {
+			if runtimeCfg.Harness == agentruntime.HarnessAuggie || runtimeCfg.Harness == agentruntime.HarnessClaude {
 				uiServer.ConfigureAgentAuth = authGate.Configure
 			}
 		}

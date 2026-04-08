@@ -364,6 +364,8 @@ type agentAuthConfigureRequest struct {
 	AugmentSessionAuthAlias string `json:"augmentSessionAuth"`
 	SessionAuth             string `json:"session_auth"`
 	SessionAuthAlias        string `json:"sessionAuth"`
+	GitHubToken             string `json:"github_token"`
+	GitHubTokenAlias        string `json:"githubToken"`
 	Value                   string `json:"value"`
 }
 
@@ -407,12 +409,14 @@ func (s Server) handleAgentAuthConfigure(w http.ResponseWriter, r *http.Request)
 		req.AugmentSessionAuthAlias,
 		req.SessionAuth,
 		req.SessionAuthAlias,
+		req.GitHubToken,
+		req.GitHubTokenAlias,
 		req.Value,
 	)
 	if sessionAuth == "" {
 		writeJSON(w, http.StatusBadRequest, map[string]any{
 			"ok":    false,
-			"error": "augment_session_auth is required",
+			"error": "configure value is required",
 			"auth":  defaultAgentAuthState(),
 		})
 		return

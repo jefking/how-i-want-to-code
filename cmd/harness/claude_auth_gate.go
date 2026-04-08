@@ -3,6 +3,7 @@ package main
 import (
 	"bufio"
 	"context"
+	"encoding/json"
 	"fmt"
 	"io"
 	"os"
@@ -14,10 +15,13 @@ import (
 	"time"
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
+	"github.com/jef/moltenhub-code/internal/hub"
 	"github.com/jef/moltenhub-code/internal/hubui"
 )
 
 const claudeAuthDocsURL = "https://code.claude.com/docs/en/authentication"
+const claudeGitHubConfigureCommand = "gh auth token"
+const claudeGitHubConfigurePlaceholder = "ghp_xxx"
 
 var claudeAuthURLPattern = regexp.MustCompile(`https?://[^\s"'<>()]+`)
 
@@ -27,7 +31,9 @@ type claudeAuthGate struct {
 	baseCtx context.Context
 	logf    func(string, ...any)
 
-	command string
+	command           string
+	runtimeConfigPath string
+	initCfg           hub.InitConfig
 
 	required bool
 	ready    bool
@@ -44,6 +50,19 @@ type claudeAuthGate struct {
 }
 
 func newClaudeAuthGate(ctx context.Context, command string, logf func(string, ...any)) *claudeAuthGate {
+	return newClaudeAuthGateWithContextAndConfig(ctx, command, "", hub.InitConfig{}, logf)
+}
+
+func newClaudeAuthGateWithConfig(command, runtimeConfigPath string, initCfg hub.InitConfig) *claudeAuthGate {
+	return newClaudeAuthGateWithContextAndConfig(context.Background(), command, runtimeConfigPath, initCfg, nil)
+}
+
+func newClaudeAuthGateWithContextAndConfig(
+	ctx context.Context,
+	command, runtimeConfigPath string,
+	initCfg hub.InitConfig,
+	logf func(string, ...any),
+) *claudeAuthGate {
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -57,24 +76,24 @@ func newClaudeAuthGate(ctx context.Context, command string, logf func(string, ..
 	}
 
 	g := &claudeAuthGate{
-		baseCtx:   ctx,
-		logf:      logf,
-		command:   command,
-		required:  true,
-		state:     "needs_browser_login",
-		message:   "Claude Code login is required. Run `claude login`, complete browser sign-in, then click Done.",
-		updatedAt: time.Now().UTC(),
+		baseCtx:           ctx,
+		logf:              logf,
+		command:           command,
+		runtimeConfigPath: strings.TrimSpace(runtimeConfigPath),
+		initCfg:           initCfg,
+		required:          true,
+		state:             "needs_browser_login",
+		message:           "Claude Code login is required. Run `claude login`, complete browser sign-in, then click Done.",
+		updatedAt:         time.Now().UTC(),
 	}
 
-	ready, probeMessage := g.probe()
+	status, _ := g.Status(context.Background())
 	g.mu.Lock()
-	if ready {
-		g.ready = true
-		g.state = "ready"
-		g.message = firstNonEmptyString(probeMessage, "Claude Code authorization is ready.")
-	} else if strings.TrimSpace(probeMessage) != "" {
-		g.message = probeMessage
-	}
+	g.required = status.Required
+	g.ready = status.Ready
+	g.state = strings.TrimSpace(status.State)
+	g.message = strings.TrimSpace(status.Message)
+	g.authURL = strings.TrimSpace(status.AuthURL)
 	g.updatedAt = time.Now().UTC()
 	g.mu.Unlock()
 
@@ -91,9 +110,39 @@ func (g *claudeAuthGate) Status(_ context.Context) (hubui.AgentAuthState, error)
 		}, nil
 	}
 
+	if blocked, state := g.githubTokenRequirementState(); blocked {
+		return state, nil
+	}
+
 	g.mu.Lock()
-	defer g.mu.Unlock()
-	return g.snapshotLocked(), nil
+	if !g.procRunning {
+		ready, probeMessage := g.probeClaude()
+		if ready {
+			g.ready = true
+			g.state = "ready"
+			g.message = "Claude Code and GitHub token are ready."
+			g.authURL = ""
+		} else {
+			g.ready = false
+			if g.state != "pending_browser_login" && g.state != "error" {
+				g.state = "needs_browser_login"
+			}
+			if g.state == "needs_browser_login" || strings.TrimSpace(g.message) == "" {
+				g.message = firstNonEmptyString(
+					probeMessage,
+					"Claude Code login is required. Run `claude login`, complete browser sign-in, then click Done.",
+				)
+			}
+			if strings.TrimSpace(g.authURL) == "" {
+				g.authURL = claudeAuthDocsURL
+			}
+		}
+		g.updatedAt = time.Now().UTC()
+	}
+	state := g.snapshotLocked()
+	g.mu.Unlock()
+
+	return state, nil
 }
 
 func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthState, error) {
@@ -106,12 +155,15 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 		}, nil
 	}
 
-	g.mu.Lock()
-	if g.ready {
-		snap := g.snapshotLocked()
-		g.mu.Unlock()
-		return snap, nil
+	status, _ := g.Status(context.Background())
+	if status.Ready {
+		return status, nil
 	}
+	if status.State == "needs_configure" {
+		return status, fmt.Errorf("github token is required")
+	}
+
+	g.mu.Lock()
 	if g.procRunning {
 		g.state = "pending_browser_login"
 		g.message = "Waiting for Claude browser sign-in. Complete auth, then click Done."
@@ -120,7 +172,13 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 		g.mu.Unlock()
 		return snap, nil
 	}
+	baseCtx := g.baseCtx
+	command := g.command
 	g.mu.Unlock()
+
+	if baseCtx == nil {
+		baseCtx = context.Background()
+	}
 
 	tmpDir, err := os.MkdirTemp("", "moltenhub-claude-auth-*")
 	if err != nil {
@@ -128,8 +186,8 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 		return snap, fmt.Errorf("create claude login temp dir: %w", err)
 	}
 
-	procCtx, cancel := context.WithCancel(g.baseCtx)
-	cmd := exec.CommandContext(procCtx, g.command, "login")
+	procCtx, cancel := context.WithCancel(baseCtx)
+	cmd := exec.CommandContext(procCtx, command, "login")
 	cmd.Dir = tmpDir
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -158,6 +216,7 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 		cancel()
 		_ = stdinPipe.Close()
 		g.mu.Lock()
+		g.ready = false
 		g.state = "error"
 		g.message = fmt.Sprintf("start claude login: %v", err)
 		g.updatedAt = time.Now().UTC()
@@ -167,6 +226,8 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 	}
 
 	g.mu.Lock()
+	g.required = true
+	g.ready = false
 	g.procRunning = true
 	g.procCancel = cancel
 	g.procInput = stdinPipe
@@ -193,53 +254,44 @@ func (g *claudeAuthGate) Verify(ctx context.Context) (hubui.AgentAuthState, erro
 		}, nil
 	}
 
-	ready, probeMessage := g.probe()
-	shouldStartLogin := false
-
-	g.mu.Lock()
-	if ready {
-		g.ready = true
-		g.state = "ready"
-		g.message = firstNonEmptyString(probeMessage, "Claude Code authorization is ready.")
-		if g.procRunning && g.procCancel != nil {
-			g.procCancel()
-		}
-		g.updatedAt = time.Now().UTC()
-		snap := g.snapshotLocked()
-		g.mu.Unlock()
-		return snap, nil
+	status, _ := g.Status(context.Background())
+	if status.Ready {
+		return status, nil
+	}
+	if status.State == "needs_configure" || status.State == "pending_browser_login" {
+		return status, nil
 	}
 
-	if g.procRunning {
-		g.ready = false
-		g.state = "pending_browser_login"
-		g.message = "Still waiting for Claude browser sign-in. Complete auth, then click Done."
-		g.updatedAt = time.Now().UTC()
-		snap := g.snapshotLocked()
-		g.mu.Unlock()
-		return snap, nil
-	}
-
-	g.ready = false
-	g.state = "needs_browser_login"
-	g.message = firstNonEmptyString(
-		probeMessage,
-		"Claude Code login is required. Run `claude login`, complete browser sign-in, then click Done.",
-	)
-	g.updatedAt = time.Now().UTC()
-	shouldStartLogin = true
-	g.mu.Unlock()
-
-	if shouldStartLogin {
-		return g.StartDeviceAuth(ctx)
-	}
-	snap, _ := g.Status(context.Background())
-	return snap, nil
+	return g.StartDeviceAuth(ctx)
 }
 
-func (g *claudeAuthGate) Configure(_ context.Context, _ string) (hubui.AgentAuthState, error) {
-	status, _ := g.Status(context.Background())
-	return status, fmt.Errorf("claude auth does not support manual config submission")
+func (g *claudeAuthGate) Configure(_ context.Context, rawInput string) (hubui.AgentAuthState, error) {
+	token := strings.TrimSpace(rawInput)
+	if token == "" {
+		state := g.needsGitHubTokenState("GitHub token is required. Paste a GitHub token below, then click Done.")
+		return state, fmt.Errorf("github token is required")
+	}
+
+	g.mu.Lock()
+	runtimeConfigPath := g.runtimeConfigPath
+	initCfg := g.initCfg
+	g.mu.Unlock()
+
+	if err := hub.SaveRuntimeConfigGitHubToken(runtimeConfigPath, initCfg, token); err != nil {
+		state := g.needsGitHubTokenState(fmt.Sprintf("save github token: %v", err))
+		return state, err
+	}
+	if err := setGitHubTokenEnvironment(token); err != nil {
+		state := g.needsGitHubTokenState(fmt.Sprintf("set github token env: %v", err))
+		return state, err
+	}
+
+	g.mu.Lock()
+	g.initCfg.GitHubToken = token
+	g.mu.Unlock()
+
+	state, _ := g.Status(context.Background())
+	return state, nil
 }
 
 func (g *claudeAuthGate) snapshotLocked() hubui.AgentAuthState {
@@ -252,12 +304,16 @@ func (g *claudeAuthGate) snapshotLocked() hubui.AgentAuthState {
 		}
 	}
 	authURL := strings.TrimSpace(g.authURL)
-	if authURL == "" && !g.ready {
+	if authURL == "" && !g.ready && state != "needs_configure" {
 		authURL = claudeAuthDocsURL
+	}
+	required := g.required
+	if !required {
+		required = true
 	}
 	return hubui.AgentAuthState{
 		Harness:   agentruntime.HarnessClaude,
-		Required:  g.required,
+		Required:  required,
 		Ready:     g.ready,
 		State:     state,
 		Message:   strings.TrimSpace(g.message),
@@ -266,7 +322,41 @@ func (g *claudeAuthGate) snapshotLocked() hubui.AgentAuthState {
 	}
 }
 
-func (g *claudeAuthGate) probe() (bool, string) {
+func (g *claudeAuthGate) needsGitHubTokenState(message string) hubui.AgentAuthState {
+	message = firstNonEmptyString(
+		message,
+		"GitHub token is required. Set GITHUB_TOKEN/GH_TOKEN or paste a token below, then click Done.",
+	)
+	return hubui.AgentAuthState{
+		Harness:              agentruntime.HarnessClaude,
+		Required:             true,
+		Ready:                false,
+		State:                "needs_configure",
+		Message:              message,
+		ConfigureCommand:     claudeGitHubConfigureCommand,
+		ConfigurePlaceholder: claudeGitHubConfigurePlaceholder,
+		UpdatedAt:            time.Now().UTC().Format(time.RFC3339Nano),
+	}
+}
+
+func (g *claudeAuthGate) githubTokenRequirementState() (bool, hubui.AgentAuthState) {
+	g.mu.Lock()
+	runtimeConfigPath := g.runtimeConfigPath
+	initCfg := g.initCfg
+	g.mu.Unlock()
+
+	githubToken, _ := firstConfiguredGitHubToken(runtimeConfigPath, initCfg)
+	if strings.TrimSpace(githubToken) == "" {
+		return true, g.needsGitHubTokenState("")
+	}
+	if err := setGitHubTokenEnvironment(githubToken); err != nil {
+		return true, g.needsGitHubTokenState(fmt.Sprintf("set github token env: %v", err))
+	}
+
+	return false, hubui.AgentAuthState{}
+}
+
+func (g *claudeAuthGate) probeClaude() (bool, string) {
 	if enabled := firstClaudeEnabledProvider(); enabled != "" {
 		return true, fmt.Sprintf("Claude Code is configured for %s credentials.", enabled)
 	}
@@ -361,11 +451,12 @@ func (g *claudeAuthGate) waitLogin(cmd *exec.Cmd, tempDir string) {
 	}
 
 	if err == nil {
-		ready, probeMessage := g.probe()
+		ready, probeMessage := g.probeClaude()
 		if ready {
 			g.ready = true
 			g.state = "ready"
-			g.message = firstNonEmptyString(probeMessage, "Claude Code authorization is ready.")
+			g.message = "Claude Code and GitHub token are ready."
+			g.authURL = ""
 		} else {
 			g.ready = false
 			g.state = "needs_browser_login"
@@ -379,6 +470,7 @@ func (g *claudeAuthGate) waitLogin(cmd *exec.Cmd, tempDir string) {
 		return
 	}
 
+	g.ready = false
 	if strings.TrimSpace(g.authURL) == "" {
 		g.state = "needs_browser_login"
 		g.message = "Claude login did not provide a browser URL. Click Done to retry."
@@ -418,6 +510,57 @@ func shouldAdvanceClaudeLoginPrompt(line string) bool {
 		}
 	}
 	return false
+}
+
+func firstConfiguredGitHubToken(runtimeConfigPath string, initCfg hub.InitConfig) (value string, source string) {
+	if env := strings.TrimSpace(os.Getenv("GH_TOKEN")); env != "" {
+		return env, "environment"
+	}
+	if env := strings.TrimSpace(os.Getenv("GITHUB_TOKEN")); env != "" {
+		return env, "environment"
+	}
+	if init := strings.TrimSpace(initCfg.GitHubToken); init != "" {
+		return init, "init config"
+	}
+	if persisted := loadPersistedGitHubToken(runtimeConfigPath); persisted != "" {
+		return persisted, "runtime config"
+	}
+	return "", ""
+}
+
+func loadPersistedGitHubToken(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return ""
+	}
+	return firstNonEmptyString(
+		stringValue(doc["github_token"]),
+		stringValue(doc["githubToken"]),
+		stringValue(doc["GITHUB_TOKEN"]),
+	)
+}
+
+func setGitHubTokenEnvironment(token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("github token is required")
+	}
+	if err := os.Setenv("GITHUB_TOKEN", token); err != nil {
+		return err
+	}
+	if err := os.Setenv("GH_TOKEN", token); err != nil {
+		return err
+	}
+	return nil
 }
 
 func firstClaudeEnabledProvider() string {

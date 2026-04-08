@@ -163,11 +163,6 @@ if [ "${AUGMENT_SESSION_AUTH:-}" = "" ]; then
     fi
 fi
 
-if [ "${GH_TOKEN:-}" = "" ] && [ "${GITHUB_TOKEN:-}" = "" ]; then
-    echo "missing required GitHub token: set GITHUB_TOKEN/GH_TOKEN or add github_token to ${init_path}" >&2
-    exit 21
-fi
-
 git config --global user.name "${GIT_USER_NAME:-moltenhub-bot}"
 git config --global user.email "${GIT_USER_EMAIL:-moltenhub-bot@users.noreply.github.com}"
 
@@ -178,8 +173,16 @@ if ! git config --global --get-all url."https://github.com/".insteadOf 2>/dev/nu
     git config --global --add url."https://github.com/".insteadOf "ssh://git@github.com/"
 fi
 
-gh auth status >/dev/null
-gh auth setup-git >/dev/null
+if [ "${GH_TOKEN:-}" = "" ] && [ "${GITHUB_TOKEN:-}" = "" ]; then
+    echo "warning: missing GitHub token: set GITHUB_TOKEN/GH_TOKEN or add github_token to ${init_path}; continuing so the UI can capture configuration" >&2
+else
+    if ! gh auth status >/dev/null 2>&1; then
+        echo "warning: gh auth status failed; continuing so runtime UI can capture updated GitHub token configuration" >&2
+    fi
+    if ! gh auth setup-git >/dev/null 2>&1; then
+        echo "warning: gh auth setup-git failed; continuing with git fallback configuration" >&2
+    fi
+fi
 
 if [ "${OPENAI_API_KEY:-}" != "" ] && command -v codex >/dev/null 2>&1; then
     if ! printf '%s' "${OPENAI_API_KEY}" | codex login --with-api-key >/dev/null 2>&1; then

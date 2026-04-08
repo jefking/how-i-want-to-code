@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -12,7 +13,7 @@ import (
 	"github.com/jef/moltenhub-code/internal/hub"
 )
 
-func TestClaudeAuthGateRequiresBrowserLoginWhenNoCredentialsExist(t *testing.T) {
+func TestClaudeAuthGateRequiresGitHubConfigureWhenTokenIsMissing(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
 	t.Setenv("ANTHROPIC_API_KEY", "")
@@ -20,6 +21,8 @@ func TestClaudeAuthGateRequiresBrowserLoginWhenNoCredentialsExist(t *testing.T) 
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "")
 	t.Setenv("CLAUDE_CODE_USE_VERTEX", "")
 	t.Setenv("CLAUDE_CODE_USE_FOUNDRY", "")
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
 
 	g := newClaudeAuthGate(context.Background(), "", nil)
 	status, err := g.Status(context.Background())
@@ -28,6 +31,35 @@ func TestClaudeAuthGateRequiresBrowserLoginWhenNoCredentialsExist(t *testing.T) 
 	}
 	if status.Harness != agentruntime.HarnessClaude || status.Ready || !status.Required {
 		t.Fatalf("status = %+v", status)
+	}
+	if got, want := status.State, "needs_configure"; got != want {
+		t.Fatalf("State = %q, want %q", got, want)
+	}
+	if got, want := status.ConfigureCommand, claudeGitHubConfigureCommand; got != want {
+		t.Fatalf("ConfigureCommand = %q, want %q", got, want)
+	}
+	if got, want := status.ConfigurePlaceholder, claudeGitHubConfigurePlaceholder; got != want {
+		t.Fatalf("ConfigurePlaceholder = %q, want %q", got, want)
+	}
+	if !strings.Contains(status.Message, "GitHub token is required") {
+		t.Fatalf("message = %q", status.Message)
+	}
+}
+
+func TestClaudeAuthGateRequiresBrowserLoginWhenClaudeCredentialsAreMissing(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
+	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "")
+	t.Setenv("CLAUDE_CODE_USE_VERTEX", "")
+	t.Setenv("CLAUDE_CODE_USE_FOUNDRY", "")
+	t.Setenv("GH_TOKEN", "ghp_ready")
+
+	g := newClaudeAuthGate(context.Background(), "", nil)
+	status, err := g.Status(context.Background())
+	if err != nil {
+		t.Fatalf("Status() error = %v", err)
 	}
 	if got, want := status.State, "needs_browser_login"; got != want {
 		t.Fatalf("State = %q, want %q", got, want)
@@ -42,6 +74,7 @@ func TestClaudeAuthGateRequiresBrowserLoginWhenNoCredentialsExist(t *testing.T) 
 
 func TestClaudeAuthGateRecognizesEnvironmentCredentials(t *testing.T) {
 	t.Run("api-key", func(t *testing.T) {
+		t.Setenv("GH_TOKEN", "ghp_ready")
 		t.Setenv("ANTHROPIC_API_KEY", "test-key")
 		g := newClaudeAuthGate(context.Background(), "", nil)
 		status, err := g.Verify(context.Background())
@@ -51,12 +84,13 @@ func TestClaudeAuthGateRecognizesEnvironmentCredentials(t *testing.T) {
 		if !status.Ready {
 			t.Fatalf("status = %+v", status)
 		}
-		if got, want := status.Message, "Claude Code is configured via ANTHROPIC_API_KEY."; got != want {
+		if got, want := status.Message, "Claude Code and GitHub token are ready."; got != want {
 			t.Fatalf("message = %q, want %q", got, want)
 		}
 	})
 
 	t.Run("auth-token", func(t *testing.T) {
+		t.Setenv("GH_TOKEN", "ghp_ready")
 		t.Setenv("ANTHROPIC_AUTH_TOKEN", "token")
 		g := newClaudeAuthGate(context.Background(), "", nil)
 		status, err := g.Verify(context.Background())
@@ -66,12 +100,13 @@ func TestClaudeAuthGateRecognizesEnvironmentCredentials(t *testing.T) {
 		if !status.Ready {
 			t.Fatalf("status = %+v", status)
 		}
-		if got, want := status.Message, "Claude Code is configured via ANTHROPIC_AUTH_TOKEN."; got != want {
+		if got, want := status.Message, "Claude Code and GitHub token are ready."; got != want {
 			t.Fatalf("message = %q, want %q", got, want)
 		}
 	})
 
 	t.Run("cloud-provider", func(t *testing.T) {
+		t.Setenv("GH_TOKEN", "ghp_ready")
 		t.Setenv("CLAUDE_CODE_USE_BEDROCK", "true")
 		g := newClaudeAuthGate(context.Background(), "", nil)
 		status, err := g.Verify(context.Background())
@@ -81,7 +116,7 @@ func TestClaudeAuthGateRecognizesEnvironmentCredentials(t *testing.T) {
 		if !status.Ready {
 			t.Fatalf("status = %+v", status)
 		}
-		if got, want := status.Message, "Claude Code is configured for Amazon Bedrock credentials."; got != want {
+		if got, want := status.Message, "Claude Code and GitHub token are ready."; got != want {
 			t.Fatalf("message = %q, want %q", got, want)
 		}
 	})
@@ -97,6 +132,7 @@ func TestClaudeAuthGateRecognizesCredentialFile(t *testing.T) {
 		t.Fatalf("WriteFile() error = %v", err)
 	}
 	t.Setenv("CLAUDE_CONFIG_DIR", configDir)
+	t.Setenv("GH_TOKEN", "ghp_ready")
 
 	g := newClaudeAuthGate(context.Background(), "", nil)
 	status, err := g.Status(context.Background())
@@ -106,8 +142,45 @@ func TestClaudeAuthGateRecognizesCredentialFile(t *testing.T) {
 	if !status.Ready {
 		t.Fatalf("status = %+v", status)
 	}
-	if !strings.Contains(status.Message, credentialsPath) {
-		t.Fatalf("message = %q", status.Message)
+	if got, want := status.Message, "Claude Code and GitHub token are ready."; got != want {
+		t.Fatalf("message = %q, want %q", got, want)
+	}
+}
+
+func TestClaudeAuthGateConfigurePersistsGitHubTokenAndEnvironment(t *testing.T) {
+	t.Setenv("GH_TOKEN", "")
+	t.Setenv("GITHUB_TOKEN", "")
+
+	path := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	g := newClaudeAuthGateWithConfig("", path, hub.InitConfig{
+		BaseURL:      "https://na.hub.molten.bot/v1",
+		AgentHarness: agentruntime.HarnessClaude,
+	})
+
+	status, err := g.Configure(context.Background(), "ghp_saved_token")
+	if err != nil {
+		t.Fatalf("Configure() error = %v", err)
+	}
+	if status.State == "needs_configure" {
+		t.Fatalf("status = %+v", status)
+	}
+	if got, want := os.Getenv("GH_TOKEN"), "ghp_saved_token"; got != want {
+		t.Fatalf("GH_TOKEN = %q, want %q", got, want)
+	}
+	if got, want := os.Getenv("GITHUB_TOKEN"), "ghp_saved_token"; got != want {
+		t.Fatalf("GITHUB_TOKEN = %q, want %q", got, want)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if got, want := doc["github_token"], "ghp_saved_token"; got != want {
+		t.Fatalf("github_token = %#v, want %q", got, want)
 	}
 }
 
@@ -119,6 +192,7 @@ func TestClaudeAuthGateStartDeviceAuthRunsLoginAndCapturesURL(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "")
 	t.Setenv("CLAUDE_CODE_USE_VERTEX", "")
 	t.Setenv("CLAUDE_CODE_USE_FOUNDRY", "")
+	t.Setenv("GH_TOKEN", "ghp_ready")
 
 	cmdPath := filepath.Join(t.TempDir(), "claude-login-stub.sh")
 	if err := os.WriteFile(cmdPath, []byte(`#!/bin/sh
@@ -184,6 +258,7 @@ func TestClaudeAuthGateVerifyStartsLoginWhenNotReady(t *testing.T) {
 	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "")
 	t.Setenv("CLAUDE_CODE_USE_VERTEX", "")
 	t.Setenv("CLAUDE_CODE_USE_FOUNDRY", "")
+	t.Setenv("GH_TOKEN", "ghp_ready")
 
 	cmdPath := filepath.Join(t.TempDir(), "claude-login-verify-stub.sh")
 	if err := os.WriteFile(cmdPath, []byte(`#!/bin/sh
