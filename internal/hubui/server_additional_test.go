@@ -291,7 +291,7 @@ func TestTaskPanelStylesConstrainHorizontalOverflow(t *testing.T) {
 	if !strings.Contains(css, ".task-meta > div {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}") {
 		t.Fatalf("expected task metadata rows to truncate instead of widening cards")
 	}
-	if !strings.Contains(css, ".task-scroll {\n  scrollbar-width: thin;\n  scrollbar-color: rgba(136, 162, 189, 0.55) rgba(17, 28, 42, 0.35);\n  overflow-x: hidden;\n}") {
+	if !strings.Contains(css, ".task-scroll {\n  scrollbar-width: thin;\n  scrollbar-color: var(--surface-scroll-thumb) rgba(17, 28, 42, 0.35);\n  overflow-x: hidden;\n}") {
 		t.Fatalf("expected task scroll containers to hide horizontal overflow")
 	}
 }
@@ -309,7 +309,7 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	}
 
 	css := resp.Body.String()
-	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: rgba(116, 160, 213, 0.2);\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));\n  color: #6f88ad;\n  letter-spacing: 0.11em;\n  position: relative;\n  justify-content: flex-start;\n}") {
+	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: var(--surface-header-border);\n  background: var(--surface-header);\n  color: var(--surface-label);\n  letter-spacing: 0.11em;\n  position: relative;\n  justify-content: flex-start;\n}") {
 		t.Fatalf("expected Studio title bar to align its controls with the panel content")
 	}
 	if !strings.Contains(css, ".prompt-titlebar {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  justify-content: flex-end;\n  min-height: 62px;\n  padding-bottom: 24px;\n}") {
@@ -318,11 +318,11 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	if !strings.Contains(css, ".prompt-mode-tabs-titlebar {\n  position: absolute;\n  left: 50%;\n  bottom: 0;\n  z-index: 2;\n  justify-self: center;\n  align-self: center;\n  transform: translate(-50%, 50%);\n}") {
 		t.Fatalf("expected Studio mode tabs to dock at the centered bottom edge of the panel")
 	}
-	if !strings.Contains(css, ".prompt-wrap.panel {\n  order: 3;\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);") {
+	if !strings.Contains(css, ".prompt-wrap.panel {\n  order: 3;\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  border-color: var(--surface-glow-border);") {
 		t.Fatalf("expected studio panel to stack header/form without clipping and anchor the dock")
 	}
-	if !strings.Contains(css, ".prompt-mode-tabs {\n  display: inline-flex;\n  gap: 4px;\n  padding: 5px;\n  border-radius: 14px;\n  border: 1px solid rgba(112, 163, 221, 0.28);\n  background: linear-gradient(180deg, rgba(248, 252, 255, 0.96), rgba(226, 239, 255, 0.92));") {
-		t.Fatalf("expected studio mode tabs to use the refreshed light segmented-control treatment")
+	if !strings.Contains(css, ".prompt-mode-tabs {\n  display: inline-flex;\n  gap: 4px;\n  padding: 5px;\n  border-radius: 14px;\n  border: 1px solid var(--surface-tab-border);\n  background: var(--surface-tab-bg);") {
+		t.Fatalf("expected studio mode tabs to use theme-aware segmented-control treatment")
 	}
 	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 14px 14px 88px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
 		t.Fatalf("expected studio form content to leave room for the bottom dock instead of clipping controls")
