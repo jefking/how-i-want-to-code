@@ -309,6 +309,15 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	}
 
 	css := resp.Body.String()
+	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  position: relative;\n  justify-content: center;\n") {
+		t.Fatalf("expected Studio title bar to center its contents")
+	}
+	if !strings.Contains(css, ".prompt-titlebar {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);\n  align-items: center;\n") {
+		t.Fatalf("expected Studio title bar to reserve centered space for the mode switcher")
+	}
+	if !strings.Contains(css, ".prompt-mode-tabs-titlebar {\n  justify-self: center;\n  align-self: center;\n}") {
+		t.Fatalf("expected Studio mode tabs to be centered inside the title bar")
+	}
 	if !strings.Contains(css, ".prompt-wrap.panel {\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);") {
 		t.Fatalf("expected studio panel to stack header/form without clipping")
 	}
