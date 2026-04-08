@@ -400,6 +400,18 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "id.title = prompt;") {
 		t.Fatalf("expected index html task title tooltip to contain prompt text only")
 	}
+	if !strings.Contains(markup, "const showTaskPRLink = isCompletedTask(task) && prURL !== \"\";") {
+		t.Fatalf("expected index html to gate task PR links to completed tasks with a pull request URL")
+	}
+	if !strings.Contains(markup, "node.classList.toggle(\"task-has-pr-link\", showTaskPRLink);") {
+		t.Fatalf("expected index html to mark task cards with right-side PR links")
+	}
+	if !strings.Contains(markup, "body.className = \"task-body\";") {
+		t.Fatalf("expected index html to render a task body container alongside the PR link rail")
+	}
+	if strings.Contains(markup, "topActions.appendChild(prLink);") {
+		t.Fatalf("expected index html to place task PR links in the right-side rail instead of top actions")
+	}
 	if !strings.Contains(markup, `id="local-conn-text"`) {
 		t.Fatalf("expected index html to include local connection indicator")
 	}
@@ -842,6 +854,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-rerun") {
 		t.Fatalf("expected stylesheet to include task rerun styles")
 	}
+	if !strings.Contains(css, ".task-body") {
+		t.Fatalf("expected stylesheet to include task body column styles")
+	}
 	if !strings.Contains(css, ".task-output-toggle") {
 		t.Fatalf("expected stylesheet to include task output toggle styles")
 	}
@@ -886,6 +901,21 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".task-fullscreen") {
 		t.Fatalf("expected stylesheet to include full screen task layout styles")
+	}
+	if !strings.Contains(css, ".task-pr-link") || !strings.Contains(css, "align-self: stretch;") {
+		t.Fatalf("expected stylesheet to stretch task PR links to full task card height")
+	}
+	if !strings.Contains(css, ".task.task-has-pr-link {\n  padding-right: 0;\n  gap: 0;") {
+		t.Fatalf("expected stylesheet to reserve a dedicated right-side rail for task PR links")
+	}
+	if !strings.Contains(css, ".task.task-has-pr-link .task-pr-link {\n  margin-top: -10px;\n  margin-bottom: -10px;") {
+		t.Fatalf("expected stylesheet to make task PR links fill the full task card height")
+	}
+	if !strings.Contains(css, "aspect-ratio: 1 / 1;") {
+		t.Fatalf("expected stylesheet to keep task PR links square while stretching to task height")
+	}
+	if !strings.Contains(css, ".task-pr-link img {\n  display: block;\n  width: 100%;\n  height: 100%;") {
+		t.Fatalf("expected stylesheet to scale the GitHub logo to fill the task PR rail")
 	}
 	if !strings.Contains(css, ".task-fullscreen {\n  position: fixed;\n  inset: 0;\n  z-index: 80;\n  padding: 0;") {
 		t.Fatalf("expected stylesheet to make full screen task layout use full viewport padding")

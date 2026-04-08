@@ -2764,24 +2764,6 @@
         topActions.appendChild(badge);
 
         const prURL = String(task.pr_url || "").trim();
-        if (prURL) {
-          const prLink = document.createElement("a");
-          prLink.className = "task-pr-link";
-          prLink.href = prURL;
-          prLink.target = "_blank";
-          prLink.rel = "noopener noreferrer";
-          prLink.title = "Open pull request";
-          prLink.setAttribute("aria-label", "Open pull request");
-          const prLogo = document.createElement("img");
-          prLogo.src = GITHUB_LOGO_URL;
-          prLogo.alt = "GitHub";
-          prLogo.loading = "lazy";
-          prLink.appendChild(prLogo);
-          prLink.addEventListener("click", (event) => {
-            event.stopPropagation();
-          });
-          topActions.appendChild(prLink);
-        }
 
         if (shouldSparkleTask(task)) {
           const sparklet = document.createElement("span");
@@ -2877,7 +2859,9 @@
 
         top.append(id, topActions);
 
-        node.appendChild(top);
+        const body = document.createElement("div");
+        body.className = "task-body";
+        body.appendChild(top);
 
         if (!collapsed) {
           const meta = document.createElement("div");
@@ -2896,10 +2880,34 @@
           const progress = renderTaskProgress(task);
 
           if (progress) {
-            node.append(meta, progress);
+            body.append(meta, progress);
           } else {
-            node.append(meta);
+            body.append(meta);
           }
+        }
+
+        const showTaskPRLink = isCompletedTask(task) && prURL !== "";
+        node.classList.toggle("task-has-pr-link", showTaskPRLink);
+        node.appendChild(body);
+        if (showTaskPRLink) {
+          const prLink = document.createElement("a");
+          prLink.className = "task-pr-link";
+          prLink.href = prURL;
+          prLink.target = "_blank";
+          prLink.rel = "noopener noreferrer";
+          prLink.title = "Open pull request";
+          prLink.setAttribute("aria-label", "Open pull request");
+
+          const prLogo = document.createElement("img");
+          prLogo.src = GITHUB_LOGO_URL;
+          prLogo.alt = "GitHub";
+          prLogo.loading = "lazy";
+          prLink.appendChild(prLogo);
+
+          prLink.addEventListener("click", (event) => {
+            event.stopPropagation();
+          });
+          node.appendChild(prLink);
         }
         listNode.appendChild(node);
       }
