@@ -390,6 +390,9 @@ exit 1
 	if got, want := status.State, "pending_browser_login"; got != want {
 		t.Fatalf("Configure() state = %q, want %q", got, want)
 	}
+	if strings.Contains(strings.ToLower(status.Message), "click done") {
+		t.Fatalf("Configure() message = %q, want no manual Done instruction after code submission", status.Message)
+	}
 
 	waitForCondition(t, 5*time.Second, func() bool {
 		data, err := os.ReadFile(capturedPath)
