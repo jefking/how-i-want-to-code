@@ -569,7 +569,7 @@ func (h Harness) processChangedRepo(
 			return ExitGit, "git", err
 		}
 		if strings.TrimSpace(statusRes.Stdout) == "" {
-			return ExitPR, "checks", fmt.Errorf("required PR checks failed and codex produced no remediation changes for repo %s", repo.URL)
+			return ExitPR, "checks", fmt.Errorf("required PR checks failed and agent produced no remediation changes for repo %s", repo.URL)
 		}
 
 		h.logf("stage=git status=start action=repair_commit attempt=%d repo=%s repo_dir=%s", attempt+1, repo.URL, repo.RelDir)
@@ -1429,7 +1429,7 @@ func (h Harness) runCodexWithHeartbeat(
 		case run := <-done:
 			if run.err == nil {
 				if failed, detail := codexReportedFailure(run.res); failed {
-					return run.res, fmt.Errorf("codex reported failure: %s", detail)
+					return run.res, fmt.Errorf("%s reported failure: %s", agentStage, detail)
 				}
 			}
 			return run.res, run.err
@@ -1439,7 +1439,7 @@ func (h Harness) runCodexWithHeartbeat(
 			run := <-done
 			if run.err == nil {
 				if failed, detail := codexReportedFailure(run.res); failed {
-					return run.res, fmt.Errorf("codex reported failure: %s", detail)
+					return run.res, fmt.Errorf("%s reported failure: %s", agentStage, detail)
 				}
 			}
 			if run.err != nil {
