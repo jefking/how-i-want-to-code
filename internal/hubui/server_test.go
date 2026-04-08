@@ -403,8 +403,19 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "const showTaskPRLink = isCompletedTask(task) && prURL !== \"\";") {
 		t.Fatalf("expected index html to gate task PR links to completed tasks with a pull request URL")
 	}
+	if !strings.Contains(markup, "const TASK_PR_LINK_SIZE_PX = \"34px\";") {
+		t.Fatalf("expected index html to define a stable runtime width for task PR links")
+	}
 	if !strings.Contains(markup, "node.classList.toggle(\"task-has-pr-link\", showTaskPRLink);") {
 		t.Fatalf("expected index html to mark task cards with right-side PR links")
+	}
+	if !strings.Contains(markup, "prLink.style.width = TASK_PR_LINK_SIZE_PX;") ||
+		!strings.Contains(markup, "prLink.style.height = TASK_PR_LINK_SIZE_PX;") ||
+		!strings.Contains(markup, "prLink.style.alignSelf = \"center\";") {
+		t.Fatalf("expected index html to size task PR links inline to avoid task-height expansion when css is stale")
+	}
+	if !strings.Contains(markup, "prLogo.width = TASK_PR_LOGO_SIZE;") || !strings.Contains(markup, "prLogo.height = TASK_PR_LOGO_SIZE;") {
+		t.Fatalf("expected index html to define deterministic task PR logo dimensions")
 	}
 	if !strings.Contains(markup, "body.className = \"task-body\";") {
 		t.Fatalf("expected index html to render a task body container alongside the PR link rail")
@@ -629,6 +640,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function clearBuilderPromptDraft(") {
 		t.Fatalf("expected index html to include prompt clear handler")
 	}
+	if !strings.Contains(markup, "function submitBuilderPromptOnEnter(event)") ||
+		!strings.Contains(markup, "if (event.shiftKey || event.altKey || event.ctrlKey || event.metaKey || event.isComposing)") ||
+		!strings.Contains(markup, "localPromptForm.requestSubmit();") ||
+		!strings.Contains(markup, "builderPromptInput.addEventListener(\"keydown\", submitBuilderPromptOnEnter);") {
+		t.Fatalf("expected index html to submit builder prompts on Enter while preserving Shift+Enter multiline input")
+	}
 	if !strings.Contains(markup, "function hasBuilderDraftToClear(") ||
 		!strings.Contains(markup, "const promptDirty = String(builderPromptInput?.value || \"\").trim() !== \"\";") ||
 		!strings.Contains(markup, "const branchDirty = ![\"\", \"main\"].includes(String(builderBaseBranch?.value || \"\").trim());") ||
@@ -821,7 +838,8 @@ func TestHandlerIndexIncludesClaudeBrowserCodeFlow(t *testing.T) {
 		`src="https://molten.bot/logos/claude-code.svg"`,
 		`function authHarness(auth) {`,
 		`return configuredHarnessName();`,
-		`const showBrowserCode = isClaudeBrowserCodeState() && state.agentAuthInteracted;`,
+		`function isClaudeBrowserCodeAwaitingSubmission(auth) {`,
+		`const showBrowserCode = isClaudeBrowserCodeAwaitingSubmission() && state.agentAuthInteracted;`,
 		`const useClaudeLogoLink = authHarness(state.agentAuth) === "claude" && authURL !== "";`,
 		`(!requiresClaudeBrowserCode || hasClaudeBrowserCode)`,
 		`agentAuthURL.addEventListener("click", markAgentAuthInteraction);`,
@@ -933,17 +951,23 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-fullscreen") {
 		t.Fatalf("expected stylesheet to include full screen task layout styles")
 	}
-	if !strings.Contains(css, ".task-pr-link") || !strings.Contains(css, "align-self: stretch;") {
-		t.Fatalf("expected stylesheet to stretch task PR links to full task card height")
+	if !strings.Contains(css, ".task-pr-link") ||
+		!strings.Contains(css, "width: 34px;") ||
+		!strings.Contains(css, "height: 34px;") ||
+		!strings.Contains(css, "align-self: center;") {
+		t.Fatalf("expected stylesheet to render task PR links as fixed-size controls that do not affect task card height")
 	}
-	if !strings.Contains(css, ".task.task-has-pr-link {\n  padding-right: 0;\n  gap: 0;") {
-		t.Fatalf("expected stylesheet to reserve a dedicated right-side rail for task PR links")
+	if strings.Contains(css, "align-self: stretch;") {
+		t.Fatalf("expected stylesheet to avoid stretching task PR links to task card height")
 	}
-	if !strings.Contains(css, ".task.task-has-pr-link .task-pr-link {\n  margin-top: -10px;\n  margin-bottom: -10px;") {
-		t.Fatalf("expected stylesheet to make task PR links fill the full task card height")
+	if strings.Contains(css, ".task.task-has-pr-link {\n  padding-right: 0;\n  gap: 0;") {
+		t.Fatalf("expected stylesheet to remove the dedicated right-side PR rail layout")
 	}
-	if !strings.Contains(css, "aspect-ratio: 1 / 1;") {
-		t.Fatalf("expected stylesheet to keep task PR links square while stretching to task height")
+	if strings.Contains(css, ".task.task-has-pr-link .task-pr-link {\n  margin-top: -10px;\n  margin-bottom: -10px;") {
+		t.Fatalf("expected stylesheet to avoid task-height-filling PR link margins")
+	}
+	if strings.Contains(css, "aspect-ratio: 1 / 1;") {
+		t.Fatalf("expected stylesheet to avoid aspect-ratio-driven PR link stretching")
 	}
 	if !strings.Contains(css, ".task-pr-link img {\n  display: block;\n  width: 100%;\n  height: 100%;") {
 		t.Fatalf("expected stylesheet to scale the GitHub logo to fill the task PR rail")

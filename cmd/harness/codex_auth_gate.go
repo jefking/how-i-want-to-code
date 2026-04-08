@@ -33,9 +33,11 @@ type codexAuthGate struct {
 	runner  execx.Runner
 	logf    func(string, ...any)
 
-	command           string
-	runtimeConfigPath string
-	initCfg           hub.InitConfig
+	command string
+
+	runtimeConfigPath  string
+	initCfg            hub.InitConfig
+	requireGitHubToken bool
 
 	required bool
 	ready    bool
@@ -54,8 +56,18 @@ func newCodexAuthGate(
 	ctx context.Context,
 	runner execx.Runner,
 	command string,
+	logf func(string, ...any),
+) *codexAuthGate {
+	return newCodexAuthGateWithConfig(ctx, runner, command, "", hub.InitConfig{}, false, logf)
+}
+
+func newCodexAuthGateWithConfig(
+	ctx context.Context,
+	runner execx.Runner,
+	command string,
 	runtimeConfigPath string,
 	initCfg hub.InitConfig,
+	requireGitHubToken bool,
 	logf func(string, ...any),
 ) *codexAuthGate {
 	if runner == nil {
@@ -71,24 +83,26 @@ func newCodexAuthGate(
 	}
 
 	g := &codexAuthGate{
-		baseCtx:           ctx,
-		runner:            runner,
-		logf:              logf,
-		command:           command,
-		runtimeConfigPath: strings.TrimSpace(runtimeConfigPath),
-		initCfg:           initCfg,
-		required:          true,
-		ready:             false,
-		state:             "needs_device_auth",
-		message:           "Codex authorization is required before running tasks.",
-		updatedAt:         time.Now().UTC(),
+		baseCtx:            ctx,
+		runner:             runner,
+		logf:               logf,
+		command:            command,
+		runtimeConfigPath:  strings.TrimSpace(runtimeConfigPath),
+		initCfg:            initCfg,
+		requireGitHubToken: requireGitHubToken,
+		required:           true,
+		ready:              false,
+		state:              "needs_device_auth",
+		message:            "Codex authorization is required before running tasks.",
+		updatedAt:          time.Now().UTC(),
 	}
 
 	if blocked, state := g.githubTokenRequirementState(); blocked {
 		g.mu.Lock()
-		g.ready = false
-		g.state = strings.TrimSpace(state.State)
-		g.message = strings.TrimSpace(state.Message)
+		g.required = state.Required
+		g.ready = state.Ready
+		g.state = state.State
+		g.message = state.Message
 		g.updatedAt = time.Now().UTC()
 		g.mu.Unlock()
 		return g
@@ -144,6 +158,35 @@ func (g *codexAuthGate) Status(_ context.Context) (hubui.AgentAuthState, error) 
 		return state, nil
 	}
 
+	needsProbe := false
+	g.mu.Lock()
+	if !g.ready && !g.procRunning && strings.TrimSpace(g.state) == "needs_configure" {
+		needsProbe = true
+	}
+	g.mu.Unlock()
+
+	if needsProbe {
+		ready, probeMessage, probeErr := g.probe(context.Background())
+		g.mu.Lock()
+		if probeErr != nil {
+			g.ready = false
+			g.state = "error"
+			g.message = probeErr.Error()
+			g.updatedAt = time.Now().UTC()
+		} else if ready {
+			g.ready = true
+			g.state = "ready"
+			g.message = normalizeCodexStatusMessage(probeMessage)
+			g.updatedAt = time.Now().UTC()
+		} else {
+			g.ready = false
+			g.state = "needs_device_auth"
+			g.message = firstNonEmptyString(probeMessage, "Codex is not logged in. Device authorization is required.")
+			g.updatedAt = time.Now().UTC()
+		}
+		g.mu.Unlock()
+	}
+
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.snapshotLocked(), nil
@@ -159,9 +202,8 @@ func (g *codexAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthState
 		}, nil
 	}
 
-	status, _ := g.Status(context.Background())
-	if status.State == "needs_configure" {
-		return status, fmt.Errorf("github token is required")
+	if blocked, state := g.githubTokenRequirementState(); blocked {
+		return state, fmt.Errorf("github token is required")
 	}
 
 	g.mu.Lock()
@@ -296,14 +338,19 @@ func (g *codexAuthGate) Verify(ctx context.Context) (hubui.AgentAuthState, error
 }
 
 func (g *codexAuthGate) Configure(_ context.Context, rawInput string) (hubui.AgentAuthState, error) {
-	status, _ := g.Status(context.Background())
-	if status.State != "needs_configure" {
-		return status, fmt.Errorf("codex auth does not support manual config submission")
+	if g == nil {
+		return hubui.AgentAuthState{
+			Required: false,
+			Ready:    true,
+			State:    "ready",
+			Message:  "Agent auth is ready.",
+		}, nil
 	}
 
 	token := strings.TrimSpace(rawInput)
 	if token == "" {
-		return g.needsGitHubTokenState("GitHub token is required. Paste a GitHub token below, then click Done."), fmt.Errorf("github token is required")
+		state := g.needsGitHubTokenState("GitHub token is required. Paste a GitHub token below, then click Done.")
+		return state, fmt.Errorf("github token is required")
 	}
 
 	g.mu.Lock()
@@ -312,17 +359,23 @@ func (g *codexAuthGate) Configure(_ context.Context, rawInput string) (hubui.Age
 	g.mu.Unlock()
 
 	if err := hub.SaveRuntimeConfigGitHubToken(runtimeConfigPath, initCfg, token); err != nil {
-		return g.needsGitHubTokenState(fmt.Sprintf("save github token: %v", err)), err
+		state := g.needsGitHubTokenState(fmt.Sprintf("save github token: %v", err))
+		return state, err
 	}
 	if err := setGitHubTokenEnvironment(token); err != nil {
-		return g.needsGitHubTokenState(fmt.Sprintf("set github token env: %v", err)), err
+		state := g.needsGitHubTokenState(fmt.Sprintf("set github token env: %v", err))
+		return state, err
 	}
 
 	g.mu.Lock()
 	g.initCfg.GitHubToken = token
 	g.mu.Unlock()
 
-	return g.Verify(context.Background())
+	state, err := g.Verify(context.Background())
+	if err != nil {
+		return state, err
+	}
+	return state, nil
 }
 
 func (g *codexAuthGate) readDeviceAuthStream(r io.ReadCloser) {
@@ -485,6 +538,10 @@ func (g *codexAuthGate) needsGitHubTokenState(message string) hubui.AgentAuthSta
 }
 
 func (g *codexAuthGate) githubTokenRequirementState() (bool, hubui.AgentAuthState) {
+	if g == nil || !g.requireGitHubToken {
+		return false, hubui.AgentAuthState{}
+	}
+
 	g.mu.Lock()
 	runtimeConfigPath := g.runtimeConfigPath
 	initCfg := g.initCfg
