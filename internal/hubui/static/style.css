@@ -123,6 +123,7 @@
   --theme-button-focus:
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
     0 0 0 3px rgba(76, 133, 233, 0.18);
+  --agent-logo-filter: brightness(0) saturate(100%);
   --body-radial-left: radial-gradient(1300px 600px at -10% -15%, rgba(10, 132, 255, 0.16), transparent 60%);
   --body-radial-right: radial-gradient(980px 560px at 110% 8%, rgba(123, 97, 255, 0.12), transparent 62%);
   --body-linear: linear-gradient(180deg, #f8fbff, #f2f7ff 55%, #ecf3ff);
@@ -277,6 +278,7 @@ textarea {
   height: 42px;
   padding: 7px;
   border-radius: 14px;
+  filter: var(--agent-logo-filter);
 }
 
 .title {
@@ -1327,6 +1329,7 @@ select.prompt-control {
   width: 100%;
   height: 100%;
   object-fit: contain;
+  filter: var(--agent-logo-filter);
 }
 
 .task-pr-link:hover {
@@ -2077,6 +2080,7 @@ select.prompt-control {
   border-radius: 16px;
   background: var(--surface-auth-button-bg);
   box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+  filter: var(--agent-logo-filter);
 }
 
 .agent-auth-url-logo-link:hover .agent-auth-url-logo,
@@ -2263,6 +2267,7 @@ html.dark {
   --theme-button-focus:
     inset 0 1px 0 rgba(255, 255, 255, 0.03),
     0 0 0 3px rgba(76, 133, 233, 0.22);
+  --agent-logo-filter: brightness(0) saturate(100%) invert(1);
   --shadow-sm: 0 10px 28px rgba(4, 11, 27, 0.38);
   --shadow-md: 0 18px 44px rgba(4, 11, 27, 0.5);
   --shadow-lg: 0 28px 72px rgba(4, 11, 27, 0.62);
@@ -2380,6 +2385,7 @@ html.night {
   --theme-button-focus:
     inset 0 1px 0 rgba(255, 255, 255, 0.025),
     0 0 0 3px rgba(76, 133, 233, 0.22);
+  --agent-logo-filter: brightness(0) saturate(100%) invert(1);
   --shadow-sm: 0 10px 28px rgba(0, 0, 0, 0.46);
   --shadow-md: 0 18px 44px rgba(0, 0, 0, 0.58);
   --shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.7);
