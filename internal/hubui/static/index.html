@@ -866,13 +866,26 @@
     function isAuggieConfigureState(auth) {
       const current = auth && typeof auth === "object" ? auth : state.agentAuth;
       const harness = String(current?.harness || "").trim().toLowerCase();
-      return harness === "auggie" && isManualConfigureState(current);
+      return harness === "auggie" && isManualConfigureState(current) && !isGitHubTokenConfigureState(current);
     }
 
     function isClaudeGitHubConfigureState(auth) {
       const current = auth && typeof auth === "object" ? auth : state.agentAuth;
       const harness = String(current?.harness || "").trim().toLowerCase();
-      return harness === "claude" && isManualConfigureState(current);
+      return isManualConfigureState(current) && (harness === "claude" || isGitHubTokenConfigureState(current));
+    }
+
+    function isGitHubTokenConfigureState(auth) {
+      const current = auth && typeof auth === "object" ? auth : state.agentAuth;
+      if (!isManualConfigureState(current)) {
+        return false;
+      }
+      const command = String(current?.configureCommand || "").trim().toLowerCase();
+      if (command.startsWith("gh auth token")) {
+        return true;
+      }
+      const message = String(current?.message || "").trim().toLowerCase();
+      return message.includes("github token");
     }
 
     function isManualConfigureState(auth) {
