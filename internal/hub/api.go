@@ -863,7 +863,10 @@ func truncateBody(body []byte) string {
 }
 
 func buildAgentMetadata(cfg InitConfig) map[string]any {
-	harness := strings.TrimSpace(cfg.AgentHarness)
+	harness := agentruntime.Default().Harness
+	if runtime, err := agentruntime.Resolve(cfg.AgentHarness, cfg.AgentCommand); err == nil {
+		harness = runtime.Harness
+	}
 	metadata := map[string]any{
 		"agent_type":          normalizeAgentType(nil),
 		"runtime":             runtimeIdentifier,
