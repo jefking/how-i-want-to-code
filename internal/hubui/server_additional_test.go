@@ -350,6 +350,27 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	}
 }
 
+func TestLibraryTaskListUsesDesktopTwoColumnAndMobileSingleColumnLayout(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/static/style.css", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.Code)
+	}
+
+	css := resp.Body.String()
+	if !strings.Contains(css, ".library-task-list {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));") {
+		t.Fatalf("expected library task list to use two columns in wide layouts")
+	}
+	if !strings.Contains(css, "@media (max-width: 720px) {\n  .library-task-list {\n    grid-template-columns: minmax(0, 1fr);\n  }") {
+		t.Fatalf("expected library task list to collapse to one column only on mobile")
+	}
+}
+
 func TestStudioStylesUseRefinedPanelAndInputTreatment(t *testing.T) {
 	t.Parallel()
 

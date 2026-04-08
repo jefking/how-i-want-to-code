@@ -854,7 +854,7 @@ select.prompt-control {
 
 .library-task-list {
   display: grid;
-  grid-template-columns: minmax(0, 1fr);
+  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
   max-height: 280px;
   overflow: auto;
@@ -1576,12 +1576,13 @@ body.task-fullscreen-open #task-fullscreen-toggle {
     min-width: 0;
   }
 
-  .library-task-list {
-    grid-template-columns: 1fr;
-  }
 }
 
 @media (max-width: 720px) {
+  .library-task-list {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
   .status-row {
     flex-wrap: nowrap;
     gap: 8px;
