@@ -237,9 +237,17 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 	snap := g.snapshotLocked()
 	g.mu.Unlock()
 
-	go g.readLoginStream(stdoutPipe)
-	go g.readLoginStream(stderrPipe)
-	go g.waitLogin(cmd, tmpDir)
+	var readerWG sync.WaitGroup
+	readerWG.Add(2)
+	go func() {
+		defer readerWG.Done()
+		g.readLoginStream(stdoutPipe)
+	}()
+	go func() {
+		defer readerWG.Done()
+		g.readLoginStream(stderrPipe)
+	}()
+	go g.waitLogin(cmd, tmpDir, &readerWG)
 
 	// Prompt-driven login flows can emit non-newline terminal controls; proactively
 	// send Enter once so default selections continue and the browser URL is printed.
@@ -499,7 +507,10 @@ func (g *claudeAuthGate) ingestLoginLine(line string) {
 	}
 }
 
-func (g *claudeAuthGate) waitLogin(cmd *exec.Cmd, tempDir string) {
+func (g *claudeAuthGate) waitLogin(cmd *exec.Cmd, tempDir string, readerWG *sync.WaitGroup) {
+	if readerWG != nil {
+		readerWG.Wait()
+	}
 	err := cmd.Wait()
 	_ = os.RemoveAll(strings.TrimSpace(tempDir))
 
