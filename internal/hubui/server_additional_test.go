@@ -426,7 +426,7 @@ func TestHeaderStatusStylesStayReadable(t *testing.T) {
 	if !strings.Contains(css, ".status-item-metrics .status-value {\n  color: var(--text-soft);\n  font-size: 0.9rem;") {
 		t.Fatalf("expected metrics text to use readable status color tokens")
 	}
-	if !strings.Contains(css, "@media (max-width: 720px) {\n  .status-row {\n    flex-wrap: nowrap;\n    gap: 8px;\n  }\n\n  .status-item-metrics {\n    flex: 1 1 auto;\n    width: auto;\n    min-width: 0;") {
+	if !strings.Contains(css, "@media (max-width: 720px) {\n  .library-task-list {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .status-row {\n    flex-wrap: nowrap;\n    gap: 8px;\n  }\n\n  .status-item-metrics {\n    flex: 1 1 auto;\n    width: auto;\n    min-width: 0;") {
 		t.Fatalf("expected status row to stay on one line through mobile widths")
 	}
 }
