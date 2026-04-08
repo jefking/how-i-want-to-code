@@ -330,7 +330,7 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 		}, nil
 	}
 
-	code := strings.TrimSpace(rawInput)
+	code := normalizeClaudeBrowserCode(rawInput)
 	if code == "" {
 		state, _ := g.Status(context.Background())
 		if strings.TrimSpace(state.State) == "" {
@@ -374,13 +374,17 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 	g.mu.Lock()
 	if !g.ready {
 		g.state = "pending_browser_login"
-		g.message = "Claude authentication code received. Finish browser login, then click Done."
+		g.message = "Claude authentication code received. Finish browser login in the opened page."
 		g.updatedAt = time.Now().UTC()
 	}
 	snap := g.snapshotLocked()
 	g.mu.Unlock()
 
 	return snap, nil
+}
+
+func normalizeClaudeBrowserCode(raw string) string {
+	return strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
 }
 
 func (g *claudeAuthGate) completePendingBrowserLoginIfReady() (hubui.AgentAuthState, bool) {

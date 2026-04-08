@@ -11,6 +11,7 @@ import (
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
 	"github.com/jef/moltenhub-code/internal/hub"
+	"github.com/jef/moltenhub-code/internal/hubui"
 )
 
 func TestClaudeAuthGateRequiresGitHubConfigureWhenTokenIsMissing(t *testing.T) {
@@ -390,6 +391,9 @@ exit 1
 	if got, want := status.State, "pending_browser_login"; got != want {
 		t.Fatalf("Configure() state = %q, want %q", got, want)
 	}
+	if strings.Contains(strings.ToLower(status.Message), "click done") {
+		t.Fatalf("Configure() message = %q, want no manual Done instruction after code submission", status.Message)
+	}
 
 	waitForCondition(t, 5*time.Second, func() bool {
 		data, err := os.ReadFile(capturedPath)
@@ -397,6 +401,66 @@ exit 1
 			return false
 		}
 		return string(data) == submittedCode
+	})
+}
+
+func TestClaudeAuthGateConfigureNormalizesBrowserCodeWhitespace(t *testing.T) {
+	t.Setenv("HOME", t.TempDir())
+	t.Setenv("CLAUDE_CONFIG_DIR", "")
+	t.Setenv("ANTHROPIC_API_KEY", "")
+	t.Setenv("ANTHROPIC_AUTH_TOKEN", "")
+	t.Setenv("CLAUDE_CODE_USE_BEDROCK", "")
+	t.Setenv("CLAUDE_CODE_USE_VERTEX", "")
+	t.Setenv("CLAUDE_CODE_USE_FOUNDRY", "")
+	t.Setenv("GH_TOKEN", "ghp_ready")
+
+	capturedPath := filepath.Join(t.TempDir(), "captured-code-normalized.txt")
+	cmdPath := filepath.Join(t.TempDir(), "claude-login-submit-code-normalized.sh")
+	if err := os.WriteFile(cmdPath, []byte(`#!/bin/sh
+if [ "$1" != "auth" ] || [ "$2" != "login" ]; then
+  exit 64
+fi
+echo "Select login method:"
+if ! read choice; then
+  exit 2
+fi
+echo "Open browser:"
+echo "https://claude.ai/login/device?flow=submit-code-normalized"
+if ! read authcode; then
+  exit 3
+fi
+printf "%s" "$authcode" > "`+capturedPath+`"
+sleep 1
+exit 1
+`), 0o755); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	g := newClaudeAuthGate(context.Background(), cmdPath, nil)
+	if _, err := g.StartDeviceAuth(context.Background()); err != nil {
+		t.Fatalf("StartDeviceAuth() error = %v", err)
+	}
+
+	waitForCondition(t, 5*time.Second, func() bool {
+		s, _ := g.Status(context.Background())
+		return strings.Contains(s.AuthURL, "https://claude.ai/login/device?flow=submit-code-normalized")
+	})
+
+	rawPastedCode := "  code-from-\n  claude \t browser  "
+	status, err := g.Configure(context.Background(), rawPastedCode)
+	if err != nil {
+		t.Fatalf("Configure() error = %v", err)
+	}
+	if got, want := status.State, "pending_browser_login"; got != want {
+		t.Fatalf("Configure() state = %q, want %q", got, want)
+	}
+
+	waitForCondition(t, 5*time.Second, func() bool {
+		data, err := os.ReadFile(capturedPath)
+		if err != nil {
+			return false
+		}
+		return string(data) == "code-from-claudebrowser"
 	})
 }
 
@@ -459,7 +523,14 @@ sleep 30
 		return string(data) == submittedCode
 	})
 
-	status, err := g.Verify(context.Background())
+	var (
+		status hubui.AgentAuthState
+		err    error
+	)
+	waitForCondition(t, 5*time.Second, func() bool {
+		status, err = g.Verify(context.Background())
+		return err == nil && status.Ready
+	})
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}
@@ -477,6 +548,9 @@ sleep 30
 func TestClaudeAuthHelpers(t *testing.T) {
 	t.Parallel()
 
+	if got, want := normalizeClaudeBrowserCode("  code-from-\n claude \t browser  "), "code-from-claudebrowser"; got != want {
+		t.Fatalf("normalizeClaudeBrowserCode() = %q, want %q", got, want)
+	}
 	if got, want := extractClaudeAuthURL("Use https://claude.ai/login/device?x=y); now"), "https://claude.ai/login/device?x=y"; got != want {
 		t.Fatalf("extractClaudeAuthURL() = %q, want %q", got, want)
 	}
