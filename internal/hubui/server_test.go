@@ -812,10 +812,10 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-fullscreen-toggle-icon") {
 		t.Fatalf("expected stylesheet to include task full screen icon styles")
 	}
-	if !strings.Contains(css, ".task-fullscreen-toggle {\n  width: 32px;\n  height: 32px;") {
+	if !strings.Contains(css, ".task-fullscreen-toggle {\n  display: inline-flex;\n  width: 32px;\n  height: 32px;") {
 		t.Fatalf("expected stylesheet to size the task full screen control as a compact icon affordance")
 	}
-	if !strings.Contains(css, ".task-fullscreen-toggle {\n  display: inline-flex;\n  width: 32px;\n  height: 32px;") {
+	if !strings.Contains(css, "display: inline-flex;") {
 		t.Fatalf("expected stylesheet to center the task full screen icon with inline-flex button layout")
 	}
 	if !strings.Contains(css, "background: transparent;") || !strings.Contains(css, "border: 0;") {
