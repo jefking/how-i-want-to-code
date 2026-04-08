@@ -569,4 +569,7 @@ func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
 	if !strings.Contains(html, "normalizeAuggieSessionAuthPayload") {
 		t.Fatalf("expected auggie configure JSON schema validator")
 	}
+	if !strings.Contains(html, "function isGitHubTokenConfigureState(auth)") {
+		t.Fatalf("expected auth gate to detect GitHub token configure flows across harnesses")
+	}
 }

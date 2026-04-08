@@ -57,36 +57,8 @@ func newAuggieAuthGate(runtimeConfigPath string, initCfg hub.InitConfig) *auggie
 	}
 
 	g.mu.Lock()
-	defer g.mu.Unlock()
-
-	if configured, source := firstConfiguredAuggieSessionAuth(g.runtimeConfigPath, initCfg); configured != "" {
-		if canonical, err := normalizeAuggieSessionAuth(configured); err == nil {
-			if source != "environment" {
-				_ = os.Setenv(auggieSessionAuthEnv, canonical)
-			}
-			g.initCfg.AugmentSessionAuth = canonical
-			g.ready = true
-			g.state = "ready"
-			g.message = "Auggie session auth is ready."
-			g.updatedAt = time.Now().UTC()
-			return g
-		} else {
-			g.message = fmt.Sprintf(
-				"Auggie session auth from %s is invalid: %v. Run `%s` in your terminal locally, paste the JSON, then click Done.",
-				source,
-				err,
-				auggieConfigureCommand,
-			)
-			g.updatedAt = time.Now().UTC()
-			return g
-		}
-	}
-
-	g.message = fmt.Sprintf(
-		"Auggie session auth is required. Run `%s` in your terminal locally, paste the JSON output below, then click Done.",
-		auggieConfigureCommand,
-	)
-	g.updatedAt = time.Now().UTC()
+	g.refreshLocked()
+	g.mu.Unlock()
 	return g
 }
 
@@ -102,6 +74,7 @@ func (g *auggieAuthGate) Status(_ context.Context) (hubui.AgentAuthState, error)
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.refreshLocked()
 	return g.snapshotLocked(), nil
 }
 
@@ -117,6 +90,7 @@ func (g *auggieAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.refreshLocked()
 	return g.snapshotLocked(), nil
 }
 
@@ -132,6 +106,7 @@ func (g *auggieAuthGate) Verify(_ context.Context) (hubui.AgentAuthState, error)
 
 	g.mu.Lock()
 	defer g.mu.Unlock()
+	g.refreshLocked()
 	return g.snapshotLocked(), nil
 }
 
@@ -145,11 +120,76 @@ func (g *auggieAuthGate) Configure(_ context.Context, rawInput string) (hubui.Ag
 		}, nil
 	}
 
+	g.mu.Lock()
+	g.refreshLocked()
+	if g.ready {
+		snap := g.snapshotLocked()
+		g.mu.Unlock()
+		return snap, nil
+	}
+	configureCommand := strings.TrimSpace(g.configureCommand)
+	initCfg := g.initCfg
+	runtimeConfigPath := g.runtimeConfigPath
+	g.mu.Unlock()
+
+	if configureCommand == claudeGitHubConfigureCommand {
+		token := strings.TrimSpace(rawInput)
+		if token == "" {
+			g.mu.Lock()
+			g.ready = false
+			g.state = "needs_configure"
+			g.configureCommand = claudeGitHubConfigureCommand
+			g.configurePlaceholder = claudeGitHubConfigurePlaceholder
+			g.message = fmt.Sprintf(
+				"GitHub token is required. Run `%s` in your terminal locally, paste the token below, then click Done.",
+				claudeGitHubConfigureCommand,
+			)
+			g.updatedAt = time.Now().UTC()
+			snap := g.snapshotLocked()
+			g.mu.Unlock()
+			return snap, fmt.Errorf("github token is required")
+		}
+
+		if err := hub.SaveRuntimeConfigGitHubToken(runtimeConfigPath, initCfg, token); err != nil {
+			g.mu.Lock()
+			g.ready = false
+			g.state = "needs_configure"
+			g.configureCommand = claudeGitHubConfigureCommand
+			g.configurePlaceholder = claudeGitHubConfigurePlaceholder
+			g.message = fmt.Sprintf("save github token: %v", err)
+			g.updatedAt = time.Now().UTC()
+			snap := g.snapshotLocked()
+			g.mu.Unlock()
+			return snap, err
+		}
+		if err := setGitHubTokenEnvironment(token); err != nil {
+			g.mu.Lock()
+			g.ready = false
+			g.state = "needs_configure"
+			g.configureCommand = claudeGitHubConfigureCommand
+			g.configurePlaceholder = claudeGitHubConfigurePlaceholder
+			g.message = fmt.Sprintf("set github token env: %v", err)
+			g.updatedAt = time.Now().UTC()
+			snap := g.snapshotLocked()
+			g.mu.Unlock()
+			return snap, err
+		}
+
+		g.mu.Lock()
+		g.initCfg.GitHubToken = token
+		g.refreshLocked()
+		snap := g.snapshotLocked()
+		g.mu.Unlock()
+		return snap, nil
+	}
+
 	canonical, err := normalizeAuggieSessionAuth(rawInput)
 	if err != nil {
 		g.mu.Lock()
 		g.ready = false
 		g.state = "needs_configure"
+		g.configureCommand = auggieConfigureCommand
+		g.configurePlaceholder = auggieConfigurePlaceholderValue
 		g.message = fmt.Sprintf(
 			"Auggie session auth is invalid: %v. Run `%s` in your terminal locally, paste the JSON, then click Done.",
 			err,
@@ -160,16 +200,12 @@ func (g *auggieAuthGate) Configure(_ context.Context, rawInput string) (hubui.Ag
 		g.mu.Unlock()
 		return snap, err
 	}
-
-	g.mu.Lock()
-	initCfg := g.initCfg
-	runtimeConfigPath := g.runtimeConfigPath
-	g.mu.Unlock()
-
 	if err := hub.SaveRuntimeConfigAuggieAuth(runtimeConfigPath, initCfg, canonical); err != nil {
 		g.mu.Lock()
 		g.ready = false
 		g.state = "needs_configure"
+		g.configureCommand = auggieConfigureCommand
+		g.configurePlaceholder = auggieConfigurePlaceholderValue
 		g.message = fmt.Sprintf("save auggie config.json: %v", err)
 		g.updatedAt = time.Now().UTC()
 		snap := g.snapshotLocked()
@@ -180,6 +216,8 @@ func (g *auggieAuthGate) Configure(_ context.Context, rawInput string) (hubui.Ag
 		g.mu.Lock()
 		g.ready = false
 		g.state = "needs_configure"
+		g.configureCommand = auggieConfigureCommand
+		g.configurePlaceholder = auggieConfigurePlaceholderValue
 		g.message = fmt.Sprintf("set %s: %v", auggieSessionAuthEnv, err)
 		g.updatedAt = time.Now().UTC()
 		snap := g.snapshotLocked()
@@ -189,13 +227,74 @@ func (g *auggieAuthGate) Configure(_ context.Context, rawInput string) (hubui.Ag
 
 	g.mu.Lock()
 	g.initCfg.AugmentSessionAuth = canonical
-	g.ready = true
-	g.state = "ready"
-	g.message = "Auggie session auth is ready."
-	g.updatedAt = time.Now().UTC()
+	g.refreshLocked()
 	snap := g.snapshotLocked()
 	g.mu.Unlock()
 	return snap, nil
+}
+
+func (g *auggieAuthGate) refreshLocked() {
+	if g == nil {
+		return
+	}
+
+	g.required = true
+	g.ready = false
+	g.state = "needs_configure"
+	g.configureCommand = auggieConfigureCommand
+	g.configurePlaceholder = auggieConfigurePlaceholderValue
+	g.updatedAt = time.Now().UTC()
+
+	configuredSessionAuth, source := firstConfiguredAuggieSessionAuth(g.runtimeConfigPath, g.initCfg)
+	if configuredSessionAuth == "" {
+		g.message = fmt.Sprintf(
+			"Auggie session auth is required. Run `%s` in your terminal locally, paste the JSON output below, then click Done.",
+			auggieConfigureCommand,
+		)
+		return
+	}
+
+	canonicalSessionAuth, err := normalizeAuggieSessionAuth(configuredSessionAuth)
+	if err != nil {
+		g.message = fmt.Sprintf(
+			"Auggie session auth from %s is invalid: %v. Run `%s` in your terminal locally, paste the JSON, then click Done.",
+			source,
+			err,
+			auggieConfigureCommand,
+		)
+		return
+	}
+	if source != "environment" {
+		if err := os.Setenv(auggieSessionAuthEnv, canonicalSessionAuth); err != nil {
+			g.message = fmt.Sprintf("set %s: %v", auggieSessionAuthEnv, err)
+			return
+		}
+	}
+	g.initCfg.AugmentSessionAuth = canonicalSessionAuth
+
+	githubToken, _ := firstConfiguredGitHubToken(g.runtimeConfigPath, g.initCfg)
+	if strings.TrimSpace(githubToken) == "" {
+		g.configureCommand = claudeGitHubConfigureCommand
+		g.configurePlaceholder = claudeGitHubConfigurePlaceholder
+		g.message = fmt.Sprintf(
+			"GitHub token is required. Run `%s` in your terminal locally, paste the token below, then click Done.",
+			claudeGitHubConfigureCommand,
+		)
+		return
+	}
+	if err := setGitHubTokenEnvironment(githubToken); err != nil {
+		g.configureCommand = claudeGitHubConfigureCommand
+		g.configurePlaceholder = claudeGitHubConfigurePlaceholder
+		g.message = fmt.Sprintf("set github token env: %v", err)
+		return
+	}
+
+	g.initCfg.GitHubToken = strings.TrimSpace(githubToken)
+	g.ready = true
+	g.state = "ready"
+	g.message = "Auggie session auth and GitHub token are ready."
+	g.configureCommand = ""
+	g.configurePlaceholder = ""
 }
 
 func (g *auggieAuthGate) snapshotLocked() hubui.AgentAuthState {
