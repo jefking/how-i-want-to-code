@@ -68,8 +68,8 @@ func TestHandlerLibraryEndpointReturnsTasks(t *testing.T) {
 	srv := NewServer("", NewBroker())
 	srv.LoadLibraryTasks = func() ([]library.TaskSummary, error) {
 		return []library.TaskSummary{
-			{Name: "security-review", Description: "Audit security boundaries."},
-			{Name: "unit-test-coverage"},
+			{Name: "security-review", DisplayName: "Security Review", Prompt: "Review the repository."},
+			{Name: "unit-test-coverage", DisplayName: "100% Unit Test Coverage", Prompt: "Raise coverage."},
 		}, nil
 	}
 
@@ -93,6 +93,9 @@ func TestHandlerLibraryEndpointReturnsTasks(t *testing.T) {
 	}
 	if got, want := len(body.Tasks), 2; got != want {
 		t.Fatalf("len(tasks) = %d, want %d", got, want)
+	}
+	if got, want := body.Tasks[0].Prompt, "Review the repository."; got != want {
+		t.Fatalf("tasks[0].prompt = %q, want %q", got, want)
 	}
 }
 
@@ -205,6 +208,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function fullscreenTasks(") {
 		t.Fatalf("expected index html to include full screen task list renderer")
 	}
+	if !strings.Contains(markup, "const taskPanel = document.getElementById(\"task-panel\");") {
+		t.Fatalf("expected index html to cache the task panel element")
+	}
+	if !strings.Contains(markup, "if (open && !displayTasks(state.snapshot).length) {") {
+		t.Fatalf("expected index html to block fullscreen when no tasks exist")
+	}
 	if !strings.Contains(markup, "function isMinimizedTask(") {
 		t.Fatalf("expected index html to include completed-task minimization handler")
 	}
@@ -228,6 +237,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `id="task-fullscreen-toggle"`) {
 		t.Fatalf("expected index html to include tasks full screen toggle")
+	}
+	if !strings.Contains(markup, `id="task-panel"`) {
+		t.Fatalf("expected index html to include task panel wrapper")
+	}
+	if !strings.Contains(markup, `id="task-panel" class="panel min-h-[220px] overflow-hidden rounded-2xl border border-hub-border bg-hub-panel bg-[linear-gradient(170deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] hidden" aria-hidden="true"`) {
+		t.Fatalf("expected index html to keep task panel hidden before tasks exist")
 	}
 	if strings.Contains(markup, "<span>Tasks</span>") {
 		t.Fatalf("expected index html to remove Tasks title label from panel header")
@@ -282,6 +297,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, "rightCol.classList.toggle(\"task-output-hidden\", !outputVisible);") {
 		t.Fatalf("expected index html to collapse the standard layout when output is hidden")
+	}
+	if !strings.Contains(markup, "rightCol.classList.toggle(\"task-list-hidden\", !hasTasks);") {
+		t.Fatalf("expected index html to collapse the standard layout when there are no tasks")
+	}
+	if !strings.Contains(markup, "taskPanel.classList.toggle(\"hidden\", !hasTasks);") {
+		t.Fatalf("expected index html to hide the task panel when there are no tasks")
 	}
 	if !strings.Contains(markup, "setTerminalOutputOpen(task.request_id, nextOpen);") {
 		t.Fatalf("expected index html to open full terminal output from task Open Output action")
@@ -343,6 +364,21 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "Connected via HTTP long polling") {
 		t.Fatalf("expected index html to include HTTP long-polling connection copy")
 	}
+	if !strings.Contains(markup, `const HUB_CONNECT_URL = "https://app.molten.bot";`) {
+		t.Fatalf("expected index html to define the molten hub connect url")
+	}
+	if !strings.Contains(markup, `text = actionable ? "Connect to Molten Hub" : text;`) {
+		t.Fatalf("expected index html to render connect CTA copy when hub is disconnected")
+	}
+	if !strings.Contains(markup, `hubConnItem.addEventListener("click", maybeOpenHubConnectPage);`) {
+		t.Fatalf("expected index html to open the molten hub app when the disconnected indicator is clicked")
+	}
+	if !strings.Contains(markup, `window.open(HUB_CONNECT_URL, "_blank", "noopener,noreferrer");`) {
+		t.Fatalf("expected index html to open the molten hub app in a new page")
+	}
+	if !strings.Contains(markup, `hubConnItem.classList.toggle("status-item-action", actionable);`) {
+		t.Fatalf("expected index html to mark the disconnected hub indicator as actionable")
+	}
 	if !strings.Contains(markup, `id="prompt-visibility-toggle"`) {
 		t.Fatalf("expected index html to include studio visibility toggle")
 	}
@@ -354,6 +390,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `class="panel-title">Studio</span>`) {
 		t.Fatalf("expected index html to render Studio as the title-bar label")
+	}
+	if !strings.Contains(markup, "library-task-option-prompt") {
+		t.Fatalf("expected index html to include expandable library prompt sections")
+	}
+	if !strings.Contains(markup, "button.setAttribute(\"aria-expanded\", String(entry.name === selected));") {
+		t.Fatalf("expected index html to mark the selected library task as expanded")
+	}
+	if strings.Contains(markup, "library-task-option-name") {
+		t.Fatalf("expected index html to stop rendering library task internal names")
 	}
 	if !strings.Contains(markup, `id="resource-metrics-text"`) {
 		t.Fatalf("expected index html to include resource metrics indicator")
