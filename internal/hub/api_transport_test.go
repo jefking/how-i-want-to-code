@@ -307,9 +307,9 @@ func TestRegisterRuntimePublishesLibraryTaskMetadata(t *testing.T) {
 	client := NewAPIClient("http://example.test/v1")
 	client.HTTPClient = &http.Client{
 		Transport: roundTripFunc(func(r *http.Request) (*http.Response, error) {
-			defer r.Body.Close()
 			var body map[string]any
 			if r.Body != nil {
+				defer r.Body.Close()
 				data, _ := io.ReadAll(r.Body)
 				_ = json.Unmarshal(data, &body)
 			}
