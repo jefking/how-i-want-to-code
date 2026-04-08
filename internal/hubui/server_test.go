@@ -545,6 +545,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "clearPromptImages(false);") {
 		t.Fatalf("expected index html to clear attached screenshots after a successful submit without repopulating raw JSON")
 	}
+	if !strings.Contains(markup, "resetBuilderTargetSubdir();") || !strings.Contains(markup, "resetBaseBranchToMain(false);") {
+		t.Fatalf("expected index html to reset branch and target subdir as part of queued-submit cleanup")
+	}
 	if !strings.Contains(markup, "clearSubmittedPromptState();") {
 		t.Fatalf("expected index html to clear the submitted prompt state after a successful queue")
 	}

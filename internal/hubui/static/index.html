@@ -904,6 +904,8 @@
     function clearSubmittedPromptState() {
       clearSubmittedPromptDraft();
       clearPromptImages(false);
+      resetBuilderTargetSubdir();
+      resetBaseBranchToMain(false);
     }
 
     function readFileAsDataURL(file) {
@@ -1099,11 +1101,11 @@
       }
     }
 
-    function resetBaseBranchToMain() {
+    function resetBaseBranchToMain(syncRaw = true) {
       builderBaseBranch.value = "main";
       libraryBaseBranch.value = "main";
       syncBaseBranchClearState();
-      if (state.promptMode === "json") {
+      if (syncRaw && state.promptMode === "json") {
         try {
           syncRawFromMode("builder");
         } catch (_err) {
@@ -1237,8 +1239,6 @@
 
     function clearBuilderPromptDraft() {
       clearSubmittedPromptState();
-      resetBuilderTargetSubdir();
-      resetBaseBranchToMain();
       if (state.promptMode === "json") {
         localPromptInput.focus();
         return;
