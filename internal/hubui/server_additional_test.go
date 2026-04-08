@@ -350,11 +350,20 @@ func TestTaskPanelStylesConstrainHorizontalOverflow(t *testing.T) {
 	}
 
 	css := resp.Body.String()
+	if !strings.Contains(css, ".task-meta {\n  display: flex;\n  flex-wrap: wrap;\n  align-items: center;\n  gap: 4px 0;\n  color: var(--muted);\n  font-size: 0.74rem;\n  min-width: 0;\n}") {
+		t.Fatalf("expected task metadata to share one line when space allows")
+	}
 	if !strings.Contains(css, ".task-output-list {\n  margin-top: 8px;\n  border-top: 1px dashed rgba(125, 154, 185, 0.32);\n  padding-top: 7px;\n  display: grid;\n  grid-template-columns: minmax(0, 1fr);") {
 		t.Fatalf("expected task output list to clamp width to panel columns")
 	}
 	if !strings.Contains(css, ".task-meta > div {\n  min-width: 0;\n  overflow: hidden;\n  text-overflow: ellipsis;\n  white-space: nowrap;\n}") {
 		t.Fatalf("expected task metadata rows to truncate instead of widening cards")
+	}
+	if !strings.Contains(css, ".task-meta > div + div::before {\n  content: \"|\";\n  position: absolute;\n  left: 4px;\n  color: var(--meta);\n}") {
+		t.Fatalf("expected task metadata rows to display inline separators on wider layouts")
+	}
+	if !strings.Contains(css, ".task-meta {\n    flex-direction: column;\n    align-items: flex-start;\n    gap: 4px;\n  }") {
+		t.Fatalf("expected task metadata rows to stack in compressed layouts")
 	}
 	if !strings.Contains(css, ".task-scroll {\n  scrollbar-width: thin;\n  scrollbar-color: var(--surface-scroll-thumb) rgba(17, 28, 42, 0.35);\n  overflow-x: hidden;\n}") {
 		t.Fatalf("expected task scroll containers to hide horizontal overflow")
