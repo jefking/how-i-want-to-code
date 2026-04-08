@@ -294,11 +294,23 @@
           <span id="agent-auth-url-text"></span>
         </a>
         <div id="agent-auth-browser-code" class="hidden space-y-2">
-          <label class="text-sm font-medium text-hub-text/85" for="agent-auth-browser-code-input">Paste Claude authentication code</label>
+          <div id="agent-auth-browser-commands" class="space-y-2">
+            <div class="text-sm text-hub-text/80">Run locally</div>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <div id="agent-auth-browser-command-primary" class="font-mono text-[1rem] tracking-[0.02em] text-hub-text">claude setup-token</div>
+              <button id="agent-auth-browser-command-primary-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
+            </div>
+            <div class="text-sm text-hub-text/80">If already signed in, paste credentials output</div>
+            <div class="flex flex-wrap items-center gap-2.5">
+              <div id="agent-auth-browser-command-secondary" class="font-mono text-[0.92rem] tracking-[0.01em] text-hub-text">if [ -f ~/.claude/.credentials.json ]; then cat ~/.claude/.credentials.json; else cat ~/.config/claude/.credentials.json; fi</div>
+              <button id="agent-auth-browser-command-secondary-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
+            </div>
+          </div>
+          <label class="text-sm font-medium text-hub-text/85" for="agent-auth-browser-code-input">Paste Claude authentication code, token, or credentials JSON</label>
           <textarea
             id="agent-auth-browser-code-input"
             class="prompt-text min-h-[96px] font-mono text-[0.9rem]"
-            placeholder="Paste the code from the Claude page"
+            placeholder="Paste browser code, token, or output of: cat ~/.claude/.credentials.json"
             spellcheck="false"></textarea>
           <p id="agent-auth-browser-code-error" class="hidden text-sm text-rose-200"></p>
         </div>
@@ -609,6 +621,10 @@
     const agentAuthCode = document.getElementById("agent-auth-code");
     const agentAuthCopy = document.getElementById("agent-auth-copy");
     const agentAuthBrowserCode = document.getElementById("agent-auth-browser-code");
+    const agentAuthBrowserCommandPrimary = document.getElementById("agent-auth-browser-command-primary");
+    const agentAuthBrowserCommandPrimaryCopy = document.getElementById("agent-auth-browser-command-primary-copy");
+    const agentAuthBrowserCommandSecondary = document.getElementById("agent-auth-browser-command-secondary");
+    const agentAuthBrowserCommandSecondaryCopy = document.getElementById("agent-auth-browser-command-secondary-copy");
     const agentAuthBrowserCodeInput = document.getElementById("agent-auth-browser-code-input");
     const agentAuthBrowserCodeError = document.getElementById("agent-auth-browser-code-error");
     const agentAuthConfigure = document.getElementById("agent-auth-configure");
@@ -1122,7 +1138,7 @@
     }
 
     function normalizeClaudeBrowserCode(raw) {
-      return String(raw || "").replace(/\s+/g, "");
+      return String(raw || "").trim();
     }
 
     function claudeBrowserCodeValue() {
@@ -1149,8 +1165,7 @@
 
     function syncAgentAuthBrowserCodeVisibility() {
       if (!agentAuthBrowserCode) return;
-      const showBrowserCode = isClaudePendingBrowserLoginState() &&
-        (!hasClaudeBrowserCodeBeenAccepted() || !state.agentAuthVerifyPending);
+      const showBrowserCode = isClaudePendingBrowserLoginState();
       agentAuthBrowserCode.classList.toggle("hidden", !showBrowserCode);
     }
 
@@ -1159,10 +1174,11 @@
       const requiresManualConfigure = isManualConfigureState();
       const hasCodeChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode);
       const meetsAuthInteractionRequirement = requiresManualConfigure || (!hasCodeChallenge || state.agentAuthInteracted);
+      const isClaudePending = isClaudePendingBrowserLoginState();
       const visible = state.agentAuth.required &&
         !state.agentAuth.ready &&
         meetsAuthInteractionRequirement &&
-        !state.agentAuthVerifyPending;
+        (!state.agentAuthVerifyPending || isClaudePending);
       agentAuthVerify.classList.toggle("hidden", !visible);
     }
 
@@ -1661,7 +1677,7 @@
     }
 
     async function verifyAgentDeviceAuth() {
-      if (state.agentAuthBusy || state.agentAuthVerifyPending) {
+      if (state.agentAuthBusy || (state.agentAuthVerifyPending && !isClaudePendingBrowserLoginState())) {
         return;
       }
       try {

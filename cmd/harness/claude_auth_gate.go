@@ -296,6 +296,11 @@ func (g *claudeAuthGate) Verify(ctx context.Context) (hubui.AgentAuthState, erro
 func (g *claudeAuthGate) Configure(_ context.Context, rawInput string) (hubui.AgentAuthState, error) {
 	status, _ := g.Status(context.Background())
 	if status.State == "pending_browser_login" {
+		if token := extractClaudeOAuthTokenFromInput(rawInput); token != "" {
+			g.completeWithClaudeOAuthToken(token)
+			state, _ := g.Status(context.Background())
+			return state, nil
+		}
 		return g.submitBrowserCode(rawInput)
 	}
 
@@ -354,7 +359,7 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 		if strings.TrimSpace(state.State) == "" {
 			state.State = "pending_browser_login"
 		}
-		state.Message = "Claude authentication code is required. Paste the code from the browser, then click Done."
+		state.Message = "Claude authentication input is required. Paste the browser code, token, or `~/.claude/.credentials.json` contents, then click Done."
 		return state, fmt.Errorf("claude authentication code is required")
 	}
 
@@ -398,7 +403,7 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 	g.mu.Lock()
 	if !g.ready {
 		g.state = "pending_browser_login"
-		g.message = "Claude authentication code received. Finish browser login in the opened page."
+		g.message = "Claude authentication code received. Finish browser login in the opened page, or paste `~/.claude/.credentials.json` if needed."
 		g.updatedAt = time.Now().UTC()
 	}
 	snap := g.snapshotLocked()
@@ -409,6 +414,79 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 
 func normalizeClaudeBrowserCode(raw string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+}
+
+func extractClaudeOAuthTokenFromInput(raw string) string {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return ""
+	}
+
+	fields := strings.Fields(raw)
+	if len(fields) == 1 && isLikelyClaudeOAuthToken(fields[0]) {
+		return fields[0]
+	}
+
+	var parsed any
+	if err := json.Unmarshal([]byte(raw), &parsed); err != nil {
+		return ""
+	}
+	return extractClaudeOAuthTokenFromJSONValue(parsed)
+}
+
+func extractClaudeOAuthTokenFromJSONValue(value any) string {
+	switch typed := value.(type) {
+	case string:
+		token := strings.TrimSpace(typed)
+		if isLikelyClaudeOAuthToken(token) {
+			return token
+		}
+		return ""
+	case map[string]any:
+		for _, key := range []string{
+			"accessToken",
+			"access_token",
+			"claude_code_oauth_token",
+			"oauth_token",
+		} {
+			if token := extractClaudeOAuthTokenFromJSONValue(typed[key]); token != "" {
+				return token
+			}
+		}
+		for _, key := range []string{
+			"claudeAiOauth",
+			"claude_ai_oauth",
+			"oauth",
+			"credentials",
+		} {
+			if token := extractClaudeOAuthTokenFromJSONValue(typed[key]); token != "" {
+				return token
+			}
+		}
+		for _, nested := range typed {
+			if token := extractClaudeOAuthTokenFromJSONValue(nested); token != "" {
+				return token
+			}
+		}
+	case []any:
+		for _, nested := range typed {
+			if token := extractClaudeOAuthTokenFromJSONValue(nested); token != "" {
+				return token
+			}
+		}
+	}
+	return ""
+}
+
+func isLikelyClaudeOAuthToken(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" || strings.ContainsAny(value, " \t\r\n#") {
+		return false
+	}
+	if strings.HasPrefix(value, "sk-ant-") || strings.HasPrefix(value, "sk-") {
+		return true
+	}
+	return false
 }
 
 func normalizeClaudeBrowserCodeForSubmission(rawInput, authURL string) string {
@@ -779,7 +857,7 @@ func (g *claudeAuthGate) ingestLoginLine(line string) {
 		g.authURL = authURL
 		if !g.ready {
 			g.state = "pending_browser_login"
-			g.message = "Open the Claude login URL, complete sign-in, then click Done."
+			g.message = "Open the Claude login URL and complete sign-in. If needed, run `cat ~/.claude/.credentials.json` locally and paste it here, then click Done."
 		}
 		update = true
 	}

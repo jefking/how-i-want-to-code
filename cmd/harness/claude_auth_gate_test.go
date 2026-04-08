@@ -249,6 +249,53 @@ func TestClaudeAuthGateConfigurePersistsGitHubTokenAndEnvironment(t *testing.T) 
 	}
 }
 
+func TestClaudeAuthGateConfigureAcceptsCredentialsJSONInPendingState(t *testing.T) {
+	t.Setenv("GH_TOKEN", "ghp_ready")
+	t.Setenv("GITHUB_TOKEN", "ghp_ready")
+	t.Setenv(claudeOAuthTokenEnv, "")
+
+	path := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	g := &claudeAuthGate{
+		baseCtx:           context.Background(),
+		required:          true,
+		state:             "pending_browser_login",
+		message:           "auth pending",
+		procRunning:       true,
+		runtimeConfigPath: path,
+		initCfg: hub.InitConfig{
+			BaseURL:      "https://na.hub.molten.bot/v1",
+			AgentHarness: agentruntime.HarnessClaude,
+			GitHubToken:  "ghp_ready",
+		},
+		updatedAt: time.Now().UTC(),
+		logf:      func(string, ...any) {},
+	}
+
+	raw := `{"claudeAiOauth":{"accessToken":"sk-ant-oat01-manual-token-123456"}}`
+	status, err := g.Configure(context.Background(), raw)
+	if err != nil {
+		t.Fatalf("Configure() error = %v", err)
+	}
+	if !status.Ready {
+		t.Fatalf("status = %+v, want ready", status)
+	}
+	if got, want := os.Getenv(claudeOAuthTokenEnv), "sk-ant-oat01-manual-token-123456"; got != want {
+		t.Fatalf("%s = %q, want %q", claudeOAuthTokenEnv, got, want)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if got, want := doc["claude_code_oauth_token"], "sk-ant-oat01-manual-token-123456"; got != want {
+		t.Fatalf("claude_code_oauth_token = %#v, want %q", got, want)
+	}
+}
+
 func TestClaudeAuthGateStartDeviceAuthRunsLoginAndCapturesURL(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", "")
@@ -731,6 +778,15 @@ func TestClaudeAuthHelpers(t *testing.T) {
 
 	if got, want := normalizeClaudeBrowserCode("  code-from-\n claude \t browser  "), "code-from-claudebrowser"; got != want {
 		t.Fatalf("normalizeClaudeBrowserCode() = %q, want %q", got, want)
+	}
+	if got, want := extractClaudeOAuthTokenFromInput(`{"claudeAiOauth":{"accessToken":"sk-ant-oat01-json-token-123456"}}`), "sk-ant-oat01-json-token-123456"; got != want {
+		t.Fatalf("extractClaudeOAuthTokenFromInput(json) = %q, want %q", got, want)
+	}
+	if got, want := extractClaudeOAuthTokenFromInput("sk-ant-oat01-direct-token-123456"), "sk-ant-oat01-direct-token-123456"; got != want {
+		t.Fatalf("extractClaudeOAuthTokenFromInput(token) = %q, want %q", got, want)
+	}
+	if got := extractClaudeOAuthTokenFromInput("browserCodeWithoutPrefix#state-xyz"); got != "" {
+		t.Fatalf("extractClaudeOAuthTokenFromInput(browser-code) = %q, want empty", got)
 	}
 	if got, want := extractClaudeAuthStateFromURL("https://claude.ai/oauth/authorize?code=true&state=abc123"), "abc123"; got != want {
 		t.Fatalf("extractClaudeAuthStateFromURL() = %q, want %q", got, want)
