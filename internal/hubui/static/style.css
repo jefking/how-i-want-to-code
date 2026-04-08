@@ -1760,10 +1760,6 @@ select.prompt-control {
 }
 
 @media (max-width: 640px) {
-  :root {
-    --hub-studio-dock-height: min(388px, calc(100dvh - 212px));
-  }
-
   .prompt-actions {
     flex-wrap: wrap;
     gap: 6px;
@@ -1792,6 +1788,10 @@ select.prompt-control {
   .prompt-action-button {
     flex: 1 1 0;
     min-inline-size: 0;
+  }
+
+  :root {
+    --hub-studio-dock-height: min(388px, calc(100dvh - 212px));
   }
 
   .app {
