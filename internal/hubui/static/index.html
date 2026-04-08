@@ -8,7 +8,7 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Instrument+Sans:wght@400;500;600;700&family=Sora:wght@600;700;800&display=swap">
   <script>
-    window.__HUB_UI_CONFIG__ = {"automaticMode":false};
+    window.__HUB_UI_CONFIG__ = {"automaticMode":false,"configuredHarness":"codex","configuredAgentLabel":"Codex"};
   </script>
   <script>
     tailwind.config = {
@@ -59,7 +59,7 @@
           alt="MoltenHub logo">
         <div>
           <div class="title text-[1.4rem] font-bold uppercase tracking-[0.04em]">Molten Hub Code</div>
-          <div class="sub text-sm text-hub-muted">Codex is now a 300LB Gorilla</div>
+          <div id="configured-agent-subtitle" class="sub text-sm text-hub-muted">Configured agent: Codex</div>
         </div>
       </div>
       <div class="status-row flex flex-wrap items-center gap-2.5 text-sm text-hub-muted">
@@ -318,7 +318,21 @@
       const config = raw && typeof raw === "object" ? raw : {};
       return {
         automaticMode: Boolean(config.automaticMode),
+        configuredHarness: String(config.configuredHarness || "").trim() || "codex",
+        configuredAgentLabel: String(config.configuredAgentLabel || "").trim() || "Codex",
       };
+    }
+
+    function configuredAgentLabel() {
+      return String(state.ui.configuredAgentLabel || "Codex").trim() || "Codex";
+    }
+
+    function currentAgentLabel() {
+      const harness = String(state.agentAuth.harness || "").trim();
+      if (harness) {
+        return agentAuthLabel(harness);
+      }
+      return configuredAgentLabel();
     }
 
     function normalizeAgentAuth(raw) {
@@ -506,6 +520,7 @@
     const promptWrap = document.querySelector(".prompt-wrap");
     const promptVisibilityToggle = document.getElementById("prompt-visibility-toggle");
     const agentAuthGate = document.getElementById("agent-auth-gate");
+    const configuredAgentSubtitle = document.getElementById("configured-agent-subtitle");
     const agentAuthTitle = document.getElementById("agent-auth-title");
     const agentAuthMessage = document.getElementById("agent-auth-message");
     const agentAuthDetails = document.getElementById("agent-auth-details");
@@ -781,6 +796,13 @@
       updateAgentAuthDoneVisibility();
     }
 
+    function renderConfiguredAgent() {
+      const label = configuredAgentLabel();
+      if (configuredAgentSubtitle) {
+        configuredAgentSubtitle.textContent = `Configured agent: ${label}`;
+      }
+    }
+
     function setAgentAuthVerifyPending(pending) {
       state.agentAuthVerifyPending = Boolean(pending);
       updateAgentAuthDoneVisibility();
@@ -788,6 +810,7 @@
 
     function applyAgentAuthGate(auth) {
       state.agentAuth = normalizeAgentAuth(auth);
+      renderConfiguredAgent();
       const gateVisible = state.agentAuth.required && !state.agentAuth.ready;
       const challengeKey = `${state.agentAuth.deviceCode}|${state.agentAuth.authURL}`;
 
@@ -805,7 +828,7 @@
         agentAuthGate.classList.toggle("flex", gateVisible);
       }
       if (agentAuthTitle) {
-        agentAuthTitle.textContent = `Authorize ${agentAuthLabel(state.agentAuth.harness)} to get started`;
+        agentAuthTitle.textContent = `Authorize ${currentAgentLabel()} to get started`;
       }
       if (agentAuthMessage) {
         agentAuthMessage.textContent = state.agentAuth.message || "";
@@ -930,7 +953,7 @@
         const auth = await requestAgentAuth("/api/agent-auth/verify", "POST");
         applyAgentAuthGate(auth);
         if (auth.ready) {
-          setLocalPromptStatus("ok", `${agentAuthLabel(auth.harness)} auth is ready.`);
+          setLocalPromptStatus("ok", `${currentAgentLabel()} auth is ready.`);
         } else if (auth.state === "needs_device_auth") {
           setAgentAuthVerifyPending(false);
           await startAgentDeviceAuth();
@@ -2769,7 +2792,7 @@
     async function submitLocalPrompt(event) {
       event.preventDefault();
       if (state.agentAuth.required && !state.agentAuth.ready) {
-        setLocalPromptStatus("error", `${agentAuthLabel(state.agentAuth.harness)} auth is required. Complete the authorization screen first.`);
+        setLocalPromptStatus("error", `${currentAgentLabel()} auth is required. Complete the authorization screen first.`);
         return;
       }
       let normalized = null;
@@ -2954,6 +2977,7 @@
     initSnowfallBackground();
     setPromptMode(state.promptMode);
     applyPromptVisibility();
+    renderConfiguredAgent();
     applyAgentAuthGate(state.agentAuth);
     loadInitial();
     startStream();

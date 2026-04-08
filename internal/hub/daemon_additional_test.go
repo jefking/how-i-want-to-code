@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"net"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"testing"
@@ -306,6 +307,69 @@ func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *test
 	}
 }
 
+func TestHandleDispatchQueuesFailureFollowUpWithTaskLogPaths(t *testing.T) {
+	t.Parallel()
+
+	logRoot := filepath.Join("/tmp", ".log")
+	d := NewDaemon(failingRunner{err: errors.New("runner exploded")})
+	d.TaskLogRoot = logRoot
+	api := &stubMoltenHubAPI{token: "t"}
+	cfg := InitConfig{
+		Skill: SkillConfig{
+			Name:         "code_for_me",
+			DispatchType: "skill_request",
+			ResultType:   "skill_result",
+		},
+	}
+
+	runCfg := config.Config{
+		Repo:       "git@github.com:acme/repo.git",
+		BaseBranch: "release",
+		Prompt:     "fix failing checks",
+	}
+	runCfg.ApplyDefaults()
+
+	d.handleDispatch(
+		context.Background(),
+		api,
+		cfg,
+		SkillDispatch{
+			RequestID: "req-follow-up-logs",
+			Skill:     "code_for_me",
+			Config:    runCfg,
+		},
+		"",
+		false,
+	)
+
+	api.mu.Lock()
+	defer api.mu.Unlock()
+
+	if got, want := len(api.published), 2; got != want {
+		t.Fatalf("published payload count = %d, want %d", got, want)
+	}
+
+	followUpPayload := api.published[1]
+	runConfig, _ := followUpPayload["config"].(map[string]any)
+	if runConfig == nil {
+		t.Fatalf("follow-up config missing: %#v", followUpPayload)
+	}
+	prompt, _ := runConfig["prompt"].(string)
+	expectedLogDir := filepath.Join(logRoot, "req", "follow", "up", "logs")
+	for _, path := range []string{
+		expectedLogDir,
+		filepath.Join(expectedLogDir, "term"),
+		filepath.Join(expectedLogDir, "terminal.log"),
+	} {
+		if !strings.Contains(prompt, path) {
+			t.Fatalf("follow-up prompt missing task log path %q: %q", path, prompt)
+		}
+	}
+	if strings.Contains(prompt, failureFollowUpNoPathGuidance) {
+		t.Fatalf("follow-up prompt should prefer concrete task log paths when available: %q", prompt)
+	}
+}
+
 func TestHandleDispatchSkipsFailureFollowUpForNoDeltaFailures(t *testing.T) {
 	t.Parallel()
 
@@ -380,7 +444,7 @@ func TestFailureFollowUpPromptIncludesWorkspaceAndTargetPath(t *testing.T) {
 		}},
 	}
 
-	prompt := failureFollowUpPrompt(SkillDispatch{
+	prompt := failureFollowUpPrompt("", SkillDispatch{
 		RequestID: "req-123",
 		Config:    runCfg,
 	}, result)
