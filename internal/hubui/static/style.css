@@ -2314,12 +2314,6 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
 }
 
 @media (max-width: 700px) {
-  :root {
-    --hub-floating-bottom: max(12px, env(safe-area-inset-bottom));
-    --hub-floating-stack-height: 128px;
-    --hub-studio-dock-gap: 12px;
-  }
-
   .page-bottom-dock {
     bottom: max(12px, env(safe-area-inset-bottom));
     max-width: calc(100vw - 24px);
@@ -2342,6 +2336,12 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
 
   .theme-cycle-button {
     min-width: 104px;
+  }
+
+  :root {
+    --hub-floating-bottom: max(12px, env(safe-area-inset-bottom));
+    --hub-floating-stack-height: 128px;
+    --hub-studio-dock-gap: 12px;
   }
 
   .page-bottom-dock {
