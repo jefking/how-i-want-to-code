@@ -420,6 +420,7 @@
       taskFullscreenOpen: false,
       agentAuthBusy: false,
       agentAuthInteracted: false,
+      agentAuthVerifyPending: false,
       agentAuthChallengeKey: "",
     };
     let agentAuthRefreshTimer = null;
@@ -751,13 +752,19 @@
       if (!agentAuthVerify) return;
       const visible = state.agentAuth.required &&
         !state.agentAuth.ready &&
-        state.agentAuthInteracted;
+        state.agentAuthInteracted &&
+        !state.agentAuthVerifyPending;
       agentAuthVerify.classList.toggle("hidden", !visible);
     }
 
     function markAgentAuthInteraction() {
       if (state.agentAuthInteracted) return;
       state.agentAuthInteracted = true;
+      updateAgentAuthDoneVisibility();
+    }
+
+    function setAgentAuthVerifyPending(pending) {
+      state.agentAuthVerifyPending = Boolean(pending);
       updateAgentAuthDoneVisibility();
     }
 
@@ -769,6 +776,10 @@
       if (state.agentAuthChallengeKey !== challengeKey) {
         state.agentAuthChallengeKey = challengeKey;
         state.agentAuthInteracted = false;
+        state.agentAuthVerifyPending = false;
+      }
+      if (!gateVisible) {
+        state.agentAuthVerifyPending = false;
       }
 
       if (agentAuthGate) {
@@ -874,6 +885,7 @@
     }
 
     async function startAgentDeviceAuth() {
+      setAgentAuthVerifyPending(false);
       setAgentAuthBusy(true);
       try {
         const auth = await requestAgentAuth("/api/agent-auth/start-device", "POST");
@@ -886,6 +898,8 @@
     }
 
     async function verifyAgentDeviceAuth() {
+      markAgentAuthInteraction();
+      setAgentAuthVerifyPending(true);
       setAgentAuthBusy(true);
       try {
         const auth = await requestAgentAuth("/api/agent-auth/verify", "POST");
@@ -893,9 +907,13 @@
         if (auth.ready) {
           setLocalPromptStatus("ok", "Codex auth is ready.");
         } else if (auth.state === "needs_device_auth") {
+          setAgentAuthVerifyPending(false);
           await startAgentDeviceAuth();
+        } else {
+          setAgentAuthVerifyPending(false);
         }
       } catch (err) {
+        setAgentAuthVerifyPending(false);
         return;
       } finally {
         setAgentAuthBusy(false);

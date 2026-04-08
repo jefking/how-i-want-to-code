@@ -409,3 +409,33 @@ func TestHeaderStatusStylesStayReadable(t *testing.T) {
 		t.Fatalf("expected status row to stay on one line through mobile widths")
 	}
 }
+
+func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.Code)
+	}
+
+	html := resp.Body.String()
+	if !strings.Contains(html, "agentAuthVerifyPending: false") {
+		t.Fatalf("expected auth gate state to track pending verification")
+	}
+	if !strings.Contains(html, "!state.agentAuthVerifyPending;") {
+		t.Fatalf("expected Done button visibility to depend on pending verification state")
+	}
+	if !strings.Contains(html, "function setAgentAuthVerifyPending(pending)") {
+		t.Fatalf("expected helper to toggle pending verification state")
+	}
+	if !strings.Contains(html, "setAgentAuthVerifyPending(true);") {
+		t.Fatalf("expected verify action to hide Done button before verification completes")
+	}
+	if !strings.Contains(html, "setAgentAuthVerifyPending(false);") {
+		t.Fatalf("expected verify action to restore Done button after failed verification")
+	}
+}
