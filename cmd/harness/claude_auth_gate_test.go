@@ -11,6 +11,7 @@ import (
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
 	"github.com/jef/moltenhub-code/internal/hub"
+	"github.com/jef/moltenhub-code/internal/hubui"
 )
 
 func TestClaudeAuthGateRequiresGitHubConfigureWhenTokenIsMissing(t *testing.T) {
@@ -390,6 +391,9 @@ exit 1
 	if got, want := status.State, "pending_browser_login"; got != want {
 		t.Fatalf("Configure() state = %q, want %q", got, want)
 	}
+	if strings.Contains(strings.ToLower(status.Message), "click done") {
+		t.Fatalf("Configure() message = %q, want no manual Done instruction after code submission", status.Message)
+	}
 
 	waitForCondition(t, 5*time.Second, func() bool {
 		data, err := os.ReadFile(capturedPath)
@@ -459,7 +463,14 @@ sleep 30
 		return string(data) == submittedCode
 	})
 
-	status, err := g.Verify(context.Background())
+	var (
+		status hubui.AgentAuthState
+		err    error
+	)
+	waitForCondition(t, 5*time.Second, func() bool {
+		status, err = g.Verify(context.Background())
+		return err == nil && status.Ready
+	})
 	if err != nil {
 		t.Fatalf("Verify() error = %v", err)
 	}

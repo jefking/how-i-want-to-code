@@ -627,6 +627,9 @@ func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
 	if !strings.Contains(html, "(!requiresClaudeBrowserCode || hasClaudeBrowserCode)") {
 		t.Fatalf("expected Done button visibility to require Claude browser code when needed")
 	}
+	if !strings.Contains(html, "!claudeBrowserCodeSubmitted") {
+		t.Fatalf("expected Done button to stay hidden after Claude browser code submission is acknowledged")
+	}
 	if !strings.Contains(html, "claude_auth_code: code") {
 		t.Fatalf("expected Claude browser code configure payload support in auth UI")
 	}

@@ -991,9 +991,11 @@
       const hasCodeChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode);
       const requiresClaudeBrowserCode = isClaudeBrowserCodeAwaitingSubmission();
       const hasClaudeBrowserCode = claudeBrowserCodeValue() !== "";
+      const claudeBrowserCodeSubmitted = hasClaudeBrowserCodeBeenAccepted();
       const meetsAuthInteractionRequirement = requiresManualConfigure || (!hasCodeChallenge || state.agentAuthInteracted);
       const visible = state.agentAuth.required &&
         !state.agentAuth.ready &&
+        !claudeBrowserCodeSubmitted &&
         meetsAuthInteractionRequirement &&
         (!requiresClaudeBrowserCode || hasClaudeBrowserCode) &&
         !state.agentAuthVerifyPending;
