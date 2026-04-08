@@ -316,6 +316,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "const taskFullscreenClose = document.getElementById(\"task-fullscreen-close\");") {
 		t.Fatalf("expected index html to cache the dedicated full screen close control")
 	}
+	if !strings.Contains(markup, "renderTaskCollection(tasks, taskFullscreenList, null, {") {
+		t.Fatalf("expected index html to render the full task list in fullscreen mode")
+	}
+	if strings.Contains(markup, "renderTaskCollection(selected ? [selected] : [], taskFullscreenList, null, {") {
+		t.Fatalf("expected index html to stop collapsing fullscreen mode to a single selected task")
+	}
 	if !strings.Contains(markup, "taskFullscreenClose.classList.toggle(\"hidden\", !state.taskFullscreenOpen);") {
 		t.Fatalf("expected index html to toggle dedicated full screen close visibility")
 	}
@@ -808,6 +814,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".task-fullscreen-toggle {\n  width: 32px;\n  height: 32px;") {
 		t.Fatalf("expected stylesheet to size the task full screen control as a compact icon affordance")
+	}
+	if !strings.Contains(css, ".task-fullscreen-toggle {\n  display: inline-flex;\n  width: 32px;\n  height: 32px;") {
+		t.Fatalf("expected stylesheet to center the task full screen icon with inline-flex button layout")
 	}
 	if !strings.Contains(css, "background: transparent;") || !strings.Contains(css, "border: 0;") {
 		t.Fatalf("expected stylesheet to remove button chrome from the task full screen control")
