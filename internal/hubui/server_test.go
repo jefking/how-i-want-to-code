@@ -854,7 +854,7 @@ func TestHandlerIndexIncludesClaudeBrowserCodeFlow(t *testing.T) {
 		`function authHarness(auth) {`,
 		`return configuredHarnessName();`,
 		`function isClaudeBrowserCodeAwaitingSubmission(auth) {`,
-		`const showBrowserCode = isClaudeBrowserCodeState() && state.agentAuthInteracted;`,
+		`const showBrowserCode = isClaudePendingBrowserLoginState() &&`,
 		`const useClaudeLogoLink = authHarness(state.agentAuth) === "claude" && authURL !== "";`,
 		`const code = claudeBrowserCodeValue();`,
 		`agentAuthURL.addEventListener("click", markAgentAuthInteraction);`,

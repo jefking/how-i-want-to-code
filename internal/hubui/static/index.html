@@ -370,6 +370,8 @@
     const TASK_PR_LINK_SIZE_PX = "34px";
     const TASK_PR_LOGO_SIZE = 20;
     const CLAUDE_AUTH_LOGO_URL = "/static/logos/claude-code.svg";
+    const CLAUDE_POST_SUBMIT_VERIFY_INTERVAL_MS = 1200;
+    const CLAUDE_POST_SUBMIT_VERIFY_MAX_ATTEMPTS = 25;
 
     function normalizeUIConfig(raw) {
       const config = raw && typeof raw === "object" ? raw : {};
@@ -422,6 +424,7 @@
         message: String(auth.message || "").trim(),
         authURL: String(auth.auth_url || auth.authURL || "").trim(),
         deviceCode: String(auth.device_code || auth.deviceCode || "").trim(),
+        acceptsBrowserCode: Boolean(auth.accepts_browser_code || auth.acceptsBrowserCode),
         configureCommand: String(auth.configure_command || auth.configureCommand || "").trim(),
         configurePlaceholder: String(auth.configure_placeholder || auth.configurePlaceholder || "").trim(),
         updatedAt: String(auth.updated_at || auth.updatedAt || "").trim(),
@@ -531,6 +534,9 @@
     };
     let agentAuthRefreshTimer = null;
     let agentAuthAutoSubmitTimer = null;
+    let claudePostSubmitVerifyTimer = null;
+    let claudePostSubmitVerifyInFlight = false;
+    let claudePostSubmitVerifyAttempts = 0;
     let pendingStreamSnapshotText = "";
     let streamRenderTimer = null;
 
@@ -913,6 +919,73 @@
       agentAuthAutoSubmitTimer = null;
     }
 
+    function clearClaudePostSubmitVerifyTimer() {
+      if (claudePostSubmitVerifyTimer === null) {
+        return;
+      }
+      clearTimeout(claudePostSubmitVerifyTimer);
+      claudePostSubmitVerifyTimer = null;
+    }
+
+    function shouldPollClaudePostSubmitVerify(auth) {
+      const current = auth && typeof auth === "object" ? auth : state.agentAuth;
+      return !current.ready && hasClaudeBrowserCodeBeenAccepted(current);
+    }
+
+    function stopClaudePostSubmitVerifyPolling() {
+      clearClaudePostSubmitVerifyTimer();
+      claudePostSubmitVerifyAttempts = 0;
+      claudePostSubmitVerifyInFlight = false;
+    }
+
+    function scheduleClaudePostSubmitVerifyPolling() {
+      if (!shouldPollClaudePostSubmitVerify()) {
+        stopClaudePostSubmitVerifyPolling();
+        return;
+      }
+      if (claudePostSubmitVerifyInFlight || claudePostSubmitVerifyTimer !== null) {
+        return;
+      }
+      if (claudePostSubmitVerifyAttempts >= CLAUDE_POST_SUBMIT_VERIFY_MAX_ATTEMPTS) {
+        stopClaudePostSubmitVerifyPolling();
+        setAgentAuthVerifyPending(false);
+        setLocalPromptStatus("warn", `${currentAgentLabel()} login is still pending. You can paste the code again and click Done.`);
+        return;
+      }
+
+      claudePostSubmitVerifyTimer = window.setTimeout(async () => {
+        claudePostSubmitVerifyTimer = null;
+        if (!shouldPollClaudePostSubmitVerify()) {
+          stopClaudePostSubmitVerifyPolling();
+          return;
+        }
+        if (claudePostSubmitVerifyInFlight) {
+          return;
+        }
+
+        claudePostSubmitVerifyInFlight = true;
+        try {
+          const verified = await requestAgentAuth("/api/agent-auth/verify", "POST");
+          applyAgentAuthGate(verified);
+          if (verified.ready) {
+            setAgentAuthVerifyPending(false);
+            setLocalPromptStatus("ok", `${currentAgentLabel()} auth is ready.`);
+            stopClaudePostSubmitVerifyPolling();
+            return;
+          }
+          claudePostSubmitVerifyAttempts += 1;
+          scheduleClaudePostSubmitVerifyPolling();
+        } catch (err) {
+          const message = err && err.message ? err.message : "device auth verify failed";
+          stopClaudePostSubmitVerifyPolling();
+          setAgentAuthVerifyPending(false);
+          setLocalPromptStatus("error", `${currentAgentLabel()} auth verify failed: ${message}`);
+        } finally {
+          claudePostSubmitVerifyInFlight = false;
+        }
+      }, CLAUDE_POST_SUBMIT_VERIFY_INTERVAL_MS);
+    }
+
     function shouldAutoSubmitClaudeBrowserCode(code) {
       return String(code || "").trim().length >= 20;
     }
@@ -1012,7 +1085,7 @@
       return configuredHarnessName();
     }
 
-    function isClaudeBrowserCodeState(auth) {
+    function isClaudePendingBrowserLoginState(auth) {
       const current = auth && typeof auth === "object" ? auth : state.agentAuth;
       const harness = authHarness(current);
       if (harness !== "claude" || isManualConfigureState(current)) {
@@ -1025,9 +1098,19 @@
       return String(current?.authURL || "").trim() !== "";
     }
 
+    function isClaudeBrowserCodeState(auth) {
+      const current = auth && typeof auth === "object" ? auth : state.agentAuth;
+      return isClaudePendingBrowserLoginState(current) && Boolean(current?.acceptsBrowserCode);
+    }
+
     function hasClaudeBrowserCodeBeenAccepted(auth) {
       const current = auth && typeof auth === "object" ? auth : state.agentAuth;
-      if (!isClaudeBrowserCodeState(current)) {
+      const harness = authHarness(current);
+      if (harness !== "claude" || isManualConfigureState(current)) {
+        return false;
+      }
+      const gateState = String(current?.state || "").trim().toLowerCase();
+      if (gateState !== "pending_browser_login") {
         return false;
       }
       const message = String(current?.message || "").trim().toLowerCase();
@@ -1066,7 +1149,8 @@
 
     function syncAgentAuthBrowserCodeVisibility() {
       if (!agentAuthBrowserCode) return;
-      const showBrowserCode = isClaudeBrowserCodeState() && state.agentAuthInteracted;
+      const showBrowserCode = isClaudePendingBrowserLoginState() &&
+        (!hasClaudeBrowserCodeBeenAccepted() || !state.agentAuthVerifyPending);
       agentAuthBrowserCode.classList.toggle("hidden", !showBrowserCode);
     }
 
@@ -1176,6 +1260,7 @@
         state.agentAuthVerifyPending = false;
         state.agentAuthBrowserCode = "";
         state.agentAuthLastAutoSubmittedCode = "";
+        stopClaudePostSubmitVerifyPolling();
         clearAgentAuthAutoSubmitTimer();
         if (agentAuthBrowserCodeInput) {
           agentAuthBrowserCodeInput.value = "";
@@ -1184,6 +1269,9 @@
       }
       if (!isClaudeBrowserCodeState(state.agentAuth)) {
         clearAgentAuthAutoSubmitTimer();
+      }
+      if (!shouldPollClaudePostSubmitVerify(state.agentAuth)) {
+        stopClaudePostSubmitVerifyPolling();
       }
 
       if (agentAuthGate) {
@@ -1273,13 +1361,17 @@
       if (!requiresManualConfigure) {
         setAuggieConfigureError("");
       }
-      if (!isClaudeBrowserCodeState(state.agentAuth)) {
+      if (!isClaudePendingBrowserLoginState(state.agentAuth)) {
         setAgentAuthBrowserCodeError("");
       }
 
       syncAgentAuthBrowserCodeVisibility();
       updateAgentAuthDoneVisibility();
       scheduleClaudeBrowserCodeAutoSubmit();
+      if (shouldPollClaudePostSubmitVerify(state.agentAuth)) {
+        setAgentAuthVerifyPending(true);
+        scheduleClaudePostSubmitVerifyPolling();
+      }
       if (localPromptSubmit) {
         const submitDisabled = state.agentAuthBusy || (state.agentAuth.required && !state.agentAuth.ready);
         localPromptSubmit.disabled = submitDisabled;
@@ -1472,16 +1564,20 @@
           setAgentAuthBrowserCodeError("");
           state.agentAuthBrowserCode = "";
           state.agentAuthLastAutoSubmittedCode = "";
+          stopClaudePostSubmitVerifyPolling();
           if (agentAuthBrowserCodeInput) {
             agentAuthBrowserCodeInput.value = "";
           }
           setLocalPromptStatus("ok", `${currentAgentLabel()} auth is ready.`);
         } else {
-          setAgentAuthVerifyPending(false);
-          setLocalPromptStatus("warn", `${currentAgentLabel()} login is still pending. You can paste the code again and click Done.`);
+          setAgentAuthVerifyPending(true);
+          claudePostSubmitVerifyAttempts = 0;
+          scheduleClaudePostSubmitVerifyPolling();
+          setLocalPromptStatus("warn", `${currentAgentLabel()} code submitted. Waiting for browser authentication to finish...`);
         }
       } catch (err) {
         const message = err && err.message ? err.message : "Claude code submission failed.";
+        stopClaudePostSubmitVerifyPolling();
         setAgentAuthVerifyPending(false);
         setAgentAuthBrowserCodeError(message);
         setLocalPromptStatus("error", `${currentAgentLabel()} configure failed: ${message}`);
@@ -1578,7 +1674,7 @@
           await configureClaudeGitHubToken();
           return;
         }
-        if (isClaudeBrowserCodeState()) {
+        if (isClaudePendingBrowserLoginState()) {
           const code = claudeBrowserCodeValue();
           if (code !== "") {
             await configureClaudeBrowserCode();

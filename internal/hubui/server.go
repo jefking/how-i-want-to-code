@@ -56,6 +56,7 @@ type AgentAuthState struct {
 	Message              string `json:"message,omitempty"`
 	AuthURL              string `json:"auth_url,omitempty"`
 	DeviceCode           string `json:"device_code,omitempty"`
+	AcceptsBrowserCode   bool   `json:"accepts_browser_code,omitempty"`
 	ConfigureCommand     string `json:"configure_command,omitempty"`
 	ConfigurePlaceholder string `json:"configure_placeholder,omitempty"`
 	UpdatedAt            string `json:"updated_at,omitempty"`

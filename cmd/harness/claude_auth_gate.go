@@ -45,10 +45,13 @@ type claudeAuthGate struct {
 	authURL   string
 	updatedAt time.Time
 
-	procRunning       bool
-	procCancel        context.CancelFunc
-	procInput         io.WriteCloser
-	lastPromptAdvance time.Time
+	procRunning           bool
+	procCancel            context.CancelFunc
+	procInput             io.WriteCloser
+	lastPromptAdvance     time.Time
+	pendingBrowserCode    string
+	lastBrowserSubmit     time.Time
+	browserSubmitAttempts int
 }
 
 func newClaudeAuthGate(ctx context.Context, command string, logf func(string, ...any)) *claudeAuthGate {
@@ -186,7 +189,7 @@ func (g *claudeAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthStat
 	}
 
 	procCtx, cancel := context.WithCancel(baseCtx)
-	cmd := exec.CommandContext(procCtx, command, "auth", "login")
+	cmd := buildClaudeLoginCommand(procCtx, command)
 	cmd.Dir = tmpDir
 
 	stdoutPipe, err := cmd.StdoutPipe()
@@ -279,6 +282,7 @@ func (g *claudeAuthGate) Verify(ctx context.Context) (hubui.AgentAuthState, erro
 		if snap, ok := g.completePendingBrowserLoginIfReady(); ok {
 			return snap, nil
 		}
+		g.resubmitPendingBrowserCode()
 		g.advanceLoginPrompt()
 		return status, nil
 	}
@@ -330,8 +334,19 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 		}, nil
 	}
 
-	code := normalizeClaudeBrowserCode(rawInput)
-	if code == "" {
+	var (
+		input   io.WriteCloser
+		authURL string
+	)
+	g.mu.Lock()
+	if g.procRunning && g.procInput != nil {
+		input = g.procInput
+	}
+	authURL = strings.TrimSpace(g.authURL)
+	g.mu.Unlock()
+
+	code := normalizeClaudeBrowserCodeForSubmission(rawInput, authURL)
+	if strings.TrimSpace(code) == "" {
 		state, _ := g.Status(context.Background())
 		if strings.TrimSpace(state.State) == "" {
 			state.State = "pending_browser_login"
@@ -340,11 +355,9 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 		return state, fmt.Errorf("claude authentication code is required")
 	}
 
-	var input io.WriteCloser
 	g.mu.Lock()
-	if g.procRunning && g.procInput != nil {
-		input = g.procInput
-	}
+	g.pendingBrowserCode = code
+	g.browserSubmitAttempts = 0
 	g.mu.Unlock()
 
 	if input == nil {
@@ -371,9 +384,13 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 		return snap, err
 	}
 	g.logf(
-		"hub.auth status=progress harness=claude action=submit_browser_code chars=%d",
+		"hub.auth status=progress harness=claude action=submit_browser_code chars=%d has_state=%t",
 		len(code),
+		strings.Contains(code, "#"),
 	)
+	g.mu.Lock()
+	g.lastBrowserSubmit = time.Now().UTC()
+	g.mu.Unlock()
 
 	g.mu.Lock()
 	if !g.ready {
@@ -389,6 +406,62 @@ func (g *claudeAuthGate) submitBrowserCode(rawInput string) (hubui.AgentAuthStat
 
 func normalizeClaudeBrowserCode(raw string) string {
 	return strings.Join(strings.Fields(strings.TrimSpace(raw)), "")
+}
+
+func normalizeClaudeBrowserCodeForSubmission(rawInput, authURL string) string {
+	normalized := normalizeClaudeBrowserCode(rawInput)
+	if normalized == "" {
+		return ""
+	}
+	if strings.Contains(normalized, "#") {
+		return normalized
+	}
+
+	if code, state := extractClaudeAuthCodeAndState(normalized); code != "" {
+		if state == "" {
+			state = extractClaudeAuthStateFromURL(authURL)
+		}
+		if state != "" {
+			return code + "#" + state
+		}
+		return code
+	}
+
+	state := extractClaudeAuthStateFromURL(authURL)
+	if state == "" {
+		return normalized
+	}
+	return normalized + "#" + state
+}
+
+func extractClaudeAuthCodeAndState(raw string) (code string, state string) {
+	raw = strings.TrimSpace(raw)
+	if raw == "" {
+		return "", ""
+	}
+	if parsed, err := url.Parse(raw); err == nil && parsed != nil {
+		parsedCode := strings.TrimSpace(parsed.Query().Get("code"))
+		parsedState := strings.TrimSpace(parsed.Query().Get("state"))
+		if parsedCode != "" {
+			return parsedCode, parsedState
+		}
+	}
+	if !strings.Contains(raw, "=") || !strings.Contains(raw, "&") {
+		return "", ""
+	}
+	values, err := url.ParseQuery(raw)
+	if err != nil {
+		return "", ""
+	}
+	return strings.TrimSpace(values.Get("code")), strings.TrimSpace(values.Get("state"))
+}
+
+func extractClaudeAuthStateFromURL(raw string) string {
+	parsed, err := url.Parse(strings.TrimSpace(raw))
+	if err != nil || parsed == nil {
+		return ""
+	}
+	return strings.TrimSpace(parsed.Query().Get("state"))
 }
 
 func (g *claudeAuthGate) completePendingBrowserLoginIfReady() (hubui.AgentAuthState, bool) {
@@ -413,6 +486,8 @@ func (g *claudeAuthGate) completePendingBrowserLoginIfReady() (hubui.AgentAuthSt
 	g.state = "ready"
 	g.message = "Claude Code and GitHub token are ready."
 	g.authURL = ""
+	g.pendingBrowserCode = ""
+	g.browserSubmitAttempts = 0
 	g.procRunning = false
 	g.procCancel = nil
 	g.procInput = nil
@@ -454,6 +529,51 @@ func (g *claudeAuthGate) advanceLoginPrompt() {
 	}
 }
 
+func (g *claudeAuthGate) resubmitPendingBrowserCode() {
+	if g == nil {
+		return
+	}
+
+	var (
+		input      io.WriteCloser
+		code       string
+		attempt    int
+		altVariant bool
+	)
+	g.mu.Lock()
+	if g.procRunning && g.procInput != nil {
+		now := time.Now().UTC()
+		if now.Sub(g.lastBrowserSubmit) >= 1200*time.Millisecond {
+			input = g.procInput
+			code = strings.TrimSpace(g.pendingBrowserCode)
+			g.lastBrowserSubmit = now
+			attempt = g.browserSubmitAttempts
+			g.browserSubmitAttempts++
+			if strings.Contains(code, "#") && attempt%2 == 1 {
+				if rawCode, _, ok := strings.Cut(code, "#"); ok {
+					code = strings.TrimSpace(rawCode)
+					altVariant = true
+				}
+			}
+		}
+	}
+	g.mu.Unlock()
+
+	if input == nil || code == "" {
+		return
+	}
+	if _, err := io.WriteString(input, code+"\n"); err != nil {
+		g.logf("hub.auth status=warn harness=claude action=resubmit_browser_code err=%q", err)
+		return
+	}
+	g.logf(
+		"hub.auth status=progress harness=claude action=resubmit_browser_code chars=%d attempt=%d variant=%s",
+		len(code),
+		attempt+1,
+		map[bool]string{true: "code_only", false: "full"}[altVariant],
+	)
+}
+
 func (g *claudeAuthGate) snapshotLocked() hubui.AgentAuthState {
 	state := strings.TrimSpace(g.state)
 	if state == "" {
@@ -469,14 +589,46 @@ func (g *claudeAuthGate) snapshotLocked() hubui.AgentAuthState {
 		required = true
 	}
 	return hubui.AgentAuthState{
-		Harness:   agentruntime.HarnessClaude,
-		Required:  required,
-		Ready:     g.ready,
-		State:     state,
-		Message:   strings.TrimSpace(g.message),
-		AuthURL:   authURL,
-		UpdatedAt: g.updatedAt.UTC().Format(time.RFC3339Nano),
+		Harness:            agentruntime.HarnessClaude,
+		Required:           required,
+		Ready:              g.ready,
+		State:              state,
+		Message:            strings.TrimSpace(g.message),
+		AuthURL:            authURL,
+		AcceptsBrowserCode: claudeAuthURLAcceptsBrowserCode(authURL),
+		UpdatedAt:          g.updatedAt.UTC().Format(time.RFC3339Nano),
 	}
+}
+
+func claudeAuthURLAcceptsBrowserCode(authURL string) bool {
+	authURL = strings.TrimSpace(authURL)
+	if authURL == "" {
+		return false
+	}
+	parsed, err := url.Parse(authURL)
+	if err != nil || parsed == nil {
+		return false
+	}
+
+	host := strings.ToLower(strings.TrimSpace(parsed.Host))
+	path := strings.ToLower(strings.TrimSpace(parsed.Path))
+
+	// Current claude.com/cai/oauth/authorize flow is browser-driven and does not
+	// require code submission in the CLI.
+	if host == "claude.com" || strings.HasSuffix(host, ".claude.com") {
+		if strings.HasPrefix(path, "/cai/oauth/authorize") {
+			return false
+		}
+	}
+
+	// Legacy/manual flows may prompt for pasted browser codes.
+	if host == "claude.ai" || strings.HasSuffix(host, ".claude.ai") {
+		if strings.Contains(path, "/login/device") || strings.Contains(path, "/oauth/authorize") {
+			return true
+		}
+	}
+
+	return false
 }
 
 func (g *claudeAuthGate) needsGitHubTokenState(message string) hubui.AgentAuthState {
@@ -604,6 +756,7 @@ func (g *claudeAuthGate) ingestLoginLine(line string) {
 
 	authURL := extractClaudeAuthURL(line)
 	promptAdvance := shouldAdvanceClaudeLoginPrompt(line)
+	codePrompt := shouldPromptForClaudeBrowserCode(line)
 
 	var input io.WriteCloser
 	var update bool
@@ -630,6 +783,9 @@ func (g *claudeAuthGate) ingestLoginLine(line string) {
 	}
 	g.mu.Unlock()
 
+	if codePrompt {
+		g.resubmitPendingBrowserCode()
+	}
 	if input != nil {
 		if _, err := io.WriteString(input, "\n"); err != nil {
 			g.logf("hub.auth status=warn harness=claude action=advance_login_prompt err=%q", err)
@@ -654,6 +810,8 @@ func (g *claudeAuthGate) waitLogin(cmd *exec.Cmd, tempDir string, readerWG *sync
 	g.procRunning = false
 	g.procCancel = nil
 	g.procInput = nil
+	g.pendingBrowserCode = ""
+	g.browserSubmitAttempts = 0
 	if procInput != nil {
 		_ = procInput.Close()
 	}
@@ -798,6 +956,49 @@ func shouldAdvanceClaudeLoginPrompt(line string) bool {
 		}
 	}
 	return false
+}
+
+func shouldPromptForClaudeBrowserCode(line string) bool {
+	text := strings.ToLower(strings.TrimSpace(stripANSI(line)))
+	if text == "" {
+		return false
+	}
+	return strings.Contains(text, "paste code here") ||
+		strings.Contains(text, "authentication code") ||
+		strings.Contains(text, "if prompted >")
+}
+
+func buildClaudeLoginCommand(ctx context.Context, command string) *exec.Cmd {
+	command = strings.TrimSpace(command)
+	if command == "" {
+		command = agentruntime.HarnessClaude
+	}
+	if _, err := exec.LookPath("script"); err == nil {
+		return exec.CommandContext(
+			ctx,
+			"script",
+			"-qfec",
+			shellQuoteJoin(command, "auth", "login"),
+			"/dev/null",
+		)
+	}
+	return exec.CommandContext(ctx, command, "auth", "login")
+}
+
+func shellQuoteJoin(parts ...string) string {
+	quoted := make([]string, 0, len(parts))
+	for _, part := range parts {
+		quoted = append(quoted, shellQuote(part))
+	}
+	return strings.Join(quoted, " ")
+}
+
+func shellQuote(value string) string {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return "''"
+	}
+	return "'" + strings.ReplaceAll(value, "'", "'\"'\"'") + "'"
 }
 
 func firstConfiguredGitHubToken(runtimeConfigPath string, initCfg hub.InitConfig) (value string, source string) {
