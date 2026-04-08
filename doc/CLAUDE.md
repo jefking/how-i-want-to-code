@@ -34,7 +34,7 @@ If none of those are present, the UI tells the user to run `claude`, complete br
 
 ## Molten Hub Integration Behavior
 
-The requested `na.hub.molten.bot.openapi.yaml` file is not present in this repository, so the integration notes below are derived from the runtime implementation in [`internal/hub/api.go`](/tmp/temp/100b3d485cdd8711e3b356921fe832cd/repo/internal/hub/api.go) and [`internal/hub/daemon.go`](/tmp/temp/100b3d485cdd8711e3b356921fe832cd/repo/internal/hub/daemon.go).
+The requested `na.hub.molten.bot.openapi.yaml` file is not present in this repository, so the integration notes below are derived from the runtime implementation in [`internal/hub/api.go`](../internal/hub/api.go) and [`internal/hub/daemon.go`](../internal/hub/daemon.go).
 
 Observed transport behavior:
 
