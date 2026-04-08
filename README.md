@@ -20,7 +20,7 @@ For each run:
 7. Creates or reuses PRs with `moltenhub-*` titles.
 8. Watches required CI checks and performs remediation retries when checks fail.
 
-If a task fails, no PR is created for that run, and the workspace path is logged.
+If a task fails, no PR is created for that run; the runtime returns an explicit failure payload and queues a follow-up remediation task that targets the same repository.
 
 ## Run
 
