@@ -303,6 +303,40 @@ func TestAgentAuthEndpointsWithCallbacks(t *testing.T) {
 	}
 }
 
+func TestAgentAuthConfigureEndpointAcceptsGitHubTokenPayload(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	srv.ConfigureAgentAuth = func(_ context.Context, value string) (AgentAuthState, error) {
+		if got, want := strings.TrimSpace(value), "ghp_saved_token"; got != want {
+			t.Fatalf("configure value = %q, want %q", got, want)
+		}
+		return AgentAuthState{
+			Harness:  "claude",
+			Required: true,
+			Ready:    true,
+			State:    "ready",
+			Message:  "ready",
+		}, nil
+	}
+
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	resp, err := http.Post(
+		ts.URL+"/api/agent-auth/configure",
+		"application/json",
+		bytes.NewBufferString(`{"github_token":"ghp_saved_token"}`),
+	)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth/configure error = %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/agent-auth/configure status = %d, want 200", resp.StatusCode)
+	}
+}
+
 func TestTaskPanelStylesConstrainHorizontalOverflow(t *testing.T) {
 	t.Parallel()
 

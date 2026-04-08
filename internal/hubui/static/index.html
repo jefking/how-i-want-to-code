@@ -286,7 +286,7 @@
           <div id="agent-auth-configure-command" class="font-mono text-[1rem] tracking-[0.04em] text-hub-text">auggie token print</div>
           <button id="agent-auth-configure-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
         </div>
-        <label class="text-sm font-medium text-hub-text/85" for="agent-auth-configure-input">Paste Auggie session JSON</label>
+        <label id="agent-auth-configure-label" class="text-sm font-medium text-hub-text/85" for="agent-auth-configure-input">Paste configuration value</label>
         <textarea id="agent-auth-configure-input" class="prompt-text min-h-[120px] font-mono text-[0.9rem]" placeholder='{"accessToken":"XXX","tenantURL":"https://YYY/","scopes":["email"]}' spellcheck="false"></textarea>
         <p id="agent-auth-configure-error" class="hidden text-sm text-rose-200"></p>
       </div>
@@ -567,6 +567,7 @@
     const agentAuthCopy = document.getElementById("agent-auth-copy");
     const agentAuthConfigure = document.getElementById("agent-auth-configure");
     const agentAuthConfigureCommand = document.getElementById("agent-auth-configure-command");
+    const agentAuthConfigureLabel = document.getElementById("agent-auth-configure-label");
     const agentAuthConfigureCopy = document.getElementById("agent-auth-configure-copy");
     const agentAuthConfigureInput = document.getElementById("agent-auth-configure-input");
     const agentAuthConfigureError = document.getElementById("agent-auth-configure-error");
@@ -829,7 +830,7 @@
         clearTimeout(agentAuthRefreshTimer);
         agentAuthRefreshTimer = null;
       }
-      if (isAuggieConfigureState()) {
+      if (isManualConfigureState()) {
         return;
       }
       const needsChallenge = state.agentAuth.required && !state.agentAuth.ready &&
@@ -865,8 +866,19 @@
     function isAuggieConfigureState(auth) {
       const current = auth && typeof auth === "object" ? auth : state.agentAuth;
       const harness = String(current?.harness || "").trim().toLowerCase();
+      return harness === "auggie" && isManualConfigureState(current);
+    }
+
+    function isClaudeGitHubConfigureState(auth) {
+      const current = auth && typeof auth === "object" ? auth : state.agentAuth;
+      const harness = String(current?.harness || "").trim().toLowerCase();
+      return harness === "claude" && isManualConfigureState(current);
+    }
+
+    function isManualConfigureState(auth) {
+      const current = auth && typeof auth === "object" ? auth : state.agentAuth;
       const gateState = String(current?.state || "").trim().toLowerCase();
-      return harness === "auggie" && gateState === "needs_configure";
+      return gateState === "needs_configure";
     }
 
     function setAuggieConfigureError(message) {
@@ -878,7 +890,7 @@
 
     function updateAgentAuthDoneVisibility() {
       if (!agentAuthVerify) return;
-      const requiresManualConfigure = isAuggieConfigureState();
+      const requiresManualConfigure = isManualConfigureState();
       const hasChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode);
       const visible = state.agentAuth.required &&
         !state.agentAuth.ready &&
@@ -961,7 +973,9 @@
       renderConfiguredAgent();
       const gateVisible = state.agentAuth.required && !state.agentAuth.ready;
       const challengeKey = `${state.agentAuth.state}|${state.agentAuth.deviceCode}|${state.agentAuth.authURL}`;
+      const requiresManualConfigure = isManualConfigureState(state.agentAuth);
       const needsAuggieConfigure = isAuggieConfigureState(state.agentAuth);
+      const needsClaudeGitHubConfigure = isClaudeGitHubConfigureState(state.agentAuth);
 
       if (state.agentAuthChallengeKey !== challengeKey) {
         state.agentAuthChallengeKey = challengeKey;
@@ -979,6 +993,10 @@
       if (agentAuthTitle) {
         if (needsAuggieConfigure) {
           agentAuthTitle.textContent = "Auggie Configure";
+        } else if (needsClaudeGitHubConfigure) {
+          agentAuthTitle.textContent = "GitHub Token Configure";
+        } else if (requiresManualConfigure) {
+          agentAuthTitle.textContent = `${currentAgentLabel()} Configure`;
         } else {
           agentAuthTitle.textContent = `Authorize ${currentAgentLabel()} to get started`;
         }
@@ -988,7 +1006,7 @@
         agentAuthMessage.classList.toggle("hidden", !state.agentAuth.message);
       }
 
-      const hasChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode) && !needsAuggieConfigure;
+      const hasChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode) && !requiresManualConfigure;
       if (agentAuthDetails) {
         agentAuthDetails.classList.toggle("hidden", !hasChallenge);
       }
@@ -1006,16 +1024,29 @@
         agentAuthCopy.classList.toggle("hidden", !state.agentAuth.deviceCode);
       }
       if (agentAuthConfigure) {
-        agentAuthConfigure.classList.toggle("hidden", !needsAuggieConfigure);
+        agentAuthConfigure.classList.toggle("hidden", !requiresManualConfigure);
       }
       if (agentAuthConfigureCommand) {
-        agentAuthConfigureCommand.textContent = state.agentAuth.configureCommand || "auggie token print";
+        const fallbackCommand = needsAuggieConfigure ? "auggie token print" : "gh auth token";
+        agentAuthConfigureCommand.textContent = state.agentAuth.configureCommand || fallbackCommand;
+      }
+      if (agentAuthConfigureLabel) {
+        if (needsAuggieConfigure) {
+          agentAuthConfigureLabel.textContent = "Paste Auggie session JSON";
+        } else if (needsClaudeGitHubConfigure) {
+          agentAuthConfigureLabel.textContent = "Paste GitHub token";
+        } else {
+          agentAuthConfigureLabel.textContent = "Paste configuration value";
+        }
       }
       if (agentAuthConfigureInput) {
-        const placeholder = state.agentAuth.configurePlaceholder || '{"accessToken":"XXX","tenantURL":"https://YYY/","scopes":["email"]}';
+        const fallbackPlaceholder = needsAuggieConfigure
+          ? '{"accessToken":"XXX","tenantURL":"https://YYY/","scopes":["email"]}'
+          : "ghp_xxx";
+        const placeholder = state.agentAuth.configurePlaceholder || fallbackPlaceholder;
         agentAuthConfigureInput.placeholder = placeholder;
       }
-      if (!needsAuggieConfigure) {
+      if (!requiresManualConfigure) {
         setAuggieConfigureError("");
       }
 
@@ -1131,6 +1162,17 @@
       });
     }
 
+    function normalizeGitHubTokenPayload(raw) {
+      const token = String(raw || "").trim();
+      if (!token) {
+        throw new Error("Paste a GitHub token first.");
+      }
+      if (token.length < 8) {
+        throw new Error("GitHub token appears too short.");
+      }
+      return token;
+    }
+
     async function requestAgentAuth(path, method, requestBody) {
       const init = { method, cache: "no-store" };
       if (requestBody !== undefined) {
@@ -1215,9 +1257,50 @@
       }
     }
 
+    async function configureClaudeGitHubToken() {
+      setAuggieConfigureError("");
+      let token = "";
+      try {
+        token = normalizeGitHubTokenPayload(agentAuthConfigureInput ? agentAuthConfigureInput.value : "");
+      } catch (err) {
+        const message = err && err.message ? err.message : "Invalid GitHub token.";
+        setAuggieConfigureError(message);
+        return;
+      }
+
+      setAgentAuthVerifyPending(true);
+      setAgentAuthBusy(true);
+      try {
+        const auth = await requestAgentAuth("/api/agent-auth/configure", "POST", {
+          github_token: token,
+        });
+        applyAgentAuthGate(auth);
+        if (auth.ready) {
+          setAuggieConfigureError("");
+          if (agentAuthConfigureInput) {
+            agentAuthConfigureInput.value = "";
+          }
+          setLocalPromptStatus("ok", `${currentAgentLabel()} auth is ready.`);
+        } else {
+          setAgentAuthVerifyPending(false);
+        }
+      } catch (err) {
+        const message = err && err.message ? err.message : "GitHub token configure failed.";
+        setAgentAuthVerifyPending(false);
+        setAuggieConfigureError(message);
+        setLocalPromptStatus("error", `${currentAgentLabel()} configure failed: ${message}`);
+      } finally {
+        setAgentAuthBusy(false);
+      }
+    }
+
     async function verifyAgentDeviceAuth() {
       if (isAuggieConfigureState()) {
         await configureAuggieAuth();
+        return;
+      }
+      if (isClaudeGitHubConfigureState()) {
+        await configureClaudeGitHubToken();
         return;
       }
       markAgentAuthInteraction();

@@ -197,3 +197,65 @@ func TestSaveRuntimeConfigAuggieAuthRejectsMalformedConfigJSON(t *testing.T) {
 		t.Fatalf("error = %q, want parse detail", got)
 	}
 }
+
+func TestSaveRuntimeConfigGitHubTokenCreatesConfigFromInitWhenMissing(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	token := "ghp_saved_token"
+
+	if err := SaveRuntimeConfigGitHubToken(path, InitConfig{
+		BaseURL:      "https://na.hub.molten.bot/v1",
+		AgentHarness: "claude",
+	}, token); err != nil {
+		t.Fatalf("SaveRuntimeConfigGitHubToken() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if got["github_token"] != token {
+		t.Fatalf("github_token = %#v, want %q", got["github_token"], token)
+	}
+	if got["agent_harness"] != "claude" {
+		t.Fatalf("agent_harness = %#v, want %q", got["agent_harness"], "claude")
+	}
+}
+
+func TestSaveRuntimeConfigGitHubTokenMergesIntoExistingConfig(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(path), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(path, []byte(`{"base_url":"https://na.hub.molten.bot/v1","agent_token":"agent_saved","custom":"preserved"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	if err := SaveRuntimeConfigGitHubToken(path, InitConfig{}, "ghp_saved_token"); err != nil {
+		t.Fatalf("SaveRuntimeConfigGitHubToken() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+
+	var got map[string]any
+	if err := json.Unmarshal(data, &got); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if got["github_token"] != "ghp_saved_token" {
+		t.Fatalf("github_token = %#v, want %q", got["github_token"], "ghp_saved_token")
+	}
+	if got["custom"] != "preserved" {
+		t.Fatalf("custom = %#v, want %q", got["custom"], "preserved")
+	}
+}
