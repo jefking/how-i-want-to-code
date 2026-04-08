@@ -444,7 +444,7 @@ func TestFailureFollowUpPromptIncludesWorkspaceAndTargetPath(t *testing.T) {
 		}},
 	}
 
-	prompt := failureFollowUpPrompt(SkillDispatch{
+	prompt := failureFollowUpPrompt("", SkillDispatch{
 		RequestID: "req-123",
 		Config:    runCfg,
 	}, result)
