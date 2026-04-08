@@ -400,11 +400,11 @@ func (d Daemon) processInboundMessage(
 						}
 					}
 				} else {
-					if ok, reason := shouldQueueFailureFollowUpError(failRes.Err); !ok {
+					if ok, reason := shouldQueueFailureFollowUp(dispatch, failRes); !ok {
 						d.logf(
 							"dispatch status=warn action=skip_failure_followup request_id=%s err=%q",
 							dispatch.RequestID,
-							fmt.Sprintf("non-remediable failure detected: %s", reason),
+							reason,
 						)
 					} else if followUpErr := queueFailureFollowUp(ctx, api, cfg, dispatch, failRes, d.TaskLogRoot); followUpErr != nil {
 						d.logf("dispatch status=follow_up_error request_id=%s err=%q", dispatch.RequestID, followUpErr)
@@ -589,11 +589,11 @@ func (d Daemon) handleDispatch(
 		return
 	}
 	if res.Err != nil {
-		if ok, reason := shouldQueueFailureFollowUpError(res.Err); !ok {
+		if ok, reason := shouldQueueFailureFollowUp(dispatch, res); !ok {
 			d.logf(
 				"dispatch status=warn action=skip_failure_followup request_id=%s err=%q",
 				dispatch.RequestID,
-				fmt.Sprintf("non-remediable failure detected: %s", reason),
+				reason,
 			)
 		} else if err := queueFailureFollowUp(ctx, api, cfg, dispatch, res, d.TaskLogRoot); err != nil {
 			d.logf("dispatch status=follow_up_error request_id=%s err=%q", dispatch.RequestID, err)
@@ -702,38 +702,22 @@ func failureResponseMessage(errText string) string {
 	return "Failure: task failed. Error details: " + errText
 }
 
-var failureFollowUpNonRemediableMarkers = []string{
-	"quota exceeded",
-	"insufficient_quota",
-	"billing",
-	"401 unauthorized",
-	"missing bearer or basic authentication",
-	"invalid api key",
-	"invalid_authentication",
-	"authentication error",
-	"no delta from",
-	"no commits between",
-	"head sha can't be blank",
-	"base sha can't be blank",
-	"head ref must be a branch",
-}
-
-func shouldQueueFailureFollowUpError(err error) (bool, string) {
-	if err == nil {
+func shouldQueueFailureFollowUp(dispatch SkillDispatch, res harness.Result) (bool, string) {
+	if res.Err == nil {
 		return false, "failed task did not include an error"
 	}
-
-	errText := strings.ToLower(strings.TrimSpace(err.Error()))
-	if errText == "" {
-		return false, "failed task error was empty"
-	}
-
-	for _, marker := range failureFollowUpNonRemediableMarkers {
-		if strings.Contains(errText, marker) {
-			return false, marker
-		}
+	if isFailureFollowUpRequestID(dispatch.RequestID) {
+		return false, "follow-up request failed; skipping nested follow-up queue"
 	}
 	return true, ""
+}
+
+func isFailureFollowUpRequestID(requestID string) bool {
+	requestID = strings.ToLower(strings.TrimSpace(requestID))
+	if requestID == "" {
+		return false
+	}
+	return requestID == "failure-review" || strings.HasSuffix(requestID, "-failure-review")
 }
 
 func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig, dispatch SkillDispatch, res harness.Result, taskLogRoot string) error {

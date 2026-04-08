@@ -60,7 +60,7 @@ When a task fails, the runtime already follows this contract:
 - the reply payload marks the task as failed
 - the reply payload includes `error`, `message`, and `failure.details`
 - the human-readable message is `Failure: task failed. Error details: ...`
-- a follow-up remediation task is queued when the error looks locally fixable
+- a follow-up remediation task is queued for failed tasks (with recursion guard for `*-failure-review` requests)
 - follow-up prompts include the failing log paths when available
 - follow-up prompts use the required run-config shape:
 

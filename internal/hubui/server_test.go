@@ -229,6 +229,18 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function renderTaskProgress(") {
 		t.Fatalf("expected index html to include renderTaskProgress handler")
 	}
+	if !strings.Contains(markup, `icon: "moltenhub"`) || !strings.Contains(markup, `icon: "github"`) || !strings.Contains(markup, `icon: "agent"`) {
+		t.Fatalf("expected index html to classify task progress steps by logo type")
+	}
+	if !strings.Contains(markup, "function taskProgressStepIconURL(") {
+		t.Fatalf("expected index html to include task progress icon URL resolver")
+	}
+	if !strings.Contains(markup, "task-progress-step-icon") {
+		t.Fatalf("expected index html to render task progress step icons")
+	}
+	if !strings.Contains(markup, "stage === \"claude\"") || !strings.Contains(markup, "stage === \"auggie\"") {
+		t.Fatalf("expected index html to map claude and auggie stages into the agent progress step")
+	}
 	if strings.Contains(markup, "current step:") {
 		t.Fatalf("expected index html to remove current step label text from task progress")
 	}
@@ -900,6 +912,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, "--theme-button-bg:") || !strings.Contains(css, "--surface-control-bg:") {
 		t.Fatalf("expected stylesheet to define reusable theme tokens for controls")
 	}
+	if !strings.Contains(css, "--agent-logo-filter: brightness(0) saturate(100%);") {
+		t.Fatalf("expected stylesheet to define a light-theme monochrome logo filter token")
+	}
+	if strings.Count(css, "--agent-logo-filter: brightness(0) saturate(100%) invert(1);") < 2 {
+		t.Fatalf("expected stylesheet to define dark and night monochrome logo filter tokens")
+	}
 	if !strings.Contains(css, "html.dark .theme-controls") || !strings.Contains(css, "html.night .theme-controls") {
 		t.Fatalf("expected stylesheet to include dark and night docked theme control treatments")
 	}
@@ -920,6 +938,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".task-rerun") {
 		t.Fatalf("expected stylesheet to include task rerun styles")
+	}
+	if !strings.Contains(css, ".task-progress-step.current {\n  background: var(--running);\n  border-color: rgba(10, 132, 255, 0.34);\n  box-shadow: 0 0 0 4px rgba(10, 132, 255, 0.12);\n  transform: scale(2);") {
+		t.Fatalf("expected stylesheet to render the active task progress step at 2x size")
+	}
+	if !strings.Contains(css, ".task-progress-step-icon") {
+		t.Fatalf("expected stylesheet to include task progress step icon styles")
 	}
 	if !strings.Contains(css, ".task-body") {
 		t.Fatalf("expected stylesheet to include task body column styles")
@@ -990,6 +1014,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-pr-link img {\n  display: block;\n  width: 100%;\n  height: 100%;") {
 		t.Fatalf("expected stylesheet to scale the GitHub logo to fill the task PR rail")
 	}
+	if !strings.Contains(css, ".task-pr-link img {\n  display: block;\n  width: 100%;\n  height: 100%;\n  object-fit: contain;\n  filter: var(--agent-logo-filter);") {
+		t.Fatalf("expected stylesheet to apply theme-aware monochrome treatment to task PR logos")
+	}
 	if !strings.Contains(css, ".task-fullscreen {\n  position: fixed;\n  inset: 0;\n  z-index: 80;\n  padding: 0;") {
 		t.Fatalf("expected stylesheet to make full screen task layout use full viewport padding")
 	}
@@ -1034,6 +1061,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".brand-logo") {
 		t.Fatalf("expected stylesheet to include brand logo styles")
+	}
+	if !strings.Contains(css, ".configured-agent-logo {\n  width: 42px;\n  height: 42px;\n  padding: 7px;\n  border-radius: 14px;\n  filter: var(--agent-logo-filter);") {
+		t.Fatalf("expected stylesheet to tint rotating configured-agent logos based on active theme")
+	}
+	if !strings.Contains(css, ".agent-auth-url-logo {\n  display: block;\n  width: 58px;\n  height: 58px;\n  padding: 9px;\n  border: 1px solid var(--surface-auth-button-border);\n  border-radius: 16px;\n  background: var(--surface-auth-button-bg);\n  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);\n  filter: var(--agent-logo-filter);") {
+		t.Fatalf("expected stylesheet to tint auth-gate agent logos based on active theme")
 	}
 	if !strings.Contains(css, ".rotating-brand-logo") || !strings.Contains(css, ".brand-logo-visible") {
 		t.Fatalf("expected stylesheet to include rotating brand logo cross-fade styles")
