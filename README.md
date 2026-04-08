@@ -176,10 +176,13 @@ On startup, hub mode emits a boot diagnosis checklist for:
 - `gh` CLI availability
 - selected agent CLI availability (`codex`, `claude`, or `auggie`)
 - `gh auth` readiness
-- Hub endpoint health at `<base_url host>/ping` (must return `2xx` before connecting)
+- Hub endpoint health at `<base_url host>/ping` (must return `2xx` before connecting remote transport)
 - a Molten Hub connection recommendation (`https://molten.bot/hub`) when the runtime is not connected yet
 
-If the ping check fails, hub mode exits early instead of entering transport retry loops.
+If the ping check fails and the UI is enabled, hub mode now stays up in local-only mode so Studio and local submissions remain available.
+If the ping check fails and `--ui-listen ""` is set, startup behavior is now non-fatal:
+- with Hub credentials configured, startup continues and still attempts remote transport
+- without Hub credentials, startup exits successfully after logging a headless no-op local-only status
 
 ## UI
 
@@ -264,8 +267,10 @@ Runtime config keys `sessionKey` and `timeoutMs` are optional; missing values de
 Local-only behavior:
 
 - If `bind_token`/`agent_token` are missing and no persisted runtime token exists, `harness hub` now starts in local-only mode instead of exiting with auth error.
+- If Hub ping precheck fails but the UI is enabled, `harness hub` stays available in local-only mode and skips remote transport startup.
+- If Hub ping precheck fails with `--ui-listen ""` and Hub credentials are configured, `harness hub` continues remote startup (the ping probe can be transient).
+- If Hub ping precheck fails with `--ui-listen ""` and Hub credentials are not configured, startup exits successfully with a headless no-op local-only status.
 - In local-only mode, the monitor UI and `/api/local-prompt` remain available for local runs, and remote Hub transport is skipped.
-- If local-only mode is used with `--ui-listen ""`, startup exits with an auth/config error because there is no remote or local submission channel.
 
 Runtime-owned fields:
 

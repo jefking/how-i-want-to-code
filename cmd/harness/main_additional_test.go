@@ -152,6 +152,38 @@ func TestShouldFallbackToLocalOnlyMode(t *testing.T) {
 	}
 }
 
+func TestRunHubBootDiagnosticsPingFailureBehavior(t *testing.T) {
+	t.Parallel()
+
+	if got := shouldRunHubInLocalOnlyMode(true, false, "127.0.0.1:7777", false); !got {
+		t.Fatal("shouldRunHubInLocalOnlyMode(ping_failed, ui_enabled, no_hub) = false, want true")
+	}
+	if got := shouldRunHubInLocalOnlyMode(true, false, "", false); !got {
+		t.Fatal("shouldRunHubInLocalOnlyMode(ping_failed, headless, no_hub) = false, want true")
+	}
+	if got := shouldRunHubInLocalOnlyMode(true, false, "", true); got {
+		t.Fatal("shouldRunHubInLocalOnlyMode(ping_failed, headless, hub_configured) = true, want false")
+	}
+	if got := shouldRunHubInLocalOnlyMode(true, true, "127.0.0.1:7777", false); got {
+		t.Fatal("shouldRunHubInLocalOnlyMode(ping_ok, ui_enabled, no_hub) = true, want false")
+	}
+	if got := shouldRunHubInLocalOnlyMode(false, false, "127.0.0.1:7777", false); got {
+		t.Fatal("shouldRunHubInLocalOnlyMode(ping_unchecked, ui_enabled, no_hub) = true, want false")
+	}
+}
+
+func TestHubPingFailureDetail(t *testing.T) {
+	t.Parallel()
+
+	if got, want := hubPingFailureDetail("base message", nil), "base message"; got != want {
+		t.Fatalf("hubPingFailureDetail(base,nil) = %q, want %q", got, want)
+	}
+	err := errors.New("GET https://na.hub.molten.bot/ping returned status=503")
+	if got := hubPingFailureDetail("base message", err); !strings.Contains(got, "status=503") {
+		t.Fatalf("hubPingFailureDetail(base,err) missing status detail: %q", got)
+	}
+}
+
 func TestMaybeStartAgentAuthStartsClaudeLoginWhenBrowserAuthIsNeeded(t *testing.T) {
 	t.Parallel()
 
