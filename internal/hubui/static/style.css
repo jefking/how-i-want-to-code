@@ -476,9 +476,9 @@ textarea {
   align-items: center;
   gap: 8px;
   padding: 13px 16px;
-  border-bottom: 1px solid rgba(17, 34, 68, 0.09);
-  background: linear-gradient(180deg, rgba(255, 255, 255, 0.82), rgba(242, 247, 255, 0.78));
-  color: var(--text-soft);
+  border-bottom: 1px solid var(--surface-header-border);
+  background: var(--surface-header);
+  color: var(--surface-label);
   font-weight: 700;
   font-size: 0.86rem;
   letter-spacing: 0.08em;

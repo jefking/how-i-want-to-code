@@ -1,5 +1,5 @@
 <!doctype html>
-<html lang="en" class="light">
+<html lang="en" class="dark">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -288,7 +288,7 @@
 
   <div id="appearance-controls" class="theme-controls" role="group" aria-label="Appearance controls">
     <button id="theme-cycle" class="theme-cycle-button" type="button" aria-live="polite">
-      <span id="theme-cycle-current" class="theme-cycle-current">Light</span>
+      <span id="theme-cycle-current" class="theme-cycle-current">Dark</span>
     </button>
   </div>
 
@@ -300,6 +300,7 @@
     const THEME_KEY = "hubui.theme";
     const HOVER_MODE_KEY = "hubui.hoverMode";
     const THEME_MODES = ["light", "dark", "night"];
+    const DEFAULT_THEME_MODE = "dark";
     const HOVER_MODES = ["auto", "on", "off"];
     const CLOSE_TASK_FADE_MS = 2000;
     const QUEUED_STATUS_TIMEOUT_MS = 8_000;
@@ -410,9 +411,9 @@
     function loadThemeMode() {
       try {
         const raw = localStorage.getItem(THEME_KEY);
-        return THEME_MODES.includes(raw) ? raw : "light";
+        return THEME_MODES.includes(raw) ? raw : DEFAULT_THEME_MODE;
       } catch (_err) {
-        return "light";
+        return DEFAULT_THEME_MODE;
       }
     }
 
@@ -522,7 +523,7 @@
     const hoverSelect = document.getElementById("hover-select");
 
     function themeLabel(theme) {
-      const normalized = THEME_MODES.includes(theme) ? theme : "light";
+      const normalized = THEME_MODES.includes(theme) ? theme : DEFAULT_THEME_MODE;
       return normalized.charAt(0).toUpperCase() + normalized.slice(1);
     }
 
@@ -533,7 +534,7 @@
 
     function nextThemeMode(theme) {
       const currentIndex = THEME_MODES.indexOf(theme);
-      const safeIndex = currentIndex >= 0 ? currentIndex : 0;
+      const safeIndex = currentIndex >= 0 ? currentIndex : Math.max(0, THEME_MODES.indexOf(DEFAULT_THEME_MODE));
       return THEME_MODES[(safeIndex + 1) % THEME_MODES.length];
     }
 
@@ -541,7 +542,7 @@
       if (!themeCycleButton || !themeCycleCurrent) {
         return;
       }
-      const currentTheme = THEME_MODES.includes(theme) ? theme : "light";
+      const currentTheme = THEME_MODES.includes(theme) ? theme : DEFAULT_THEME_MODE;
       const nextTheme = nextThemeMode(currentTheme);
       const currentLabel = themeLabel(currentTheme);
       const nextLabel = themeLabel(nextTheme);
@@ -551,7 +552,7 @@
     }
 
     function applyThemeMode(theme, persist) {
-      const normalized = THEME_MODES.includes(theme) ? theme : "light";
+      const normalized = THEME_MODES.includes(theme) ? theme : DEFAULT_THEME_MODE;
       const root = document.documentElement;
       root.classList.remove("light", "dark", "night");
       root.classList.add(normalized);

@@ -223,6 +223,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "if (open && !displayTasks(state.snapshot).length) {") {
 		t.Fatalf("expected index html to block fullscreen when no tasks exist")
 	}
+	if !strings.Contains(markup, `<html lang="en" class="dark">`) {
+		t.Fatalf("expected index html to default to dark theme class")
+	}
 	if !strings.Contains(markup, "function isMinimizedTask(") {
 		t.Fatalf("expected index html to include completed-task minimization handler")
 	}
@@ -705,6 +708,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="theme-cycle"`) || !strings.Contains(markup, `function nextThemeMode(theme)`) {
 		t.Fatalf("expected index html to include docked theme cycle control")
 	}
+	if !strings.Contains(markup, `const DEFAULT_THEME_MODE = "dark";`) {
+		t.Fatalf("expected index html to define dark as the default theme mode")
+	}
+	if !strings.Contains(markup, `return THEME_MODES.includes(raw) ? raw : DEFAULT_THEME_MODE;`) {
+		t.Fatalf("expected index html theme loading to fall back to the default dark theme")
+	}
+	if !strings.Contains(markup, `<span id="theme-cycle-current" class="theme-cycle-current">Dark</span>`) {
+		t.Fatalf("expected index html to render dark as the initial theme cycle label")
+	}
 	if strings.Contains(markup, `theme-cycle-next`) || strings.Contains(markup, `>Theme<`) || strings.Contains(markup, `Next: Dark`) {
 		t.Fatalf("expected index html to render the theme dock as a single cycling label")
 	}
@@ -772,6 +784,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	css := resp.Body.String()
 	if !strings.Contains(css, ".task-close") {
 		t.Fatalf("expected stylesheet to include task close styles")
+	}
+	if !strings.Contains(css, ".panel-header,\n.task-head {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  gap: 8px;\n  padding: 13px 16px;\n  border-bottom: 1px solid var(--surface-header-border);\n  background: var(--surface-header);\n  color: var(--surface-label);") {
+		t.Fatalf("expected stylesheet to style task and output headers with theme-aware surface tokens")
 	}
 	if !strings.Contains(css, ".theme-controls") || !strings.Contains(css, ".theme-cycle-button") {
 		t.Fatalf("expected stylesheet to include docked theme cycle styles")
