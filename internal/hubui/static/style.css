@@ -1,5 +1,11 @@
 :root {
   color-scheme: light;
+  --hub-floating-bottom: max(16px, env(safe-area-inset-bottom));
+  --hub-floating-stack-height: 64px;
+  --hub-studio-dock-gap: 16px;
+  --hub-studio-dock-bottom: calc(var(--hub-floating-bottom) + var(--hub-floating-stack-height) + var(--hub-studio-dock-gap));
+  --hub-studio-dock-height: clamp(280px, 34vh, 388px);
+  --hub-studio-collapsed-height: 84px;
   --hub-bg-rgb: 244 248 255;
   --hub-panel-rgb: 255 255 255;
   --hub-panel-soft-rgb: 232 239 255;
@@ -196,7 +202,7 @@ textarea {
 .app {
   width: min(1500px, 100%);
   margin: 0 auto;
-  padding: 28px 20px 104px;
+  padding: 28px 20px calc(var(--hub-studio-dock-bottom) + var(--hub-studio-dock-height) + 28px);
   display: grid;
   gap: 18px;
 }
@@ -443,6 +449,7 @@ textarea {
 .layout {
   min-height: calc(100vh - 130px);
   min-height: calc(100dvh - 130px);
+  display: flex;
 }
 
 .panel {
@@ -522,13 +529,16 @@ textarea {
 
 body .right-col {
   display: grid;
-  grid-template-rows: minmax(240px, 0.72fr) minmax(340px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  flex: 1 1 auto;
   gap: 16px;
   align-content: stretch;
+  min-height: 100%;
+  height: 100%;
 }
 
 body .right-col.prompt-collapsed {
-  grid-template-rows: minmax(240px, 0.72fr) minmax(340px, 1fr);
+  grid-template-rows: minmax(0, 1fr);
 }
 
 body .right-col.task-list-hidden {
@@ -536,18 +546,25 @@ body .right-col.task-list-hidden {
 }
 
 body .right-col.prompt-collapsed.task-list-hidden {
-  grid-template-rows: 84px;
+  grid-template-rows: auto;
 }
 
 .prompt-wrap.panel {
-  order: 3;
+  position: fixed;
+  left: 50%;
+  right: auto;
+  bottom: var(--hub-studio-dock-bottom);
+  z-index: 58;
+  width: min(calc(1500px - 40px), calc(100vw - 40px));
+  max-width: calc(100vw - 40px);
+  max-height: var(--hub-studio-dock-height);
   display: flex;
   flex-direction: column;
   border-color: var(--surface-glow-border);
   background: var(--surface-glow);
   box-shadow: var(--surface-glow-shadow);
   transform-origin: center bottom;
-  transform: translateY(0);
+  transform: translateX(-50%) translateY(0);
   transition: transform 0.24s ease, opacity 0.24s ease, box-shadow 0.24s ease, background 0.24s ease, border-color 0.24s ease;
 }
 
@@ -568,11 +585,12 @@ body .right-col.prompt-collapsed.task-list-hidden {
 }
 
 .prompt-wrap.prompt-collapsed {
-  min-height: 84px;
+  min-height: var(--hub-studio-collapsed-height);
+  max-height: var(--hub-studio-collapsed-height);
   border-color: transparent;
   background: transparent;
   box-shadow: none;
-  transform: translateY(8px);
+  transform: translateX(-50%) translateY(8px);
 }
 
 .prompt-wrap.prompt-hidden-dock .panel-header {
@@ -593,6 +611,7 @@ body .right-col.prompt-collapsed.task-list-hidden {
   padding: 14px;
   min-width: 0;
   min-height: 0;
+  flex: 1 1 auto;
   overflow-y: auto;
 }
 
@@ -656,7 +675,7 @@ body .right-col.prompt-collapsed.task-list-hidden {
 .page-bottom-dock {
   position: fixed;
   left: 50%;
-  bottom: max(16px, env(safe-area-inset-bottom));
+  bottom: var(--hub-floating-bottom);
   z-index: 61;
   display: flex;
   justify-content: center;
@@ -673,6 +692,16 @@ body .right-col.prompt-collapsed.task-list-hidden {
 
 #task-panel {
   order: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  height: 100%;
+}
+
+#task-panel .scroll {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
 }
 
 .prompt-grid {
@@ -1643,11 +1672,11 @@ select.prompt-control {
   }
 
   body .right-col {
-    grid-template-rows: minmax(220px, 0.7fr) minmax(240px, 1fr) auto;
+    grid-template-rows: minmax(0, 1fr);
   }
 
   body .right-col.prompt-collapsed {
-    grid-template-rows: minmax(220px, 0.7fr) minmax(240px, 1fr) 76px;
+    grid-template-rows: minmax(0, 1fr);
   }
 
   body .right-col.task-list-hidden {
@@ -1655,7 +1684,7 @@ select.prompt-control {
   }
 
   body .right-col.prompt-collapsed.task-list-hidden {
-    grid-template-rows: 76px;
+    grid-template-rows: auto;
   }
 
   .task-fullscreen-body {
@@ -1720,6 +1749,10 @@ select.prompt-control {
 }
 
 @media (max-width: 640px) {
+  :root {
+    --hub-studio-dock-height: min(388px, calc(100dvh - 212px));
+  }
+
   .prompt-actions {
     flex-wrap: wrap;
     gap: 6px;
@@ -1751,7 +1784,7 @@ select.prompt-control {
   }
 
   .app {
-    padding: 20px 14px 90px;
+    padding: 20px 14px calc(var(--hub-studio-dock-bottom) + var(--hub-studio-dock-height) + 20px);
   }
 
   .brand-logo {
@@ -2270,8 +2303,13 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
 }
 
 @media (max-width: 700px) {
+  :root {
+    --hub-floating-bottom: max(12px, env(safe-area-inset-bottom));
+    --hub-floating-stack-height: 128px;
+    --hub-studio-dock-gap: 12px;
+  }
+
   .page-bottom-dock {
-    bottom: max(12px, env(safe-area-inset-bottom));
     max-width: calc(100vw - 24px);
   }
 
@@ -2292,5 +2330,10 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
 
   .theme-cycle-button {
     min-width: 104px;
+  }
+
+  .prompt-wrap.panel {
+    width: calc(100vw - 24px);
+    max-width: calc(100vw - 24px);
   }
 }
