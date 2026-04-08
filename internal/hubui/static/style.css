@@ -430,12 +430,12 @@ body .right-col.prompt-collapsed.task-output-hidden {
 }
 
 .prompt-wrap .panel-header {
-  position: relative;
-  justify-content: center;
   border-bottom-color: rgba(116, 160, 213, 0.2);
   background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));
   color: #6f88ad;
   letter-spacing: 0.11em;
+  position: relative;
+  justify-content: center;
 }
 
 .prompt-titlebar {
