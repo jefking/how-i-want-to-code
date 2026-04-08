@@ -49,6 +49,12 @@ Hub listener:
 ./bin/harness hub --init ./init.example.json
 ```
 
+Already Configured:
+
+```bash
+./bin/harness hub
+```
+
 ### Container
 
 Build a container image:
