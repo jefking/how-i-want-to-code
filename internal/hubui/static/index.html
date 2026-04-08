@@ -1245,6 +1245,20 @@
       }
       builderPromptInput.focus();
     }
+
+    function defaultRepoSelection(currentValue, selectedValue, unique) {
+      if (selectedValue && unique.includes(selectedValue)) {
+        return selectedValue;
+      }
+      if (currentValue && unique.includes(currentValue)) {
+        return currentValue;
+      }
+      if (state.repoHistory.length > 0 && unique.length > 0) {
+        return unique[0];
+      }
+      return "";
+    }
+
     function renderRepoHistorySelect(historyField, select, input) {
       if (!historyField || !select || !input) {
         return;
@@ -1272,14 +1286,12 @@
         select.appendChild(option);
       }
 
-      if (manualSelected) {
-        select.value = "";
-      } else if (selectedValue && unique.includes(selectedValue)) {
-        select.value = selectedValue;
-      } else if (currentValue && unique.includes(currentValue)) {
-        select.value = currentValue;
-      } else {
-        select.value = "";
+      const nextValue = manualSelected && currentValue
+        ? ""
+        : defaultRepoSelection(currentValue, manualSelected ? "" : selectedValue, unique);
+      select.value = nextValue;
+      if (nextValue) {
+        input.value = nextValue;
       }
 
       syncRepositoryFieldVisibility();

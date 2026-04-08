@@ -488,6 +488,18 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function rememberRepos(") {
 		t.Fatalf("expected index html to include repo history persistence")
 	}
+	if !strings.Contains(markup, "function defaultRepoSelection(") {
+		t.Fatalf("expected index html to include repo history default selection helper")
+	}
+	if !strings.Contains(markup, "if (state.repoHistory.length > 0 && unique.length > 0)") {
+		t.Fatalf("expected index html to default repo selection to saved history when available")
+	}
+	if !strings.Contains(markup, "const nextValue = manualSelected && currentValue") ||
+		!strings.Contains(markup, "defaultRepoSelection(currentValue, manualSelected ? \"\" : selectedValue, unique);") ||
+		!strings.Contains(markup, "if (nextValue) {") ||
+		!strings.Contains(markup, "input.value = nextValue;") {
+		t.Fatalf("expected index html to sync default saved repo selection into the repository input")
+	}
 	if !strings.Contains(markup, "function dropReposFromHistory(") {
 		t.Fatalf("expected index html to include repo history cleanup helper")
 	}
