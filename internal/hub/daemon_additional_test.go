@@ -419,7 +419,7 @@ func TestQueueFailureFollowUpUsesSingleRepoPayloadForMultiRepoFailures(t *testin
 	}
 }
 
-func TestHandleDispatchSkipsFailureFollowUpForNoDeltaFailures(t *testing.T) {
+func TestHandleDispatchQueuesFailureFollowUpForNoDeltaFailures(t *testing.T) {
 	t.Parallel()
 
 	d := NewDaemon(failingRunner{err: errors.New("task failed: this branch has no delta from `main`; No commits between main and moltenhub-fix")})
@@ -454,23 +454,27 @@ func TestHandleDispatchSkipsFailureFollowUpForNoDeltaFailures(t *testing.T) {
 	api.mu.Lock()
 	defer api.mu.Unlock()
 
-	if got, want := len(api.published), 1; got != want {
+	if got, want := len(api.published), 2; got != want {
 		t.Fatalf("published payload count = %d, want %d", got, want)
 	}
 	if got := api.published[0]["status"]; got != "error" {
 		t.Fatalf("result payload status = %#v, want error", got)
 	}
+	if got := api.published[1]["request_id"]; got != "req-no-delta-failure-review" {
+		t.Fatalf("follow-up request_id = %#v, want req-no-delta-failure-review", got)
+	}
 }
 
-func TestShouldQueueFailureFollowUpErrorSkipsNoDeltaFailures(t *testing.T) {
+func TestShouldQueueFailureFollowUpSkipsNestedFailureReviewRequests(t *testing.T) {
 	t.Parallel()
 
-	ok, reason := shouldQueueFailureFollowUpError(errors.New("Failure: no delta from `main`; No commits between main and moltenhub-fix"))
+	dispatch := SkillDispatch{RequestID: "req-123-failure-review"}
+	ok, reason := shouldQueueFailureFollowUp(dispatch, harness.Result{Err: errors.New("still failing")})
 	if ok {
-		t.Fatal("shouldQueueFailureFollowUpError() = true, want false")
+		t.Fatal("shouldQueueFailureFollowUp() = true, want false")
 	}
-	if reason != "no delta from" {
-		t.Fatalf("reason = %q, want %q", reason, "no delta from")
+	if !strings.Contains(reason, "nested follow-up queue") {
+		t.Fatalf("reason = %q, want nested follow-up suppression reason", reason)
 	}
 }
 
