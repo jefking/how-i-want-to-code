@@ -17,7 +17,7 @@
   --hub-bad-rgb: 239 68 68;
   --hub-running-rgb: 10 132 255;
   --hub-meta-rgb: 113 136 177;
-  --hub-accent-rgb: 123 97 255;
+  --hub-accent-rgb: 10 132 255;
   --bg: #f4f8ff;
   --bg-soft: rgba(255, 255, 255, 0.84);
   --bg-elevated: #ffffff;
@@ -34,9 +34,9 @@
   --warn: #f59e0b;
   --bad: #ef4444;
   --running: #0a84ff;
-  --accent: #7b61ff;
-  --accent-soft: rgba(123, 97, 255, 0.12);
-  --brand-gradient: linear-gradient(135deg, #3ecbff 0%, #0a84ff 48%, #7b61ff 100%);
+  --accent: #0a84ff;
+  --accent-soft: rgba(10, 132, 255, 0.12);
+  --brand-gradient: linear-gradient(135deg, #3ecbff 0%, #0a84ff 48%, #1a6fff 100%);
   --surface-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(240, 245, 255, 0.74));
   --surface-glass-strong: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(240, 246, 255, 0.9));
   --surface-glass-solid: rgba(255, 255, 255, 0.92);
@@ -94,7 +94,7 @@
   --surface-fullscreen-bg:
     linear-gradient(180deg, rgba(244, 248, 255, 0.76), rgba(236, 243, 255, 0.9)),
     radial-gradient(circle at top left, rgba(62, 203, 255, 0.14), transparent 38%),
-    radial-gradient(circle at bottom right, rgba(123, 97, 255, 0.16), transparent 42%);
+    radial-gradient(circle at bottom right, rgba(10, 132, 255, 0.16), transparent 42%);
   --surface-fullscreen-close-bg: rgba(15, 27, 51, 0.92);
   --surface-fullscreen-close-border: rgba(15, 27, 51, 0.2);
   --surface-fullscreen-close-hover-bg: rgba(15, 27, 51, 0.98);
@@ -124,10 +124,10 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
     0 0 0 3px rgba(76, 133, 233, 0.18);
   --body-radial-left: radial-gradient(1300px 600px at -10% -15%, rgba(10, 132, 255, 0.16), transparent 60%);
-  --body-radial-right: radial-gradient(980px 560px at 110% 8%, rgba(123, 97, 255, 0.12), transparent 62%);
+  --body-radial-right: radial-gradient(980px 560px at 110% 8%, rgba(10, 132, 255, 0.12), transparent 62%);
   --body-linear: linear-gradient(180deg, #f8fbff, #f2f7ff 55%, #ecf3ff);
   --body-orb-a: radial-gradient(circle, rgba(62, 203, 255, 0.24) 0%, rgba(62, 203, 255, 0) 66%);
-  --body-orb-b: radial-gradient(circle, rgba(123, 97, 255, 0.2) 0%, rgba(123, 97, 255, 0) 70%);
+  --body-orb-b: radial-gradient(circle, rgba(10, 132, 255, 0.2) 0%, rgba(10, 132, 255, 0) 70%);
   --shadow-sm: 0 10px 28px rgba(10, 44, 102, 0.08);
   --shadow-md: 0 18px 44px rgba(10, 44, 102, 0.14);
   --shadow-lg: 0 28px 72px rgba(10, 44, 102, 0.18);
@@ -1399,8 +1399,8 @@ select.prompt-control {
   margin-left: -2px;
   margin-top: -2px;
   border-radius: 999px;
-  background: radial-gradient(circle, #fff 0%, #7b61ff 65%, rgba(123, 97, 255, 0) 100%);
-  box-shadow: 0 0 12px rgba(123, 97, 255, 0.5);
+  background: radial-gradient(circle, #fff 0%, #0a84ff 65%, rgba(10, 132, 255, 0) 100%);
+  box-shadow: 0 0 12px rgba(10, 132, 255, 0.5);
   animation: taskSparkletBurst 2s ease-out forwards;
 }
 
@@ -1584,7 +1584,7 @@ select.prompt-control {
 
 .task-result-link:hover {
   color: var(--accent);
-  border-bottom-color: rgba(123, 97, 255, 0.55);
+  border-bottom-color: rgba(10, 132, 255, 0.55);
 }
 
 .term {
@@ -2132,10 +2132,10 @@ html.dark {
   --hub-muted-rgb: 159 178 214;
   --hub-meta-rgb: 140 162 204;
   --body-radial-left: radial-gradient(1200px 620px at -12% -12%, rgba(10, 132, 255, 0.28), transparent 58%);
-  --body-radial-right: radial-gradient(880px 540px at 108% 4%, rgba(123, 97, 255, 0.22), transparent 60%);
+  --body-radial-right: radial-gradient(880px 540px at 108% 4%, rgba(10, 132, 255, 0.22), transparent 60%);
   --body-linear: linear-gradient(180deg, #0d1424, #0a1120 58%, #09101d);
   --body-orb-a: radial-gradient(circle, rgba(10, 132, 255, 0.22) 0%, rgba(10, 132, 255, 0) 68%);
-  --body-orb-b: radial-gradient(circle, rgba(123, 97, 255, 0.18) 0%, rgba(123, 97, 255, 0) 72%);
+  --body-orb-b: radial-gradient(circle, rgba(10, 132, 255, 0.18) 0%, rgba(10, 132, 255, 0) 72%);
   --bg: #0f1627;
   --bg-soft: rgba(20, 29, 49, 0.88);
   --bg-elevated: #18233a;
@@ -2148,7 +2148,7 @@ html.dark {
   --text-soft: #b8caea;
   --muted: #9fb2d6;
   --meta: #8ca2cc;
-  --accent-soft: rgba(123, 97, 255, 0.24);
+  --accent-soft: rgba(10, 132, 255, 0.24);
   --surface-glass: linear-gradient(160deg, rgba(25, 35, 57, 0.9), rgba(18, 27, 44, 0.82));
   --surface-glass-strong: linear-gradient(160deg, rgba(31, 43, 69, 0.94), rgba(20, 29, 47, 0.9));
   --surface-glass-solid: rgba(20, 30, 52, 0.94);
@@ -2206,7 +2206,7 @@ html.dark {
   --surface-fullscreen-bg:
     linear-gradient(180deg, rgba(8, 14, 25, 0.84), rgba(7, 12, 22, 0.94)),
     radial-gradient(circle at top left, rgba(10, 132, 255, 0.16), transparent 38%),
-    radial-gradient(circle at bottom right, rgba(123, 97, 255, 0.16), transparent 42%);
+    radial-gradient(circle at bottom right, rgba(10, 132, 255, 0.16), transparent 42%);
   --surface-fullscreen-close-bg: rgba(232, 240, 255, 0.14);
   --surface-fullscreen-close-border: rgba(232, 240, 255, 0.18);
   --surface-fullscreen-close-hover-bg: rgba(232, 240, 255, 0.2);
@@ -2265,7 +2265,7 @@ html.night {
   --text-soft: #bed0ef;
   --muted: #9badcf;
   --meta: #8ca1c9;
-  --accent-soft: rgba(123, 97, 255, 0.28);
+  --accent-soft: rgba(10, 132, 255, 0.28);
   --surface-glass: linear-gradient(160deg, rgba(16, 24, 41, 0.92), rgba(9, 14, 25, 0.88));
   --surface-glass-strong: linear-gradient(160deg, rgba(20, 29, 49, 0.96), rgba(11, 18, 31, 0.92));
   --surface-glass-solid: rgba(12, 18, 31, 0.95);
