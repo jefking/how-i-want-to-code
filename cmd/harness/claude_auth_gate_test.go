@@ -68,7 +68,7 @@ func TestClaudeAuthGateRequiresBrowserLoginWhenClaudeCredentialsAreMissing(t *te
 	if got := status.AuthURL; got != "" {
 		t.Fatalf("AuthURL = %q, want empty until login command emits a browser URL", got)
 	}
-	if !strings.Contains(status.Message, "Run `claude auth login`") {
+	if !strings.Contains(status.Message, "Run `claude setup-token`") {
 		t.Fatalf("message = %q", status.Message)
 	}
 	if !strings.Contains(status.Message, "not an authorization link") {
@@ -787,6 +787,21 @@ func TestClaudeAuthHelpers(t *testing.T) {
 	}
 	if shouldPromptForClaudeBrowserCode("Open browser and continue") {
 		t.Fatalf("shouldPromptForClaudeBrowserCode(non-prompt) = true, want false")
+	}
+	if !shouldCaptureClaudeOAuthToken("Your OAuth token (valid for 1 year):") {
+		t.Fatalf("shouldCaptureClaudeOAuthToken() = false, want true")
+	}
+	if got, want := extractClaudeOAuthTokenCandidate("abc.DEF_123-xyz-token-value"), "abc.DEF_123-xyz-token-value"; got != want {
+		t.Fatalf("extractClaudeOAuthTokenCandidate() = %q, want %q", got, want)
+	}
+	if got := extractClaudeOAuthTokenCandidate("https://claude.com/cai/oauth/authorize"); got != "" {
+		t.Fatalf("extractClaudeOAuthTokenCandidate(url) = %q, want empty", got)
+	}
+	if got := claudeLoginArgs("claude"); len(got) != 1 || got[0] != "setup-token" {
+		t.Fatalf("claudeLoginArgs(claude) = %v, want [setup-token]", got)
+	}
+	if got := claudeLoginArgs("/tmp/custom-claude-wrapper"); len(got) != 2 || got[0] != "auth" || got[1] != "login" {
+		t.Fatalf("claudeLoginArgs(custom) = %v, want [auth login]", got)
 	}
 }
 

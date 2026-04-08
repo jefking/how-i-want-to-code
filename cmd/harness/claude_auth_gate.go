@@ -23,9 +23,11 @@ import (
 const claudeAuthDocsURL = "https://code.claude.com/docs/en/authentication"
 const claudeGitHubConfigureCommand = "gh auth token"
 const claudeGitHubConfigurePlaceholder = "ghp_xxx"
-const claudeLoginCommand = "claude auth login"
+const claudeLoginCommand = "claude setup-token"
+const claudeOAuthTokenEnv = "CLAUDE_CODE_OAUTH_TOKEN"
 
 var claudeAuthURLPattern = regexp.MustCompile(`https?://[^\s"'<>()]+`)
+var claudeOAuthTokenPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{24,}$`)
 
 type claudeAuthGate struct {
 	mu sync.Mutex
@@ -52,6 +54,7 @@ type claudeAuthGate struct {
 	pendingBrowserCode    string
 	lastBrowserSubmit     time.Time
 	browserSubmitAttempts int
+	awaitingOAuthToken    bool
 }
 
 func newClaudeAuthGate(ctx context.Context, command string, logf func(string, ...any)) *claudeAuthGate {
@@ -613,17 +616,12 @@ func claudeAuthURLAcceptsBrowserCode(authURL string) bool {
 	host := strings.ToLower(strings.TrimSpace(parsed.Host))
 	path := strings.ToLower(strings.TrimSpace(parsed.Path))
 
-	// Current claude.com/cai/oauth/authorize flow is browser-driven and does not
-	// require code submission in the CLI.
-	if host == "claude.com" || strings.HasSuffix(host, ".claude.com") {
-		if strings.HasPrefix(path, "/cai/oauth/authorize") {
-			return false
-		}
+	if parsed.Query().Get("code") == "true" {
+		return true
 	}
-
-	// Legacy/manual flows may prompt for pasted browser codes.
-	if host == "claude.ai" || strings.HasSuffix(host, ".claude.ai") {
-		if strings.Contains(path, "/login/device") || strings.Contains(path, "/oauth/authorize") {
+	if host == "claude.com" || strings.HasSuffix(host, ".claude.com") ||
+		host == "claude.ai" || strings.HasSuffix(host, ".claude.ai") {
+		if strings.Contains(path, "/oauth/authorize") || strings.Contains(path, "/login/device") {
 			return true
 		}
 	}
@@ -666,8 +664,21 @@ func (g *claudeAuthGate) githubTokenRequirementState() (bool, hubui.AgentAuthSta
 }
 
 func (g *claudeAuthGate) probeClaude() (bool, string) {
+	runtimeConfigPath := strings.TrimSpace(g.runtimeConfigPath)
+
+	if oauthToken, source := firstConfiguredClaudeOAuthToken(runtimeConfigPath); strings.TrimSpace(oauthToken) != "" {
+		if err := setClaudeOAuthTokenEnvironment(oauthToken); err == nil {
+			if strings.TrimSpace(source) == "" {
+				source = "token"
+			}
+			return true, fmt.Sprintf("Claude Code and GitHub token are ready (%s).", source)
+		}
+	}
 	if enabled := firstClaudeEnabledProvider(); enabled != "" {
 		return true, fmt.Sprintf("Claude Code is configured for %s credentials.", enabled)
+	}
+	if strings.TrimSpace(os.Getenv(claudeOAuthTokenEnv)) != "" {
+		return true, "Claude Code is configured via CLAUDE_CODE_OAUTH_TOKEN."
 	}
 	if strings.TrimSpace(os.Getenv("ANTHROPIC_AUTH_TOKEN")) != "" {
 		return true, "Claude Code is configured via ANTHROPIC_AUTH_TOKEN."
@@ -757,9 +768,11 @@ func (g *claudeAuthGate) ingestLoginLine(line string) {
 	authURL := extractClaudeAuthURL(line)
 	promptAdvance := shouldAdvanceClaudeLoginPrompt(line)
 	codePrompt := shouldPromptForClaudeBrowserCode(line)
+	tokenPrompt := shouldCaptureClaudeOAuthToken(line)
 
 	var input io.WriteCloser
 	var update bool
+	var token string
 
 	g.mu.Lock()
 	if authURL != "" {
@@ -778,11 +791,25 @@ func (g *claudeAuthGate) ingestLoginLine(line string) {
 			update = true
 		}
 	}
+	if tokenPrompt {
+		g.awaitingOAuthToken = true
+	}
+	if g.awaitingOAuthToken {
+		if candidate := extractClaudeOAuthTokenCandidate(line); candidate != "" {
+			token = candidate
+			g.awaitingOAuthToken = false
+		} else if shouldStopClaudeOAuthTokenCapture(line) {
+			g.awaitingOAuthToken = false
+		}
+	}
 	if update {
 		g.updatedAt = time.Now().UTC()
 	}
 	g.mu.Unlock()
 
+	if token != "" {
+		g.completeWithClaudeOAuthToken(token)
+	}
 	if codePrompt {
 		g.resubmitPendingBrowserCode()
 	}
@@ -812,6 +839,7 @@ func (g *claudeAuthGate) waitLogin(cmd *exec.Cmd, tempDir string, readerWG *sync
 	g.procInput = nil
 	g.pendingBrowserCode = ""
 	g.browserSubmitAttempts = 0
+	g.awaitingOAuthToken = false
 	if procInput != nil {
 		_ = procInput.Close()
 	}
@@ -968,21 +996,123 @@ func shouldPromptForClaudeBrowserCode(line string) bool {
 		strings.Contains(text, "if prompted >")
 }
 
+func shouldCaptureClaudeOAuthToken(line string) bool {
+	text := strings.ToLower(strings.TrimSpace(stripANSI(line)))
+	if text == "" {
+		return false
+	}
+	return strings.Contains(text, "your oauth token")
+}
+
+func shouldStopClaudeOAuthTokenCapture(line string) bool {
+	text := strings.ToLower(strings.TrimSpace(stripANSI(line)))
+	if text == "" {
+		return false
+	}
+	return strings.Contains(text, "store this token securely") ||
+		strings.Contains(text, "use this token by setting") ||
+		strings.Contains(text, "login successful")
+}
+
+func extractClaudeOAuthTokenCandidate(line string) string {
+	line = strings.TrimSpace(stripANSI(line))
+	if line == "" {
+		return ""
+	}
+	if strings.Contains(line, " ") {
+		return ""
+	}
+	if strings.HasPrefix(line, "http://") || strings.HasPrefix(line, "https://") {
+		return ""
+	}
+	if !claudeOAuthTokenPattern.MatchString(line) {
+		return ""
+	}
+	return line
+}
+
+func (g *claudeAuthGate) completeWithClaudeOAuthToken(token string) {
+	if g == nil {
+		return
+	}
+
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return
+	}
+
+	if err := setClaudeOAuthTokenEnvironment(token); err != nil {
+		g.logf("hub.auth status=warn harness=claude action=save_oauth_token err=%q", err)
+		return
+	}
+
+	var (
+		cancel            context.CancelFunc
+		input             io.WriteCloser
+		runtimeConfigPath string
+		initCfg           hub.InitConfig
+	)
+
+	g.mu.Lock()
+	runtimeConfigPath = g.runtimeConfigPath
+	initCfg = g.initCfg
+	cancel = g.procCancel
+	input = g.procInput
+	g.ready = true
+	g.state = "ready"
+	g.message = "Claude Code and GitHub token are ready."
+	g.authURL = ""
+	g.pendingBrowserCode = ""
+	g.browserSubmitAttempts = 0
+	g.awaitingOAuthToken = false
+	g.procRunning = false
+	g.procCancel = nil
+	g.procInput = nil
+	g.updatedAt = time.Now().UTC()
+	g.mu.Unlock()
+
+	if runtimeConfigPath != "" {
+		if err := hub.SaveRuntimeConfigClaudeOAuthToken(runtimeConfigPath, initCfg, token); err != nil {
+			g.logf("hub.auth status=warn harness=claude action=persist_oauth_token err=%q", err)
+		}
+	}
+
+	if input != nil {
+		_ = input.Close()
+	}
+	if cancel != nil {
+		cancel()
+	}
+	g.logf("hub.auth status=ok harness=claude action=oauth_token_captured")
+}
+
 func buildClaudeLoginCommand(ctx context.Context, command string) *exec.Cmd {
 	command = strings.TrimSpace(command)
 	if command == "" {
 		command = agentruntime.HarnessClaude
 	}
+	args := claudeLoginArgs(command)
 	if _, err := exec.LookPath("script"); err == nil {
+		loginCmd := shellQuoteJoin(append([]string{command}, args...)...)
+		ptyCmd := "stty cols 1000 rows 50; " + loginCmd
 		return exec.CommandContext(
 			ctx,
 			"script",
-			"-qfec",
-			shellQuoteJoin(command, "auth", "login"),
+			"-qefc",
+			ptyCmd,
 			"/dev/null",
 		)
 	}
-	return exec.CommandContext(ctx, command, "auth", "login")
+	return exec.CommandContext(ctx, command, args...)
+}
+
+func claudeLoginArgs(command string) []string {
+	trimmed := strings.TrimSpace(command)
+	base := strings.ToLower(strings.TrimSpace(filepath.Base(trimmed)))
+	if trimmed == agentruntime.HarnessClaude || base == "claude" {
+		return []string{"setup-token"}
+	}
+	return []string{"auth", "login"}
 }
 
 func shellQuoteJoin(parts ...string) string {
@@ -1017,6 +1147,16 @@ func firstConfiguredGitHubToken(runtimeConfigPath string, initCfg hub.InitConfig
 	return "", ""
 }
 
+func firstConfiguredClaudeOAuthToken(runtimeConfigPath string) (value string, source string) {
+	if env := strings.TrimSpace(os.Getenv(claudeOAuthTokenEnv)); env != "" {
+		return env, "environment"
+	}
+	if persisted := loadPersistedClaudeOAuthToken(runtimeConfigPath); persisted != "" {
+		return persisted, "runtime config"
+	}
+	return "", ""
+}
+
 func loadPersistedGitHubToken(path string) string {
 	path = strings.TrimSpace(path)
 	if path == "" {
@@ -1038,6 +1178,27 @@ func loadPersistedGitHubToken(path string) string {
 	)
 }
 
+func loadPersistedClaudeOAuthToken(path string) string {
+	path = strings.TrimSpace(path)
+	if path == "" {
+		return ""
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		return ""
+	}
+	return firstNonEmptyString(
+		stringValue(doc["claude_code_oauth_token"]),
+		stringValue(doc["claudeCodeOauthToken"]),
+		stringValue(doc["CLAUDE_CODE_OAUTH_TOKEN"]),
+	)
+}
+
 func setGitHubTokenEnvironment(token string) error {
 	token = strings.TrimSpace(token)
 	if token == "" {
@@ -1050,6 +1211,14 @@ func setGitHubTokenEnvironment(token string) error {
 		return err
 	}
 	return nil
+}
+
+func setClaudeOAuthTokenEnvironment(token string) error {
+	token = strings.TrimSpace(token)
+	if token == "" {
+		return fmt.Errorf("claude oauth token is required")
+	}
+	return os.Setenv(claudeOAuthTokenEnv, token)
 }
 
 func firstClaudeEnabledProvider() string {
@@ -1134,7 +1303,7 @@ func claudeCredentialCandidates() []string {
 }
 
 func claudeBrowserLoginRequiredMessage() string {
-	return "Claude Code login is required. Run `claude auth login`, complete browser sign-in, then click Done.\nReference docs (not an authorization link): " + claudeAuthDocsURL
+	return "Claude Code login is required. Run `claude setup-token`, complete browser sign-in, then click Done.\nReference docs (not an authorization link): " + claudeAuthDocsURL
 }
 
 func isClaudeDocsURL(raw string) bool {
