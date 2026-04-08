@@ -933,17 +933,23 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-fullscreen") {
 		t.Fatalf("expected stylesheet to include full screen task layout styles")
 	}
-	if !strings.Contains(css, ".task-pr-link") || !strings.Contains(css, "align-self: stretch;") {
-		t.Fatalf("expected stylesheet to stretch task PR links to full task card height")
+	if !strings.Contains(css, ".task-pr-link") ||
+		!strings.Contains(css, "width: 34px;") ||
+		!strings.Contains(css, "height: 34px;") ||
+		!strings.Contains(css, "align-self: center;") {
+		t.Fatalf("expected stylesheet to render task PR links as fixed-size controls that do not affect task card height")
 	}
-	if !strings.Contains(css, ".task.task-has-pr-link {\n  padding-right: 0;\n  gap: 0;") {
-		t.Fatalf("expected stylesheet to reserve a dedicated right-side rail for task PR links")
+	if strings.Contains(css, "align-self: stretch;") {
+		t.Fatalf("expected stylesheet to avoid stretching task PR links to task card height")
 	}
-	if !strings.Contains(css, ".task.task-has-pr-link .task-pr-link {\n  margin-top: -10px;\n  margin-bottom: -10px;") {
-		t.Fatalf("expected stylesheet to make task PR links fill the full task card height")
+	if strings.Contains(css, ".task.task-has-pr-link {\n  padding-right: 0;\n  gap: 0;") {
+		t.Fatalf("expected stylesheet to remove the dedicated right-side PR rail layout")
 	}
-	if !strings.Contains(css, "aspect-ratio: 1 / 1;") {
-		t.Fatalf("expected stylesheet to keep task PR links square while stretching to task height")
+	if strings.Contains(css, ".task.task-has-pr-link .task-pr-link {\n  margin-top: -10px;\n  margin-bottom: -10px;") {
+		t.Fatalf("expected stylesheet to avoid task-height-filling PR link margins")
+	}
+	if strings.Contains(css, "aspect-ratio: 1 / 1;") {
+		t.Fatalf("expected stylesheet to avoid aspect-ratio-driven PR link stretching")
 	}
 	if !strings.Contains(css, ".task-pr-link img {\n  display: block;\n  width: 100%;\n  height: 100%;") {
 		t.Fatalf("expected stylesheet to scale the GitHub logo to fill the task PR rail")
