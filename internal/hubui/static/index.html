@@ -2872,13 +2872,13 @@
 
           const repos = document.createElement("div");
           repos.textContent = `repos: ${formatTaskRepos(task)}`;
+          const branch = document.createElement("div");
+          branch.textContent = `branches: ${formatTaskBranch(task)}`;
           const skill = document.createElement("div");
           skill.textContent = `skill: ${task.skill || "-"}`;
-          const branch = document.createElement("div");
-          branch.textContent = `branch: ${formatTaskBranch(task)}`;
           const update = document.createElement("div");
           update.textContent = `updated: ${relativeTime(task.updated_at)}`;
-          meta.append(repos, skill, branch, update);
+          meta.append(repos, branch, skill, update);
 
           const progress = renderTaskProgress(task);
 

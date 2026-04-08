@@ -1398,9 +1398,10 @@ select.prompt-control {
 .task-sparklet-particle:nth-child(6) { --sparkle-x: -11px; --sparkle-y: -7px; animation-delay: 0.06s; }
 
 .task-meta {
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 4px 10px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 0;
   color: var(--muted);
   font-size: 0.74rem;
   min-width: 0;
@@ -1411,6 +1412,18 @@ select.prompt-control {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.task-meta > div + div {
+  position: relative;
+  padding-left: 12px;
+}
+
+.task-meta > div + div::before {
+  content: "|";
+  position: absolute;
+  left: 4px;
+  color: var(--meta);
 }
 
 .task-progress {
@@ -1909,7 +1922,17 @@ select.prompt-control {
   }
 
   .task-meta {
-    grid-template-columns: 1fr;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 4px;
+  }
+
+  .task-meta > div + div {
+    padding-left: 0;
+  }
+
+  .task-meta > div + div::before {
+    content: none;
   }
 }
 
