@@ -442,7 +442,7 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "Connected via HTTP long polling") {
 		t.Fatalf("expected index html to include HTTP long-polling connection copy")
 	}
-	if !strings.Contains(markup, `const HUB_CONNECT_URL = "https://app.molten.bot";`) {
+	if !strings.Contains(markup, `const HUB_CONNECT_URL = "https://app.molten.bot/login";`) {
 		t.Fatalf("expected index html to define the molten hub connect url")
 	}
 	if !strings.Contains(markup, `text = actionable ? "Connect to Molten Hub" : text;`) {
