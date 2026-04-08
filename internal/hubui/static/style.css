@@ -214,9 +214,9 @@ textarea {
 .app {
   width: min(1500px, 100%);
   margin: 0 auto;
-  padding: 28px 20px calc(var(--hub-studio-dock-bottom) + var(--hub-studio-dock-height) + 28px);
+  padding: 28px 20px 124px;
   display: grid;
-  gap: 18px;
+  gap: 24px;
 }
 
 .header {
@@ -461,7 +461,7 @@ textarea {
 .layout {
   min-height: calc(100vh - 130px);
   min-height: calc(100dvh - 130px);
-  display: flex;
+  display: block;
 }
 
 .panel {
@@ -541,12 +541,11 @@ textarea {
 
 body .right-col {
   display: grid;
-  grid-template-rows: minmax(0, 1fr);
-  flex: 1 1 auto;
-  gap: 16px;
-  align-content: stretch;
-  min-height: 100%;
-  height: 100%;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 24px;
+  align-content: start;
+  min-height: 0;
+  height: auto;
 }
 
 body .right-col.prompt-collapsed {
@@ -562,26 +561,22 @@ body .right-col.prompt-collapsed.task-list-hidden {
 }
 
 .prompt-wrap.panel {
-  order: 3;
   display: flex;
   flex-direction: column;
+  position: relative;
+  left: auto;
+  right: auto;
+  bottom: auto;
+  z-index: auto;
+  width: 100%;
+  max-width: none;
+  max-height: none;
+  transform-origin: center bottom;
+  transform: none;
+  transition: box-shadow 0.24s ease, background 0.24s ease, border-color 0.24s ease;
   border-color: var(--surface-glow-border);
   background: var(--surface-glow);
   box-shadow: var(--surface-glow-shadow);
-}
-
-.prompt-wrap.panel {
-  position: fixed;
-  left: 50%;
-  right: auto;
-  bottom: var(--hub-studio-dock-bottom);
-  z-index: 58;
-  width: min(calc(1500px - 40px), calc(100vw - 40px));
-  max-width: calc(100vw - 40px);
-  max-height: var(--hub-studio-dock-height);
-  transform-origin: center bottom;
-  transform: translateX(-50%) translateY(0);
-  transition: transform 0.24s ease, opacity 0.24s ease, box-shadow 0.24s ease, background 0.24s ease, border-color 0.24s ease;
 }
 
 .prompt-wrap .panel-header {
@@ -589,24 +584,30 @@ body .right-col.prompt-collapsed.task-list-hidden {
   background: var(--surface-header);
   color: var(--surface-label);
   letter-spacing: 0.11em;
-  justify-content: flex-end;
+  justify-content: space-between;
 }
 
 .prompt-titlebar {
   display: flex;
   align-items: center;
   gap: 12px;
-  justify-content: flex-end;
+  justify-content: space-between;
   min-height: 52px;
+}
+
+.panel-section-title {
+  color: var(--text);
+  font-family: "Sora", "Instrument Sans", sans-serif;
+  font-size: 0.92rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
 }
 
 .prompt-wrap.prompt-collapsed {
   min-height: var(--hub-studio-collapsed-height);
-  max-height: var(--hub-studio-collapsed-height);
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  transform: translateX(-50%) translateY(8px);
+  max-height: none;
+  transform: none;
 }
 
 .prompt-wrap.prompt-hidden-dock .panel-header {
@@ -712,11 +713,10 @@ body .right-col.prompt-collapsed.task-list-hidden {
 }
 
 #task-panel {
-  order: 1;
   display: flex;
   flex-direction: column;
   min-height: 0;
-  height: 100%;
+  height: auto;
 }
 
 #task-panel .scroll {
@@ -1717,19 +1717,7 @@ select.prompt-control {
   }
 
   body .right-col {
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  body .right-col.prompt-collapsed {
-    grid-template-rows: minmax(0, 1fr);
-  }
-
-  body .right-col.task-list-hidden {
-    grid-template-rows: auto;
-  }
-
-  body .right-col.prompt-collapsed.task-list-hidden {
-    grid-template-rows: auto;
+    gap: 18px;
   }
 
   .task-fullscreen-body {
@@ -1829,7 +1817,7 @@ select.prompt-control {
   }
 
   .app {
-    padding: 20px 14px calc(var(--hub-studio-dock-bottom) + var(--hub-studio-dock-height) + 20px);
+    padding: 20px 14px 132px;
   }
 
   .brand-logo {
@@ -2337,7 +2325,7 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
   }
 
   .prompt-wrap.panel {
-    width: calc(100vw - 24px);
-    max-width: calc(100vw - 24px);
+    width: 100%;
+    max-width: none;
   }
 }

@@ -256,11 +256,11 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `class="panel prompt-wrap`) {
 		t.Fatalf("expected index html to include prompt wrap panel")
 	}
-	if !strings.Contains(markup, `promptWrap.classList.toggle("prompt-hidden-dock", !visible);`) {
-		t.Fatalf("expected index html to toggle hidden dock mode for collapsed studio")
+	if !strings.Contains(markup, `promptWrap.classList.toggle("prompt-collapsed", !visible);`) {
+		t.Fatalf("expected index html to toggle collapsed studio state")
 	}
-	if !strings.Contains(markup, `promptVisibilityToggle.hidden = !visible || automatic;`) {
-		t.Fatalf("expected index html to hide the minimize toggle unless studio is expanded")
+	if !strings.Contains(markup, `promptVisibilityToggle.hidden = automatic;`) {
+		t.Fatalf("expected index html to keep the studio toggle available outside automatic mode")
 	}
 	if !strings.Contains(markup, `if (!state.promptVisible && !Boolean(state.ui?.automaticMode)) {`) {
 		t.Fatalf("expected index html to auto-expand studio when a mode tab is selected")
@@ -268,8 +268,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="task-panel" class="panel min-h-[220px] overflow-hidden rounded-2xl border border-hub-border bg-hub-panel bg-[linear-gradient(170deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] hidden" aria-hidden="true"`) {
 		t.Fatalf("expected index html to keep task panel hidden before tasks exist")
 	}
-	if strings.Contains(markup, "<span>Tasks</span>") {
-		t.Fatalf("expected index html to remove Tasks title label from panel header")
+	if !strings.Contains(markup, `>Task View</span>`) {
+		t.Fatalf("expected index html to render the task panel under a Task View heading")
 	}
 	if !strings.Contains(markup, `id="task-fullscreen-list"`) {
 		t.Fatalf("expected index html to include full screen task list")
@@ -421,8 +421,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `aria-label="Minimize Studio panel"`) || !strings.Contains(markup, `title="Minimize Studio panel">▾</button>`) {
 		t.Fatalf("expected index html to initialize the studio toggle as an arrow minimize control")
 	}
-	if strings.Contains(markup, `class="panel-title">Studio</span>`) || strings.Contains(markup, ">Studio<") {
-		t.Fatalf("expected index html to remove the Studio title-bar label")
+	if !strings.Contains(markup, `>Studio</span>`) {
+		t.Fatalf("expected index html to render the studio panel under a Studio heading")
 	}
 	if !strings.Contains(markup, "library-task-option-prompt") {
 		t.Fatalf("expected index html to include expandable library prompt sections")
@@ -474,6 +474,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `class="page-bottom-dock"`) || !strings.Contains(markup, `class="prompt-mode-tabs prompt-mode-tabs-dock"`) {
 		t.Fatalf("expected index html to render the mode toggles in the bottom dock")
+	}
+	if strings.Index(markup, `id="task-panel"`) > strings.Index(markup, `class="panel prompt-wrap`) {
+		t.Fatalf("expected index html to render Task View before Studio in the page layout")
 	}
 	if !strings.Contains(markup, `id="builder-repo-select"`) {
 		t.Fatalf("expected index html to include repo history select")
