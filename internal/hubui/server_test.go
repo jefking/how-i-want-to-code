@@ -172,11 +172,17 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function dismissTask(") {
 		t.Fatalf("expected index html to include dismissTask handler")
 	}
-	if !strings.Contains(markup, "const CLOSE_TASK_ANIMATION_MS = 360;") {
-		t.Fatalf("expected index html to include close task animation timing")
+	if !strings.Contains(markup, "const CLOSE_TASK_FADE_MS = 2000;") {
+		t.Fatalf("expected index html to include close task fade timing")
 	}
 	if !strings.Contains(markup, "closingTaskIDs: new Set()") {
 		t.Fatalf("expected index html to track closing tasks")
+	}
+	if !strings.Contains(markup, "function isTaskClosePending(") {
+		t.Fatalf("expected index html to include immediate close-button hiding helper")
+	}
+	if !strings.Contains(markup, "close.hidden = closePending;") {
+		t.Fatalf("expected index html to hide the close button immediately while close is pending")
 	}
 	if !strings.Contains(markup, "completeTaskDismissal(requestID)") {
 		t.Fatalf("expected index html to include delayed task dismissal helper")
@@ -241,6 +247,18 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="task-panel"`) {
 		t.Fatalf("expected index html to include task panel wrapper")
 	}
+	if !strings.Contains(markup, `class="panel prompt-wrap`) {
+		t.Fatalf("expected index html to include prompt wrap panel")
+	}
+	if !strings.Contains(markup, `promptWrap.classList.toggle("prompt-hidden-dock", !visible);`) {
+		t.Fatalf("expected index html to toggle hidden dock mode for collapsed studio")
+	}
+	if !strings.Contains(markup, `promptVisibilityToggle.hidden = !visible || automatic;`) {
+		t.Fatalf("expected index html to hide the minimize toggle unless studio is expanded")
+	}
+	if !strings.Contains(markup, `if (!state.promptVisible && !Boolean(state.ui?.automaticMode)) {`) {
+		t.Fatalf("expected index html to auto-expand studio when a mode tab is selected")
+	}
 	if !strings.Contains(markup, `id="task-panel" class="panel min-h-[220px] overflow-hidden rounded-2xl border border-hub-border bg-hub-panel bg-[linear-gradient(170deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))] hidden" aria-hidden="true"`) {
 		t.Fatalf("expected index html to keep task panel hidden before tasks exist")
 	}
@@ -259,8 +277,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="task-fullscreen-terminal"`) {
 		t.Fatalf("expected index html to include full screen terminal output")
 	}
-	if strings.Contains(markup, `id="task-fullscreen-close"`) {
-		t.Fatalf("expected index html to use the primary full screen toggle as the close control")
+	if !strings.Contains(markup, `id="task-fullscreen-close"`) {
+		t.Fatalf("expected index html to include a dedicated full screen close control")
 	}
 	if strings.Contains(markup, "task-fullscreen-subtitle") || strings.Contains(markup, "Focused task/running/state view") {
 		t.Fatalf("expected index html to omit full screen subtitle copy")
@@ -283,14 +301,14 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "taskFullscreenBody.classList.toggle(\"task-output-hidden\", !outputVisible);") {
 		t.Fatalf("expected index html to include full screen task-only mode when output is hidden")
 	}
-	if !strings.Contains(markup, "taskFullscreenToggle.textContent = state.taskFullscreenOpen ? \"X\" : \"Full Screen\";") {
-		t.Fatalf("expected index html to set full screen toggle text to X when open")
+	if !strings.Contains(markup, "const taskFullscreenClose = document.getElementById(\"task-fullscreen-close\");") {
+		t.Fatalf("expected index html to cache the dedicated full screen close control")
 	}
-	if !strings.Contains(markup, "taskFullscreenToggle.classList.toggle(\"task-fullscreen-close\", state.taskFullscreenOpen);") {
-		t.Fatalf("expected index html to apply close-button styling to full screen toggle when open")
+	if !strings.Contains(markup, "taskFullscreenClose.classList.toggle(\"hidden\", !state.taskFullscreenOpen);") {
+		t.Fatalf("expected index html to toggle dedicated full screen close visibility")
 	}
-	if !strings.Contains(markup, "taskFullscreenToggle.setAttribute(\"aria-label\", state.taskFullscreenOpen ? \"Close full screen tasks\" : \"Open full screen tasks\");") {
-		t.Fatalf("expected index html to update full screen toggle aria-label for open and close states")
+	if !strings.Contains(markup, "taskFullscreenClose.addEventListener(\"click\", () => {") {
+		t.Fatalf("expected index html to bind the dedicated full screen close control")
 	}
 	if !strings.Contains(markup, "function setTaskOutputPanelVisibility(") {
 		t.Fatalf("expected index html to include standard output panel visibility handler")
@@ -385,11 +403,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `aria-label="Minimize Studio panel"`) || !strings.Contains(markup, `title="Minimize Studio panel">▾</button>`) {
 		t.Fatalf("expected index html to initialize the studio toggle as an arrow minimize control")
 	}
-	if !strings.Contains(markup, ">Studio<") {
-		t.Fatalf("expected index html to label the prompt panel as Studio")
-	}
-	if !strings.Contains(markup, `class="panel-title">Studio</span>`) {
-		t.Fatalf("expected index html to render Studio as the title-bar label")
+	if strings.Contains(markup, `class="panel-title">Studio</span>`) || strings.Contains(markup, ">Studio<") {
+		t.Fatalf("expected index html to remove the Studio title-bar label")
 	}
 	if !strings.Contains(markup, "library-task-option-prompt") {
 		t.Fatalf("expected index html to include expandable library prompt sections")
@@ -431,7 +446,7 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to include json mode toggle")
 	}
 	if !strings.Contains(markup, `class="prompt-mode-tabs prompt-mode-tabs-titlebar`) {
-		t.Fatalf("expected index html to center the mode toggles inside the Studio title bar")
+		t.Fatalf("expected index html to render the mode toggles inside the prompt title bar")
 	}
 	if !strings.Contains(markup, `id="builder-repo-select"`) {
 		t.Fatalf("expected index html to include repo history select")
@@ -481,6 +496,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `class="prompt-actions"`) {
 		t.Fatalf("expected index html to render prompt actions container")
 	}
+	if !strings.Contains(markup, `class="prompt-actions-start"`) {
+		t.Fatalf("expected index html to group screenshot actions on the left")
+	}
+	if !strings.Contains(markup, `class="prompt-actions-end"`) {
+		t.Fatalf("expected index html to group Clear and Run on the right")
+	}
 	if !strings.Contains(markup, `id="builder-images-clear"`) {
 		t.Fatalf("expected index html to render screenshot Clear button in prompt actions")
 	}
@@ -503,8 +524,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	pasteIdx := strings.Index(markup, `id="builder-image-paste-target"`)
 	clearIdx := strings.Index(markup, `id="builder-images-clear"`)
 	runIdx := strings.Index(markup, `id="local-prompt-submit"`)
-	if statusIdx == -1 || pasteIdx == -1 || clearIdx == -1 || runIdx == -1 || pasteIdx > clearIdx || clearIdx > runIdx || runIdx > statusIdx {
-		t.Fatalf("expected Paste/Clear/Run/status controls to render in left-to-right order")
+	if statusIdx == -1 || pasteIdx == -1 || clearIdx == -1 || runIdx == -1 || pasteIdx > statusIdx || statusIdx > clearIdx || clearIdx > runIdx {
+		t.Fatalf("expected Paste/status/Clear/Run controls to render in left-to-right order")
 	}
 	if !strings.Contains(markup, `id="builder-repo-input" class="prompt-control prompt-input"`) || !strings.Contains(markup, `id="builder-target-subdir" class="prompt-control prompt-input"`) {
 		t.Fatalf("expected index html to include builder repo and target subdir inputs")
@@ -629,6 +650,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `window.__HUB_UI_CONFIG__ = {"automaticMode":false,"configuredHarness":"","configuredAgentLabel":"Codex"};`) {
 		t.Fatalf("expected index html to include default UI config")
 	}
+	if !strings.Contains(markup, `id="theme-select"`) {
+		t.Fatalf("expected index html to include docked theme selector")
+	}
+	if !strings.Contains(markup, `rgb(var(--hub-panel-rgb) / <alpha-value>)`) || !strings.Contains(markup, `rgb(var(--hub-text-rgb) / <alpha-value>)`) {
+		t.Fatalf("expected index html to drive tailwind hub colors from CSS theme variables")
+	}
+	if strings.Contains(markup, `id="hover-select"`) || strings.Contains(markup, ">Hover<") {
+		t.Fatalf("expected index html to remove the docked hover selector")
+	}
 }
 
 func TestHandlerIndexInjectsAutomaticModeConfig(t *testing.T) {
@@ -688,11 +718,29 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-close") {
 		t.Fatalf("expected stylesheet to include task close styles")
 	}
+	if !strings.Contains(css, ".theme-controls") || !strings.Contains(css, ".theme-control-select") {
+		t.Fatalf("expected stylesheet to include docked theme selector styles")
+	}
+	if !strings.Contains(css, "appearance: none;") {
+		t.Fatalf("expected stylesheet to render the theme selector with custom select chrome")
+	}
+	if !strings.Contains(css, "html.dark .theme-controls") || !strings.Contains(css, "html.night .theme-controls") {
+		t.Fatalf("expected stylesheet to include dark and night docked theme selector treatments")
+	}
+	if !strings.Contains(css, "--hub-panel-rgb: 255 255 255;") || !strings.Contains(css, "--hub-panel-rgb: 15 22 38;") {
+		t.Fatalf("expected stylesheet to define theme-aware rgb tokens for hub panels")
+	}
+	if !strings.Contains(css, "--body-linear: linear-gradient(180deg, #0d1424, #0a1120 58%, #09101d);") || !strings.Contains(css, "--body-linear: linear-gradient(180deg, #05070d, #070b14 55%, #090f1a);") {
+		t.Fatalf("expected stylesheet to define distinct dark and night backgrounds")
+	}
 	if !strings.Contains(css, ".task.task-closing") {
 		t.Fatalf("expected stylesheet to include task closing styles")
 	}
-	if !strings.Contains(css, "@keyframes taskCloseWiggleFade") {
-		t.Fatalf("expected stylesheet to include close wiggle animation")
+	if !strings.Contains(css, ".task.task-closing {\n  pointer-events: none;\n  opacity: 0;") {
+		t.Fatalf("expected stylesheet to fade closing tasks instead of animating them")
+	}
+	if strings.Contains(css, "@keyframes taskCloseSlideFade") || strings.Contains(css, "@keyframes taskCloseWiggleFade") || strings.Contains(css, "@keyframes taskCloseButtonWiggle") {
+		t.Fatalf("expected stylesheet to remove close animations")
 	}
 	if !strings.Contains(css, ".task-rerun") {
 		t.Fatalf("expected stylesheet to include task rerun styles")
@@ -709,8 +757,8 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-fullscreen-close") {
 		t.Fatalf("expected stylesheet to include full screen close-state button styles")
 	}
-	if !strings.Contains(css, "body.task-fullscreen-open #task-fullscreen-toggle") {
-		t.Fatalf("expected stylesheet to pin the full screen toggle in the viewport while full screen is open")
+	if strings.Contains(css, "body.task-fullscreen-open #task-fullscreen-toggle") {
+		t.Fatalf("expected stylesheet to stop reusing the panel toggle as the fullscreen close control")
 	}
 	if !strings.Contains(css, "top: max(16px, env(safe-area-inset-top));") || !strings.Contains(css, "right: max(16px, env(safe-area-inset-right));") {
 		t.Fatalf("expected stylesheet to keep the full screen close control clear of viewport edges")

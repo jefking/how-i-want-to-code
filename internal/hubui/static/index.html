@@ -16,18 +16,18 @@
         extend: {
           colors: {
             hub: {
-              bg: "#f4f8ff",
-              panel: "#ffffff",
-              panelSoft: "#e8efff",
-              border: "rgba(17, 34, 68, 0.14)",
-              text: "#0f1b33",
-              muted: "#5a6f95",
-              good: "#2bb673",
-              warn: "#f59e0b",
-              bad: "#ef4444",
-              running: "#0a84ff",
-              meta: "#7188b1",
-              accent: "#7b61ff"
+              bg: "rgb(var(--hub-bg-rgb) / <alpha-value>)",
+              panel: "rgb(var(--hub-panel-rgb) / <alpha-value>)",
+              panelSoft: "rgb(var(--hub-panel-soft-rgb) / <alpha-value>)",
+              border: "rgb(var(--hub-border-rgb) / <alpha-value>)",
+              text: "rgb(var(--hub-text-rgb) / <alpha-value>)",
+              muted: "rgb(var(--hub-muted-rgb) / <alpha-value>)",
+              good: "rgb(var(--hub-good-rgb) / <alpha-value>)",
+              warn: "rgb(var(--hub-warn-rgb) / <alpha-value>)",
+              bad: "rgb(var(--hub-bad-rgb) / <alpha-value>)",
+              running: "rgb(var(--hub-running-rgb) / <alpha-value>)",
+              meta: "rgb(var(--hub-meta-rgb) / <alpha-value>)",
+              accent: "rgb(var(--hub-accent-rgb) / <alpha-value>)"
             }
           },
           fontFamily: {
@@ -101,10 +101,9 @@
     </div>
 
     <div class="layout min-h-[calc(100vh-130px)] max-[980px]:min-h-0">
-      <div class="right-col grid gap-4 [grid-template-rows:minmax(220px,30%)_minmax(220px,32%)_minmax(260px,1fr)] max-[980px]:[grid-template-rows:minmax(250px,40vh)_minmax(220px,34vh)_minmax(260px,46vh)]">
-        <section class="panel prompt-wrap min-h-[220px] overflow-hidden rounded-2xl border border-hub-border bg-hub-panel bg-[linear-gradient(170deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
+      <div class="right-col grid gap-4">
+        <section class="panel prompt-wrap min-h-[220px] overflow-visible rounded-2xl border border-hub-border bg-hub-panel bg-[linear-gradient(170deg,rgba(255,255,255,0.02),rgba(255,255,255,0.01))]">
           <div class="panel-header prompt-titlebar flex items-center justify-between gap-2 border-b border-hub-border px-3.5 py-3 text-[0.92rem] font-semibold uppercase tracking-[0.03em]">
-            <span class="panel-title">Studio</span>
             <div class="prompt-mode-tabs prompt-mode-tabs-titlebar inline-flex rounded-lg border border-hub-border p-1" role="tablist" aria-label="Studio mode">
               <button id="prompt-mode-builder" class="prompt-mode-tab active" type="button">Builder</button>
               <button id="prompt-mode-library" class="prompt-mode-tab" type="button">Library</button>
@@ -194,18 +193,22 @@
             </div>
             <div id="local-prompt-hint" class="prompt-hint text-[0.74rem] leading-[1.3] text-hub-muted"></div>
             <div class="prompt-actions">
-              <div
-                id="builder-image-paste-target"
-                class="prompt-control prompt-action-paste"
-                role="button"
-                tabindex="0">Paste screenshots.</div>
-              <button
-                id="builder-images-clear"
-                class="prompt-action-button prompt-action-clear"
-                type="button"
-                disabled>Clear</button>
-              <button id="local-prompt-submit" class="prompt-action-button prompt-submit" type="submit">Run</button>
+              <div class="prompt-actions-start">
+                <div
+                  id="builder-image-paste-target"
+                  class="prompt-control prompt-action-paste"
+                  role="button"
+                  tabindex="0">Paste screenshots.</div>
+              </div>
               <span id="local-prompt-status" class="submit-status submit-status-inline min-h-[1.3em] text-[0.74rem] leading-[1.3] text-hub-muted"></span>
+              <div class="prompt-actions-end">
+                <button
+                  id="builder-images-clear"
+                  class="prompt-action-button prompt-action-clear"
+                  type="button"
+                  disabled>Clear</button>
+                <button id="local-prompt-submit" class="prompt-action-button prompt-submit" type="submit">Run</button>
+              </div>
             </div>
           </form>
         </section>
@@ -233,6 +236,7 @@
 
   <div id="task-fullscreen" class="task-fullscreen hidden" aria-hidden="true">
     <div class="task-fullscreen-shell">
+      <button id="task-fullscreen-close" class="task-fullscreen-close hidden" type="button" aria-label="Close full screen tasks">Close</button>
       <div id="task-fullscreen-body" class="task-fullscreen-body task-output-hidden">
         <section class="panel task-fullscreen-panel">
           <div class="panel-header">
@@ -257,7 +261,8 @@
 
   <div id="agent-auth-gate" class="fixed inset-0 z-[95] hidden items-center justify-center bg-[#040911]/85 p-4 backdrop-blur-sm" aria-live="polite">
     <div class="flex min-h-[220px] w-full max-w-xl flex-col p-2">
-      <h2 id="agent-auth-title" class="text-[2rem] font-semibold leading-tight text-hub-text">Authorize Codex to get started</h2>
+      <h2 id="agent-auth-title" class="text-[2rem] font-semibold leading-tight text-hub-text">Authorize Agent to get started</h2>
+      <p id="agent-auth-message" class="mt-3 max-w-lg text-base leading-7 text-hub-text/85"></p>
 
       <div id="agent-auth-details" class="mt-5 hidden space-y-3">
         <div class="flex flex-wrap items-center gap-2.5">
@@ -282,14 +287,6 @@
         <option value="night">Night</option>
       </select>
     </label>
-    <label class="theme-control-group" for="hover-select">
-      <span class="theme-control-label">Hover</span>
-      <select id="hover-select" class="theme-control-select" aria-label="Hover mode">
-        <option value="auto">Auto</option>
-        <option value="on">On</option>
-        <option value="off">Off</option>
-      </select>
-    </label>
   </div>
 
   <script>
@@ -301,7 +298,7 @@
     const HOVER_MODE_KEY = "hubui.hoverMode";
     const THEME_MODES = ["light", "dark", "night"];
     const HOVER_MODES = ["auto", "on", "off"];
-    const CLOSE_TASK_ANIMATION_MS = 360;
+    const CLOSE_TASK_FADE_MS = 2000;
     const QUEUED_STATUS_TIMEOUT_MS = 8_000;
     const HUB_CONNECT_URL = "https://app.molten.bot";
     const COMPLETED_STATUSES = new Set(["ok", "no_changes", "error", "invalid", "duplicate", "stopped"]);
@@ -328,10 +325,10 @@
     }
 
     function currentAgentLabel() {
-      const harness = String(state.agentAuth.harness || "").trim().toLowerCase();
-      if (harness === "auggie") return "Auggie";
-      if (harness === "claude") return "Claude";
-      if (harness === "codex") return "Codex";
+      const harness = String(state.agentAuth.harness || "").trim();
+      if (harness) {
+        return agentAuthLabel(harness);
+      }
       return configuredAgentLabel();
     }
 
@@ -350,6 +347,14 @@
         deviceCode: String(auth.device_code || auth.deviceCode || "").trim(),
         updatedAt: String(auth.updated_at || auth.updatedAt || "").trim(),
       };
+    }
+
+    function agentAuthLabel(harness) {
+      const normalized = String(harness || "").trim().toLowerCase();
+      if (normalized === "codex") return "Codex";
+      if (normalized === "claude") return "Claude Code";
+      if (normalized === "auggie") return "Auggie";
+      return "Agent";
     }
 
     function loadDismissedTaskIDs() {
@@ -441,6 +446,7 @@
       taskFullscreenOpen: false,
       agentAuthBusy: false,
       agentAuthInteracted: false,
+      agentAuthVerifyPending: false,
       agentAuthChallengeKey: "",
     };
     let agentAuthRefreshTimer = null;
@@ -465,6 +471,7 @@
     const taskPanel = document.getElementById("task-panel");
     const taskFullscreenToggle = document.getElementById("task-fullscreen-toggle");
     const taskFullscreen = document.getElementById("task-fullscreen");
+    const taskFullscreenClose = document.getElementById("task-fullscreen-close");
     const taskFullscreenBody = document.getElementById("task-fullscreen-body");
     const taskFullscreenCount = document.getElementById("task-fullscreen-count");
     const taskFullscreenList = document.getElementById("task-fullscreen-list");
@@ -512,6 +519,7 @@
     const agentAuthGate = document.getElementById("agent-auth-gate");
     const configuredAgentSubtitle = document.getElementById("configured-agent-subtitle");
     const agentAuthTitle = document.getElementById("agent-auth-title");
+    const agentAuthMessage = document.getElementById("agent-auth-message");
     const agentAuthDetails = document.getElementById("agent-auth-details");
     const agentAuthURL = document.getElementById("agent-auth-url");
     const agentAuthCode = document.getElementById("agent-auth-code");
@@ -771,9 +779,11 @@
 
     function updateAgentAuthDoneVisibility() {
       if (!agentAuthVerify) return;
+      const hasChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode);
       const visible = state.agentAuth.required &&
         !state.agentAuth.ready &&
-        state.agentAuthInteracted;
+        (!hasChallenge || state.agentAuthInteracted) &&
+        !state.agentAuthVerifyPending;
       agentAuthVerify.classList.toggle("hidden", !visible);
     }
 
@@ -788,9 +798,11 @@
       if (configuredAgentSubtitle) {
         configuredAgentSubtitle.textContent = `Configured agent: ${label}`;
       }
-      if (agentAuthTitle) {
-        agentAuthTitle.textContent = `Authorize ${currentAgentLabel()} to get started`;
-      }
+    }
+
+    function setAgentAuthVerifyPending(pending) {
+      state.agentAuthVerifyPending = Boolean(pending);
+      updateAgentAuthDoneVisibility();
     }
 
     function applyAgentAuthGate(auth) {
@@ -802,11 +814,22 @@
       if (state.agentAuthChallengeKey !== challengeKey) {
         state.agentAuthChallengeKey = challengeKey;
         state.agentAuthInteracted = false;
+        state.agentAuthVerifyPending = false;
+      }
+      if (!gateVisible) {
+        state.agentAuthVerifyPending = false;
       }
 
       if (agentAuthGate) {
         agentAuthGate.classList.toggle("hidden", !gateVisible);
         agentAuthGate.classList.toggle("flex", gateVisible);
+      }
+      if (agentAuthTitle) {
+        agentAuthTitle.textContent = `Authorize ${currentAgentLabel()} to get started`;
+      }
+      if (agentAuthMessage) {
+        agentAuthMessage.textContent = state.agentAuth.message || "";
+        agentAuthMessage.classList.toggle("hidden", !state.agentAuth.message);
       }
 
       const hasChallenge = Boolean(state.agentAuth.authURL || state.agentAuth.deviceCode);
@@ -907,6 +930,7 @@
     }
 
     async function startAgentDeviceAuth() {
+      setAgentAuthVerifyPending(false);
       setAgentAuthBusy(true);
       try {
         const auth = await requestAgentAuth("/api/agent-auth/start-device", "POST");
@@ -919,6 +943,8 @@
     }
 
     async function verifyAgentDeviceAuth() {
+      markAgentAuthInteraction();
+      setAgentAuthVerifyPending(true);
       setAgentAuthBusy(true);
       try {
         const auth = await requestAgentAuth("/api/agent-auth/verify", "POST");
@@ -926,9 +952,13 @@
         if (auth.ready) {
           setLocalPromptStatus("ok", `${currentAgentLabel()} auth is ready.`);
         } else if (auth.state === "needs_device_auth") {
+          setAgentAuthVerifyPending(false);
           await startAgentDeviceAuth();
+        } else {
+          setAgentAuthVerifyPending(false);
         }
       } catch (err) {
+        setAgentAuthVerifyPending(false);
         return;
       } finally {
         setAgentAuthBusy(false);
@@ -1648,6 +1678,11 @@
       promptRawPanel.classList.toggle("hidden", !isJSON);
       builderImagePasteTarget.classList.toggle("hidden", isLibrary);
       builderImagesClear.classList.toggle("hidden", isLibrary);
+      if (!state.promptVisible && !Boolean(state.ui?.automaticMode)) {
+        state.promptVisible = true;
+        persistPromptVisibility();
+        applyPromptVisibility();
+      }
     }
 
     function clearLocalPromptStatusTimer() {
@@ -1670,6 +1705,7 @@
       const visible = !automatic && state.promptVisible;
       if (promptWrap) {
         promptWrap.classList.toggle("prompt-collapsed", !visible);
+        promptWrap.classList.toggle("prompt-hidden-dock", !visible);
       }
       if (localPromptForm) {
         localPromptForm.classList.toggle("hidden", !visible);
@@ -1679,6 +1715,8 @@
       }
       if (promptVisibilityToggle) {
         promptVisibilityToggle.disabled = automatic;
+        promptVisibilityToggle.hidden = !visible || automatic;
+        promptVisibilityToggle.setAttribute("aria-hidden", !visible || automatic ? "true" : "false");
         promptVisibilityToggle.textContent = visible ? "▾" : "▸";
         promptVisibilityToggle.setAttribute("aria-label", visible ? "Minimize Studio panel" : "Expand Studio panel");
         promptVisibilityToggle.title = visible ? "Minimize Studio panel" : "Expand Studio panel";
@@ -1842,6 +1880,12 @@
       return state.closingTaskIDs.has(requestID);
     }
 
+    function isTaskClosePending(requestID) {
+      requestID = String(requestID || "").trim();
+      if (!requestID) return false;
+      return state.closeInFlight.has(requestID) || state.closingTaskIDs.has(requestID);
+    }
+
     function clearClosingTaskTimer(requestID) {
       const timer = state.closingTaskTimers.get(requestID);
       if (!timer) return;
@@ -1968,9 +2012,11 @@
         const hasTasks = displayTasks(state.snapshot).length > 0;
         taskFullscreenToggle.disabled = !hasTasks;
         taskFullscreenToggle.setAttribute("aria-expanded", state.taskFullscreenOpen ? "true" : "false");
-        taskFullscreenToggle.classList.toggle("task-fullscreen-close", state.taskFullscreenOpen);
-        taskFullscreenToggle.textContent = state.taskFullscreenOpen ? "X" : "Full Screen";
-        taskFullscreenToggle.setAttribute("aria-label", state.taskFullscreenOpen ? "Close full screen tasks" : "Open full screen tasks");
+        taskFullscreenToggle.setAttribute("aria-label", "Open full screen tasks");
+      }
+      if (taskFullscreenClose) {
+        taskFullscreenClose.classList.toggle("hidden", !state.taskFullscreenOpen);
+        taskFullscreenClose.setAttribute("aria-hidden", state.taskFullscreenOpen ? "false" : "true");
       }
       if (state.taskFullscreenOpen) {
         document.body.classList.add("task-fullscreen-open");
@@ -2018,7 +2064,7 @@
         setLocalPromptStatus("ok", `Closed task ${requestID}`);
         const closeTimer = window.setTimeout(() => {
           completeTaskDismissal(requestID);
-        }, CLOSE_TASK_ANIMATION_MS);
+        }, CLOSE_TASK_FADE_MS);
         state.closingTaskTimers.set(requestID, closeTimer);
         render(state.snapshot);
       } catch (err) {
@@ -2481,16 +2527,15 @@
         }
 
         if (isCompletedTask(task)) {
+          const closePending = isTaskClosePending(task.request_id);
           const close = document.createElement("button");
           close.type = "button";
           close.className = "task-close";
           close.textContent = "X";
           close.title = "Abandon completed task";
           close.setAttribute("aria-label", "Close task");
-          if (closing) {
-            close.classList.add("task-closing");
-          }
-          close.disabled = closing || state.closeInFlight.has(task.request_id);
+          close.hidden = closePending;
+          close.disabled = closePending;
           close.addEventListener("click", (event) => {
             event.stopPropagation();
             dismissTask(task.request_id);
@@ -2573,9 +2618,11 @@
       if (taskFullscreenToggle) {
         taskFullscreenToggle.disabled = !hasTasks;
         taskFullscreenToggle.setAttribute("aria-expanded", state.taskFullscreenOpen ? "true" : "false");
-        taskFullscreenToggle.classList.toggle("task-fullscreen-close", state.taskFullscreenOpen);
-        taskFullscreenToggle.textContent = state.taskFullscreenOpen ? "X" : "Full Screen";
-        taskFullscreenToggle.setAttribute("aria-label", state.taskFullscreenOpen ? "Close full screen tasks" : "Open full screen tasks");
+        taskFullscreenToggle.setAttribute("aria-label", "Open full screen tasks");
+      }
+      if (taskFullscreenClose) {
+        taskFullscreenClose.classList.toggle("hidden", !state.taskFullscreenOpen);
+        taskFullscreenClose.setAttribute("aria-hidden", state.taskFullscreenOpen ? "false" : "true");
       }
       if (taskFullscreen) {
         taskFullscreen.classList.toggle("hidden", !state.taskFullscreenOpen);
@@ -2868,6 +2915,9 @@
     taskFullscreenToggle.addEventListener("click", () => {
       setTaskFullscreen(!state.taskFullscreenOpen);
     });
+    taskFullscreenClose.addEventListener("click", () => {
+      setTaskFullscreen(false);
+    });
     document.addEventListener("keydown", (event) => {
       if (event.key === "Escape" && state.taskFullscreenOpen) {
         setTaskFullscreen(false);
@@ -2875,7 +2925,7 @@
     });
 
     promptModeBuilder.addEventListener("click", () => {
-      if (state.promptMode === "builder") return;
+      if (state.promptMode === "builder" && state.promptVisible) return;
       if (state.promptMode === "json") {
         try {
           syncFormsFromPayload(parseLocalPromptPayload(localPromptInput.value));
@@ -2887,7 +2937,7 @@
     });
 
     promptModeLibrary.addEventListener("click", () => {
-      if (state.promptMode === "library") return;
+      if (state.promptMode === "library" && state.promptVisible) return;
       if (state.promptMode === "json") {
         try {
           syncFormsFromPayload(parseLocalPromptPayload(localPromptInput.value));
@@ -2899,7 +2949,7 @@
     });
 
     promptModeJSON.addEventListener("click", () => {
-      if (state.promptMode === "json") return;
+      if (state.promptMode === "json" && state.promptVisible) return;
       try {
         syncRawFromMode(state.promptMode === "library" ? "library" : "builder");
       } catch (_err) {

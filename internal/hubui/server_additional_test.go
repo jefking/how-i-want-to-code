@@ -309,44 +309,71 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	}
 
 	css := resp.Body.String()
-	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: rgba(116, 160, 213, 0.2);\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));\n  color: #6f88ad;\n  letter-spacing: 0.11em;\n  position: relative;\n  justify-content: center;\n}") {
-		t.Fatalf("expected Studio title bar to center its contents")
+	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: rgba(116, 160, 213, 0.2);\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));\n  color: #6f88ad;\n  letter-spacing: 0.11em;\n  position: relative;\n  justify-content: flex-start;\n}") {
+		t.Fatalf("expected Studio title bar to align its controls with the panel content")
 	}
-	if !strings.Contains(css, ".prompt-titlebar {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);\n  align-items: center;\n") {
-		t.Fatalf("expected Studio title bar to reserve centered space for the mode switcher")
+	if !strings.Contains(css, ".prompt-titlebar {\n  display: flex;\n  align-items: center;\n  gap: 12px;\n  justify-content: flex-end;\n  min-height: 62px;\n  padding-bottom: 24px;\n}") {
+		t.Fatalf("expected Studio title bar to reserve room for the bottom dock while keeping the minimize control aligned")
 	}
-	if !strings.Contains(css, ".prompt-mode-tabs-titlebar {\n  justify-self: center;\n  align-self: center;\n}") {
-		t.Fatalf("expected Studio mode tabs to be centered inside the title bar")
+	if !strings.Contains(css, ".prompt-mode-tabs-titlebar {\n  position: absolute;\n  left: 50%;\n  bottom: 0;\n  z-index: 2;\n  justify-self: center;\n  align-self: center;\n  transform: translate(-50%, 50%);\n}") {
+		t.Fatalf("expected Studio mode tabs to dock at the centered bottom edge of the panel")
 	}
-	if !strings.Contains(css, ".prompt-wrap.panel {\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);") {
-		t.Fatalf("expected studio panel to stack header/form without clipping")
+	if !strings.Contains(css, ".prompt-wrap.panel {\n  order: 3;\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);") {
+		t.Fatalf("expected studio panel to stack header/form without clipping and anchor the dock")
 	}
-	if !strings.Contains(css, ".prompt-mode-tabs {\n  display: inline-flex;\n  gap: 4px;\n  padding: 5px;\n  border-radius: 14px;") {
-		t.Fatalf("expected studio mode tabs to use the refined segmented-control spacing")
+	if !strings.Contains(css, ".prompt-mode-tabs {\n  display: inline-flex;\n  gap: 4px;\n  padding: 5px;\n  border-radius: 14px;\n  border: 1px solid rgba(112, 163, 221, 0.28);\n  background: linear-gradient(180deg, rgba(248, 252, 255, 0.96), rgba(226, 239, 255, 0.92));") {
+		t.Fatalf("expected studio mode tabs to use the refreshed light segmented-control treatment")
 	}
-	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 14px 14px 13px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
-		t.Fatalf("expected studio form content to scroll instead of clipping controls")
+	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 14px 14px 88px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
+		t.Fatalf("expected studio form content to leave room for the bottom dock instead of clipping controls")
 	}
 	if !strings.Contains(css, ".prompt-field-repository {\n  flex: 1 1 320px;\n  min-width: 280px;\n}") {
 		t.Fatalf("expected repository input to retain enough width beside the history selector")
 	}
-	if !strings.Contains(css, ".prompt-actions {\n  display: flex;\n  align-items: center;\n  justify-content: flex-start;\n  flex-wrap: wrap;\n  gap: 10px;\n}") {
-		t.Fatalf("expected prompt actions to keep buttons left-aligned with wrapping layout")
+	if !strings.Contains(css, ".prompt-actions {\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  min-width: 0;\n}") {
+		t.Fatalf("expected prompt actions to keep the status between screenshots and the right-aligned buttons")
 	}
-	if !strings.Contains(css, ".prompt-action-paste {\n  display: flex;\n  align-items: center;\n  flex: 0 1 30%;\n  width: 30%;\n  max-width: 30%;") {
-		t.Fatalf("expected screenshot paste target to stay at 30%% width on desktop")
+	if !strings.Contains(css, ".prompt-actions-start {\n  display: flex;\n  flex: 1 1 30%;\n  min-width: 0;\n}") {
+		t.Fatalf("expected prompt actions to reserve the left side for screenshots")
+	}
+	if !strings.Contains(css, ".prompt-actions-end {\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  gap: 10px;\n  margin-left: auto;\n  flex: 0 0 auto;\n}") {
+		t.Fatalf("expected prompt actions to right-align Clear and Run")
+	}
+	if !strings.Contains(css, ".prompt-action-paste {\n  display: flex;\n  align-items: center;\n  flex: 1 1 auto;\n  width: 100%;\n  max-width: 100%;") {
+		t.Fatalf("expected screenshot paste target to fill the left action group")
 	}
 	if !strings.Contains(css, ".prompt-action-button {\n  width: auto;\n  display: inline-flex;") {
 		t.Fatalf("expected action buttons to avoid full-width auto-column overflow")
 	}
-	if !strings.Contains(css, ".submit-status-inline {\n  display: inline-flex;\n  align-items: center;\n  flex: 1 1 0;\n  min-width: 140px;\n}") {
-		t.Fatalf("expected inline status to flex without pushing the action buttons to the right edge")
+	if !strings.Contains(css, ".submit-status-inline {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex: 0 1 280px;\n  min-width: 140px;\n  text-align: center;\n}") {
+		t.Fatalf("expected inline status to sit between the screenshot area and the action buttons")
 	}
 	if !strings.Contains(css, ".prompt-image-chip {\n  border-radius: 14px;\n  border: 1px solid var(--border);\n  background: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(240, 246, 255, 0.88));") {
 		t.Fatalf("expected screenshot chips to use the shared light panel treatment")
 	}
-	if !strings.Contains(css, "@media (max-width: 640px) {\n  .prompt-actions {\n    gap: 6px;\n  }\n\n  .prompt-action-paste {\n    flex: 1 1 100%;\n    width: 100%;\n    max-width: none;\n  }\n\n  .submit-status-inline {\n    flex: 1 1 100%;\n    width: 100%;\n    min-width: 0;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }") {
+	if !strings.Contains(css, "@media (max-width: 640px) {\n  .prompt-actions {\n    flex-wrap: wrap;\n    gap: 6px;\n  }\n\n  .prompt-actions-start,\n  .submit-status-inline,\n  .prompt-actions-end {\n    flex: 1 1 100%;\n    width: 100%;\n  }\n\n  .prompt-actions-end {\n    justify-content: flex-end;\n    margin-left: 0;\n  }\n\n  .prompt-action-paste {\n    max-width: none;\n  }\n\n  .submit-status-inline {\n    min-width: 0;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }") {
 		t.Fatalf("expected mobile layout to keep Studio action controls fully visible")
+	}
+}
+
+func TestLibraryTaskListUsesDesktopTwoColumnAndMobileSingleColumnLayout(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/static/style.css", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.Code)
+	}
+
+	css := resp.Body.String()
+	if !strings.Contains(css, ".library-task-list {\n  display: grid;\n  grid-template-columns: repeat(2, minmax(0, 1fr));") {
+		t.Fatalf("expected library task list to use two columns in wide layouts")
+	}
+	if !strings.Contains(css, "@media (max-width: 720px) {\n  .library-task-list {\n    grid-template-columns: minmax(0, 1fr);\n  }") {
+		t.Fatalf("expected library task list to collapse to one column only on mobile")
 	}
 }
 
@@ -363,11 +390,14 @@ func TestStudioStylesUseRefinedPanelAndInputTreatment(t *testing.T) {
 	}
 
 	css := resp.Body.String()
-	if !strings.Contains(css, ".prompt-wrap.panel {\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);\n  background:\n    linear-gradient(180deg, rgba(223, 241, 255, 0.96), rgba(245, 250, 255, 0.9) 18%, rgba(255, 255, 255, 0.92) 100%),") {
+	if !strings.Contains(css, ".prompt-wrap.panel {\n  order: 3;\n  position: relative;\n  display: flex;\n  flex-direction: column;\n  border-color: rgba(74, 118, 178, 0.18);\n  background:\n    linear-gradient(180deg, rgba(223, 241, 255, 0.96), rgba(245, 250, 255, 0.9) 18%, rgba(255, 255, 255, 0.92) 100%),") {
 		t.Fatalf("expected studio panel to use the refreshed blue-tint shell treatment")
 	}
-	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: rgba(116, 160, 213, 0.2);\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));\n  color: #6f88ad;\n  letter-spacing: 0.11em;\n  position: relative;\n  justify-content: center;\n}") {
-		t.Fatalf("expected studio header to use the lighter section title styling")
+	if !strings.Contains(css, ".prompt-wrap .panel-header {\n  border-bottom-color: rgba(116, 160, 213, 0.2);\n  background: linear-gradient(180deg, rgba(255, 255, 255, 0.26), rgba(255, 255, 255, 0.08));\n  color: #6f88ad;\n  letter-spacing: 0.11em;\n  position: relative;\n  justify-content: flex-start;\n}") {
+		t.Fatalf("expected studio header to keep its controls aligned to the left")
+	}
+	if !strings.Contains(css, ".prompt-mode-tab.active {\n  background: linear-gradient(135deg, #fefefe 0%, #e7f2ff 48%, #d7eaff 100%);\n  border: 1px solid rgba(112, 163, 221, 0.34);") {
+		t.Fatalf("expected active studio mode tab to use the light shell treatment instead of the dark accent pill")
 	}
 	if !strings.Contains(css, ".prompt-control,\n.prompt-text,\n.prompt-action-paste {\n  width: 100%;\n  border: 1px solid rgba(112, 163, 221, 0.34);\n  border-radius: 16px;\n  background: linear-gradient(180deg, rgba(251, 254, 255, 0.98), rgba(234, 245, 255, 0.88));") {
 		t.Fatalf("expected studio controls to use the updated light-blue input treatment")
@@ -405,7 +435,43 @@ func TestHeaderStatusStylesStayReadable(t *testing.T) {
 	if !strings.Contains(css, ".status-item-metrics .status-value {\n  color: var(--text-soft);\n  font-size: 0.9rem;") {
 		t.Fatalf("expected metrics text to use readable status color tokens")
 	}
-	if !strings.Contains(css, "@media (max-width: 720px) {\n  .status-row {\n    flex-wrap: nowrap;\n    gap: 8px;\n  }\n\n  .status-item-metrics {\n    flex: 1 1 auto;\n    width: auto;\n    min-width: 0;") {
+	if !strings.Contains(css, "@media (max-width: 720px) {\n  .library-task-list {\n    grid-template-columns: minmax(0, 1fr);\n  }\n\n  .status-row {\n    flex-wrap: nowrap;\n    gap: 8px;\n  }\n\n  .status-item-metrics {\n    flex: 1 1 auto;\n    width: auto;\n    min-width: 0;") {
 		t.Fatalf("expected status row to stay on one line through mobile widths")
+	}
+}
+
+func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d, want 200", resp.Code)
+	}
+
+	html := resp.Body.String()
+	if !strings.Contains(html, "agentAuthVerifyPending: false") {
+		t.Fatalf("expected auth gate state to track pending verification")
+	}
+	if !strings.Contains(html, "(!hasChallenge || state.agentAuthInteracted) &&") {
+		t.Fatalf("expected Done button visibility to allow non-device auth flows")
+	}
+	if !strings.Contains(html, "function setAgentAuthVerifyPending(pending)") {
+		t.Fatalf("expected helper to toggle pending verification state")
+	}
+	if !strings.Contains(html, "setAgentAuthVerifyPending(true);") {
+		t.Fatalf("expected verify action to hide Done button before verification completes")
+	}
+	if !strings.Contains(html, "setAgentAuthVerifyPending(false);") {
+		t.Fatalf("expected verify action to restore Done button after failed verification")
+	}
+	if !strings.Contains(html, "Authorize Agent to get started") {
+		t.Fatalf("expected generic auth gate heading")
+	}
+	if !strings.Contains(html, "function agentAuthLabel(harness)") {
+		t.Fatalf("expected auth gate labels to be harness-aware")
 	}
 }
