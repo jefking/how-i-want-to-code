@@ -622,9 +622,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `fetch("/api/github/profile", { cache: "no-store" })`) {
 		t.Fatalf("expected index html to resolve the authenticated GitHub public profile through the hub ui api")
 	}
-	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-github"`) ||
+	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-logo"`) ||
 		!strings.Contains(markup, `src="/static/logos/github.svg"`) {
-		t.Fatalf("expected index html to render GitHub as an icon-only item inside the shared segmented dock")
+		t.Fatalf("expected index html to render GitHub as an icon-only item inside the shared segmented dock using the shared logo-link class")
 	}
 	if !strings.Contains(markup, `<span class="sr-only">GitHub</span>`) {
 		t.Fatalf("expected index html to keep the GitHub dock item screen-reader accessible without visible text")
@@ -1115,11 +1115,11 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".prompt-mode-link img {\n  display: block;\n  width: 15px;\n  height: 15px;") {
 		t.Fatalf("expected stylesheet to size dock icons for integrated menu items")
 	}
-	if !strings.Contains(css, ".prompt-mode-link-github {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
-		t.Fatalf("expected stylesheet to keep the icon-only GitHub dock item balanced with the text tabs")
+	if !strings.Contains(css, ".prompt-mode-link-logo {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
+		t.Fatalf("expected stylesheet to keep icon-only dock items balanced with the text tabs")
 	}
-	if !strings.Contains(css, ".prompt-mode-link-github::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
-		t.Fatalf("expected stylesheet to visually integrate the GitHub icon into the shared dock instead of a detached pill")
+	if !strings.Contains(css, ".prompt-mode-link-logo-divider::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
+		t.Fatalf("expected stylesheet to visually integrate the leading icon-only dock item into the shared dock instead of a detached pill")
 	}
 	if !strings.Contains(css, ".task-fullscreen {\n  position: fixed;\n  inset: 0;\n  z-index: 80;\n  padding: 0;") {
 		t.Fatalf("expected stylesheet to make full screen task layout use full viewport padding")
