@@ -591,9 +591,6 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `<span class="sr-only">GitHub</span>`) {
 		t.Fatalf("expected index html to keep the GitHub dock item screen-reader accessible without visible text")
 	}
-	if strings.Contains(markup, `>GitHub<`) {
-		t.Fatalf("expected index html to remove visible GitHub text from the dock menu")
-	}
 	if strings.Index(markup, `id="task-panel"`) > strings.Index(markup, `class="panel prompt-wrap`) {
 		t.Fatalf("expected index html to render Task View before Studio in the page layout")
 	}

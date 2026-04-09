@@ -741,6 +741,9 @@ body .right-col.prompt-collapsed.task-list-hidden {
 .prompt-mode-link-github {
   min-width: 40px;
   padding-inline: 12px;
+}
+
+.prompt-mode-link-github {
   position: relative;
 }
 
