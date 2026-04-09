@@ -2501,9 +2501,19 @@
       builderImagesClear.disabled = !hasBuilderDraftToClear();
     }
 
+    function resetPromptInputSize(input) {
+      if (!input) {
+        return;
+      }
+      input.style.removeProperty("height");
+      input.style.removeProperty("width");
+    }
+
     function clearSubmittedPromptDraft() {
       builderPromptInput.value = "";
       localPromptInput.value = "";
+      resetPromptInputSize(builderPromptInput);
+      resetPromptInputSize(localPromptInput);
       syncBuilderDraftClearState();
     }
 
