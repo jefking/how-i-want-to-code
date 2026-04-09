@@ -1021,8 +1021,17 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".theme-toggle {\n  position: fixed;\n  right: 16px;\n  bottom: 16px;") {
 		t.Fatalf("expected stylesheet to dock the theme toggle in the bottom-right corner")
 	}
+	if !strings.Contains(css, ".theme-toggle {\n  position: fixed;\n  right: 16px;\n  bottom: 16px;\n  z-index: 96;") {
+		t.Fatalf("expected stylesheet to keep the theme toggle above onboarding overlays")
+	}
 	if !strings.Contains(css, ".theme-toggle:hover { transform: scale(1.04); }") || !strings.Contains(css, ".theme-toggle:active { transform: scale(.96); }") {
 		t.Fatalf("expected stylesheet to include the theme toggle hover and active treatments")
+	}
+	if !strings.Contains(css, ".agent-auth-shell {\n  padding: clamp(24px, 3vw, 32px);\n  border: 1px solid var(--surface-auth-panel-border);\n  border-radius: 24px;\n  background: var(--surface-auth-panel-bg);\n  box-shadow: var(--surface-auth-panel-shadow);\n}") {
+		t.Fatalf("expected stylesheet to render onboarding content inside a readable auth panel")
+	}
+	if !strings.Contains(css, "--surface-auth-panel-bg:") || !strings.Contains(css, "--surface-auth-panel-border:") || !strings.Contains(css, "--surface-auth-panel-shadow:") {
+		t.Fatalf("expected stylesheet to define theme-aware auth panel surface tokens")
 	}
 	if !strings.Contains(css, "--hub-panel-rgb: 255 255 255;") || !strings.Contains(css, "--hub-panel-rgb: 15 22 38;") {
 		t.Fatalf("expected stylesheet to define theme-aware rgb tokens for hub panels")
