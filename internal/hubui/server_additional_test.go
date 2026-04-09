@@ -925,6 +925,9 @@ func TestHeaderStatusStylesStayReadable(t *testing.T) {
 	if !strings.Contains(css, ".status-row:hover .metric-label,\n.status-row:hover .metric-unit,\n.status-row:focus-within .metric-label,\n.status-row:focus-within .metric-unit {\n  max-width: 56px;\n  opacity: 1;\n  transform: translateX(0);\n}") {
 		t.Fatalf("expected metric labels and units to reveal on status row hover")
 	}
+	if !strings.Contains(css, ".metric-unit-visible {\n  max-width: 56px;\n  opacity: 1;\n  overflow: visible;\n  transform: translateX(0);\n  margin-left: 3px;\n}") {
+		t.Fatalf("expected the disk metrics suffix to remain visible without hovering the header")
+	}
 	if !strings.Contains(css, ".status-item-metrics .status-value {\n  color: var(--text-soft);\n  font-size: 0.9rem;") {
 		t.Fatalf("expected metrics text to use readable status color tokens")
 	}
