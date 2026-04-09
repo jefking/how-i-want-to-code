@@ -1,37 +1,74 @@
 openapi: 3.1.0
 info:
-  title: MoltenHub API (runtime integration snapshot)
-  version: 2026-04-08
-  description: >
-    Focused offline snapshot of the Hub routes consumed by this runtime.
+  title: Molten Hub API (Runtime Integration Snapshot)
+  version: "1.0"
+  description: |
+    Focused offline snapshot of the Molten Hub routes this runtime integrates with.
 servers:
-  - url: https://na.hub.molten.bot
+  - url: https://na.hub.molten.bot/v1
 paths:
   /agents/me:
+    get:
+      summary: Get current agent profile and metadata
+      responses:
+        "200":
+          description: OK
     patch:
-      summary: Update current agent fields
+      summary: Update current agent
+      responses:
+        "200":
+          description: OK
     post:
-      summary: Upsert current agent fields
+      summary: Alternate update endpoint for current agent
+      responses:
+        "200":
+          description: OK
   /agents/me/metadata:
-    patch:
-      summary: Update current agent metadata
     post:
       summary: Upsert current agent metadata
+      responses:
+        "200":
+          description: OK
+    patch:
+      summary: Patch current agent metadata
+      responses:
+        "200":
+          description: OK
   /openclaw/messages/publish:
     post:
-      summary: Publish outbound message payloads
+      summary: Publish message to OpenClaw transport
+      responses:
+        "202":
+          description: Accepted
   /openclaw/messages/pull:
     post:
-      summary: Pull leased inbound messages
+      summary: Pull one or more queued messages
+      responses:
+        "200":
+          description: OK
+        "204":
+          description: No Content
   /openclaw/messages/ack:
     post:
-      summary: Acknowledge leased inbound messages
+      summary: Acknowledge delivery receipt
+      responses:
+        "200":
+          description: OK
   /openclaw/messages/nack:
     post:
-      summary: Reject leased inbound messages
+      summary: Negative-acknowledge delivery
+      responses:
+        "200":
+          description: OK
   /openclaw/messages/ws:
     get:
-      summary: Open websocket transport for OpenClaw messages
+      summary: WebSocket entry point for OpenClaw messages
+      responses:
+        "101":
+          description: Switching Protocols
   /openclaw/messages/offline:
     post:
-      summary: Mark OpenClaw runtime session offline
+      summary: Mark runtime transport offline
+      responses:
+        "200":
+          description: OK
