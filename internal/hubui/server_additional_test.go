@@ -776,6 +776,14 @@ func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
 	if !strings.Contains(html, "id=\"agent-auth-browser-code-input\"") {
 		t.Fatalf("expected auth gate to include Claude browser-code input")
 	}
+	if !strings.Contains(html, "id=\"agent-auth-browser-command-primary\"") ||
+		!strings.Contains(html, "id=\"agent-auth-browser-command-primary-copy\"") {
+		t.Fatalf("expected auth gate to include Claude primary command copy controls")
+	}
+	if !strings.Contains(html, "id=\"agent-auth-browser-command-secondary\"") ||
+		!strings.Contains(html, "id=\"agent-auth-browser-command-secondary-copy\"") {
+		t.Fatalf("expected auth gate to include Claude credentials command copy controls")
+	}
 	if !strings.Contains(html, "function isClaudeBrowserCodeState(auth)") {
 		t.Fatalf("expected auth gate to detect Claude browser-code submission state")
 	}
@@ -788,7 +796,7 @@ func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
 	if !strings.Contains(html, "claude_auth_code: code") {
 		t.Fatalf("expected Claude browser code configure payload support in auth UI")
 	}
-	if !strings.Contains(html, "if (isClaudeBrowserCodeAwaitingSubmission()) {") ||
+	if !strings.Contains(html, "if (isClaudePendingBrowserLoginState()) {") ||
 		!strings.Contains(html, "const code = claudeBrowserCodeValue();") ||
 		!strings.Contains(html, "if (code !== \"\") {") {
 		t.Fatalf("expected Done handler to submit Claude browser code only when a code is provided")

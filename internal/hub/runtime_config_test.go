@@ -300,6 +300,30 @@ func TestLoadRuntimeConfigSupportsInitStyleWholeConfig(t *testing.T) {
 	}
 }
 
+func TestSaveRuntimeConfigClaudeOAuthTokenPersistsValue(t *testing.T) {
+	t.Parallel()
+
+	path := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := SaveRuntimeConfigClaudeOAuthToken(path, InitConfig{
+		BaseURL:      "https://na.hub.molten.bot/v1",
+		AgentHarness: "claude",
+	}, "oauth_token_saved"); err != nil {
+		t.Fatalf("SaveRuntimeConfigClaudeOAuthToken() error = %v", err)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("read config: %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("unmarshal config: %v", err)
+	}
+	if got, want := doc["claude_code_oauth_token"], "oauth_token_saved"; got != want {
+		t.Fatalf("claude_code_oauth_token = %#v, want %q", got, want)
+	}
+}
+
 func TestDefaultRuntimeConfigPath(t *testing.T) {
 	t.Parallel()
 
