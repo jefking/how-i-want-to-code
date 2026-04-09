@@ -642,8 +642,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `class="metric-copy"`) || !strings.Contains(markup, `class="metric-label text-xs leading-tight">CPU</span>`) {
 		t.Fatalf("expected index html to separate compact metric values from hover-revealed labels")
 	}
-	if !strings.Contains(markup, `class="metric-unit text-xs leading-tight">MB/s</span>`) {
-		t.Fatalf("expected index html to reveal the disk throughput unit only when the metrics pill expands")
+	if !strings.Contains(markup, `class="metric-unit metric-unit-visible text-xs leading-tight">MB/s</span>`) {
+		t.Fatalf("expected index html to keep the disk throughput unit visible in the metrics pill")
 	}
 	if !strings.Contains(markup, `id="prompt-mode-builder"`) {
 		t.Fatalf("expected index html to include builder mode toggle")

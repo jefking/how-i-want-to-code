@@ -497,6 +497,14 @@ textarea {
   margin-left: 3px;
 }
 
+.metric-unit-visible {
+  max-width: 56px;
+  opacity: 1;
+  overflow: visible;
+  transform: translateX(0);
+  margin-left: 3px;
+}
+
 .metric-value,
 .status-item-metrics .status-value,
 .event-line,
