@@ -968,7 +968,10 @@ func TestConfigureHubSetupExistingAgentReturnsLoginVerificationFailure(t *testin
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
 			_, _ = w.Write([]byte(`{"handle":"existing-agent"}`))
-		case r.Method == http.MethodPatch && r.URL.Path == "/v1/agents/me/status":
+		case (r.Method == http.MethodPatch || r.Method == http.MethodPost) &&
+			(r.URL.Path == "/v1/agents/me/status" ||
+				r.URL.Path == "/v1/agents/me" ||
+				r.URL.Path == "/v1/agents/me/metadata"):
 			http.Error(w, `{"error":"status update not allowed"}`, http.StatusUnauthorized)
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
