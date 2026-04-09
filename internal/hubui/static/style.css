@@ -2440,6 +2440,13 @@ html.night {
   --shadow-lg: 0 28px 72px rgba(0, 0, 0, 0.7);
 }
 
+html.dark .theme-controls,
+html.night .theme-controls {
+  border-color: var(--theme-dock-border);
+  background: var(--theme-dock-bg);
+  box-shadow: var(--theme-dock-shadow);
+}
+
 html[data-hover-mode="on"] .prompt-action-button:not(:disabled),
 html[data-hover-mode="on"] .task-rerun:not(:disabled),
 html[data-hover-mode="on"] .task-output-toggle:not(:disabled),
