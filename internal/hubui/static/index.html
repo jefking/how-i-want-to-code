@@ -2600,6 +2600,21 @@
       return new Date(iso).toLocaleString();
     }
 
+    function taskTimingSummary(task) {
+      const updated = relativeTime(task?.updated_at || task?.updatedAt);
+      const started = relativeTime(task?.started_at || task?.startedAt);
+      if (updated && started) {
+        return `${updated} | started ${started}`;
+      }
+      if (updated) {
+        return updated;
+      }
+      if (started) {
+        return `started ${started}`;
+      }
+      return "-";
+    }
+
     function cleanRepoName(value) {
       let repo = String(value || "").trim();
       if (!repo) return "";
@@ -3329,33 +3344,38 @@
           topActions.appendChild(close);
         }
 
-        top.append(id, topActions);
+        top.append(id);
 
         const body = document.createElement("div");
         body.className = "task-body";
         body.appendChild(top);
 
         if (!collapsed) {
+          const progress = renderTaskProgress(task);
+          if (progress) {
+            body.appendChild(progress);
+          }
+
+          const footer = document.createElement("div");
+          footer.className = "task-footer";
+
           const meta = document.createElement("div");
           meta.className = "task-meta";
 
           const repos = document.createElement("div");
           repos.textContent = `repos: ${formatTaskRepos(task)}`;
           const branch = document.createElement("div");
-          branch.textContent = `branches: ${formatTaskBranch(task)}`;
+          branch.textContent = `branch: ${formatTaskBranch(task)}`;
           const skill = document.createElement("div");
           skill.textContent = `skill: ${task.skill || "-"}`;
           const update = document.createElement("div");
-          update.textContent = `updated: ${relativeTime(task.updated_at)}`;
+          update.textContent = taskTimingSummary(task);
           meta.append(repos, branch, skill, update);
 
-          const progress = renderTaskProgress(task);
-
-          if (progress) {
-            body.append(meta, progress);
-          } else {
-            body.append(meta);
-          }
+          footer.append(meta, topActions);
+          body.append(footer);
+        } else {
+          top.append(topActions);
         }
 
         const showTaskPRLink = isCompletedTask(task) && prURL !== "";
