@@ -654,8 +654,20 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `class="metric-copy"`) || !strings.Contains(markup, `class="metric-label text-xs leading-tight">CPU</span>`) {
 		t.Fatalf("expected index html to separate compact metric values from hover-revealed labels")
 	}
+	if !strings.Contains(markup, `id="resource-metrics-unit"`) {
+		t.Fatalf("expected index html to include a dedicated disk throughput unit element")
+	}
 	if !strings.Contains(markup, `class="metric-unit metric-unit-visible text-xs leading-tight">MB/s</span>`) {
-		t.Fatalf("expected index html to keep the disk throughput unit visible in the metrics pill")
+		t.Fatalf("expected index html to initialize the disk throughput unit as MB/s")
+	}
+	if !strings.Contains(markup, "function formatDiskThroughput(") {
+		t.Fatalf("expected index html to include a disk throughput formatter")
+	}
+	if !strings.Contains(markup, `unit: "KB/s"`) || !strings.Contains(markup, `unit: "GB/s"`) {
+		t.Fatalf("expected index html to scale disk throughput units between KB/s, MB/s, and GB/s")
+	}
+	if !strings.Contains(markup, "resourceMetricsUnit.textContent = diskThroughput.unit;") {
+		t.Fatalf("expected index html to update the rendered disk throughput unit dynamically")
 	}
 	if !strings.Contains(markup, `id="prompt-mode-builder"`) {
 		t.Fatalf("expected index html to include builder mode toggle")
