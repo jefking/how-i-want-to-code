@@ -200,11 +200,32 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="moltenbot-hub-link"`) {
 		t.Fatalf("expected index html to include molten bot hub dock link")
 	}
-	if !strings.Contains(markup, `href="https://app.molten.bot/hub"`) {
-		t.Fatalf("expected index html to link dock icon to molten bot hub")
+	if !strings.Contains(markup, `href="https://app.molten.bot/signin?target=hub"`) {
+		t.Fatalf("expected index html to link unconfigured dock icon to molten hub sign-in")
 	}
 	if !strings.Contains(markup, `img src="https://app.molten.bot/logo.svg"`) {
 		t.Fatalf("expected index html to use the remote molten bot logo asset")
+	}
+	if !strings.Contains(markup, `id="moltenbot-hub-plus"`) {
+		t.Fatalf("expected index html to include molten hub plus badge")
+	}
+	if !strings.Contains(markup, `id="hub-setup-gate"`) {
+		t.Fatalf("expected index html to include hub setup modal gate")
+	}
+	if !strings.Contains(markup, `id="hub-setup-form"`) {
+		t.Fatalf("expected index html to include hub setup form")
+	}
+	if !strings.Contains(markup, `id="hub-setup-signin-link"`) || !strings.Contains(markup, `https://app.molten.bot/signin?target=hub`) {
+		t.Fatalf("expected index html to include molten hub sign-in shortcut inside the setup dialog")
+	}
+	if !strings.Contains(markup, `function normalizeHubSetup(raw)`) {
+		t.Fatalf("expected index html to include hub setup state normalization")
+	}
+	if !strings.Contains(markup, `async function submitHubSetup(event)`) {
+		t.Fatalf("expected index html to include hub setup submit handler")
+	}
+	if !strings.Contains(markup, `async function loadHubSetupStatus()`) {
+		t.Fatalf("expected index html to include hub setup status loader")
 	}
 	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-logo prompt-mode-link-logo-divider"`) {
 		t.Fatalf("expected first dock logo link to use shared icon-link styling with divider")
