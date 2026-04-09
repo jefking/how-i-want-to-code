@@ -27,6 +27,7 @@ func TestHandleHubSetupStatusAndConfigure(t *testing.T) {
 	srv.HubSetupStatus = func(context.Context) (HubSetupState, error) {
 		state := defaultHubSetupState()
 		state.Configured = true
+		state.Region = "eu"
 		state.Handle = "molten-agent"
 		state.Profile.DisplayName = "Molten Agent"
 		return state, nil
@@ -35,10 +36,14 @@ func TestHandleHubSetupStatusAndConfigure(t *testing.T) {
 		if req.Token != token {
 			return defaultHubSetupState(), fmt.Errorf("unexpected token")
 		}
+		if req.Region != "eu" {
+			return defaultHubSetupState(), fmt.Errorf("unexpected region %q", req.Region)
+		}
 		state := defaultHubSetupState()
 		state.Configured = true
 		state.AgentMode = req.AgentMode
 		state.TokenType = req.TokenType
+		state.Region = req.Region
 		state.Handle = "saved-agent"
 		state.Profile.DisplayName = "Saved Agent"
 		state.NeedsRestart = false
@@ -63,7 +68,7 @@ func TestHandleHubSetupStatusAndConfigure(t *testing.T) {
 		t.Fatalf("GET hub setup body = %#v, want configured ok response", getBody)
 	}
 
-	postReq := httptest.NewRequest(http.MethodPost, "/api/hub-setup", strings.NewReader(fmt.Sprintf(`{"agent_mode":"new","token_type":"bind","token":%q}`, token)))
+	postReq := httptest.NewRequest(http.MethodPost, "/api/hub-setup", strings.NewReader(fmt.Sprintf(`{"agent_mode":"new","token_type":"bind","region":"eu","token":%q}`, token)))
 	postReq.Header.Set("Content-Type", "application/json")
 	postResp := httptest.NewRecorder()
 	srv.Handler().ServeHTTP(postResp, postReq)
@@ -78,7 +83,7 @@ func TestHandleHubSetupStatusAndConfigure(t *testing.T) {
 	if err := json.NewDecoder(postResp.Body).Decode(&postBody); err != nil {
 		t.Fatalf("decode POST body: %v", err)
 	}
-	if !postBody.OK || postBody.Hub.Handle != "saved-agent" || postBody.Hub.NeedsRestart || postBody.Hub.AgentMode != "new" || postBody.Hub.TokenType != "bind" {
+	if !postBody.OK || postBody.Hub.Handle != "saved-agent" || postBody.Hub.NeedsRestart || postBody.Hub.AgentMode != "new" || postBody.Hub.TokenType != "bind" || postBody.Hub.Region != "eu" {
 		t.Fatalf("POST hub setup body = %#v, want saved state", postBody)
 	}
 }

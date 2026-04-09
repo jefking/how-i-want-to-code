@@ -37,6 +37,7 @@ const hubPingRemoteContinueDetail = "Hub endpoint ping precheck failed; continui
 const hubPingHeadlessNoopDetail = "Hub endpoint ping precheck failed with UI disabled and no Hub credentials configured; startup completed without remote transport."
 const gitHubCLIPackageLabel = "github-cli (gh)"
 const gitHubCLIAuthRecommendation = "Run `gh auth login` (the GitHub CLI binary from the `github-cli` package) or set GH_TOKEN before dispatching tasks."
+const hubSetupValidationOfflineReason = "hub_setup_validation"
 
 const hubBootDiagnosticTimeout = 10 * time.Second
 const hubPingDiagnosticTimeout = 5 * time.Second
@@ -1492,6 +1493,7 @@ func currentHubSetupState(cfg hub.InitConfig) hubui.HubSetupState {
 		DashboardURL: "https://app.molten.bot/hub",
 		AgentMode:    "existing",
 		TokenType:    "agent",
+		Region:       "na",
 	}
 
 	activeCfg := cfg
@@ -1503,6 +1505,7 @@ func currentHubSetupState(cfg hub.InitConfig) hubui.HubSetupState {
 	}
 
 	state.Configured = strings.TrimSpace(activeCfg.BindToken) != "" || strings.TrimSpace(activeCfg.AgentToken) != ""
+	state.Region = hubSetupRegionForBaseURL(activeCfg.BaseURL)
 	state.Handle = strings.TrimSpace(activeCfg.Handle)
 	state.Profile.Bio = strings.TrimSpace(activeCfg.Profile.Bio)
 	state.Profile.DisplayName = strings.TrimSpace(activeCfg.Profile.DisplayName)
@@ -1523,6 +1526,7 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 	state := currentHubSetupState(cfg)
 	state.AgentMode = normalizeHubSetupMode(req.AgentMode)
 	state.TokenType = hubSetupTokenTypeForMode(state.AgentMode)
+	state.Region = normalizeHubSetupRegion(req.Region)
 	state.Handle = strings.TrimSpace(req.Handle)
 	state.Profile.Bio = strings.TrimSpace(req.Profile.Bio)
 	state.Profile.DisplayName = strings.TrimSpace(req.Profile.DisplayName)
@@ -1543,6 +1547,7 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 		return state, fmt.Errorf("load runtime config: %w", err)
 	}
 	activeCfg.ApplyDefaults()
+	activeCfg.BaseURL = hubSetupBaseURL(activeCfg.BaseURL, state.Region)
 
 	activeCfg.BindToken = ""
 	activeCfg.AgentToken = ""
@@ -1572,6 +1577,9 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 			return state, fmt.Errorf("sync hub profile: %w", err)
 		}
 	} else {
+		if err := client.MarkOpenClawOffline(ctx, resolvedToken, finalCfg.SessionKey, hubSetupValidationOfflineReason); err != nil {
+			return state, fmt.Errorf("verify hub login: %w", err)
+		}
 		profile, err := client.AgentProfile(ctx, resolvedToken)
 		if err != nil {
 			return state, fmt.Errorf("load hub profile: %w", err)
@@ -1594,6 +1602,7 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 	}
 
 	state.Configured = true
+	state.Region = hubSetupRegionForBaseURL(finalCfg.BaseURL)
 	state.Handle = strings.TrimSpace(finalCfg.Handle)
 	state.Profile.Bio = strings.TrimSpace(finalCfg.Profile.Bio)
 	state.Profile.DisplayName = strings.TrimSpace(finalCfg.Profile.DisplayName)
@@ -1643,6 +1652,37 @@ func normalizeHubSetupTokenType(tokenType string) string {
 	default:
 		return "bind"
 	}
+}
+
+func normalizeHubSetupRegion(region string) string {
+	switch strings.ToLower(strings.TrimSpace(region)) {
+	case "eu":
+		return "eu"
+	default:
+		return "na"
+	}
+}
+
+func hubSetupRegionForBaseURL(baseURL string) string {
+	baseURL = strings.ToLower(strings.TrimSpace(baseURL))
+	switch {
+	case strings.Contains(baseURL, "://eu.hub.molten.bot/"), strings.HasPrefix(baseURL, "https://eu.hub.molten.bot"), strings.HasPrefix(baseURL, "http://eu.hub.molten.bot"):
+		return "eu"
+	default:
+		return "na"
+	}
+}
+
+func hubSetupBaseURL(baseURL, region string) string {
+	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")
+	region = normalizeHubSetupRegion(region)
+	if baseURL == "" || baseURL == "https://na.hub.molten.bot/v1" || baseURL == "https://eu.hub.molten.bot/v1" {
+		if region == "eu" {
+			return "https://eu.hub.molten.bot/v1"
+		}
+		return "https://na.hub.molten.bot/v1"
+	}
+	return baseURL
 }
 
 func hubSetupTokenTypeForMode(mode string) string {

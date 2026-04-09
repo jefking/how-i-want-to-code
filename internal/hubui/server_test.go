@@ -231,8 +231,17 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="hub-setup-token-label"`) {
 		t.Fatalf("expected index html to include the dynamic hub setup token label")
 	}
+	if !strings.Contains(markup, `id="hub-setup-region-na-toggle"`) || !strings.Contains(markup, `id="hub-setup-region-eu-toggle"`) {
+		t.Fatalf("expected index html to include hub setup region toggles")
+	}
 	if strings.Contains(markup, `id="hub-setup-bind-toggle"`) || strings.Contains(markup, `id="hub-setup-agent-toggle"`) {
 		t.Fatalf("expected index html to remove the separate hub setup token type toggles")
+	}
+	if !strings.Contains(markup, `function scheduleHubSetupAutoSubmit()`) {
+		t.Fatalf("expected index html to include hub setup auto-submit scheduling")
+	}
+	if !strings.Contains(markup, `Bind Token`) {
+		t.Fatalf("expected index html to relabel new-agent token entry as Bind Token")
 	}
 	if !strings.Contains(markup, `>Done</button>`) {
 		t.Fatalf("expected hub setup submit button copy to be updated")
@@ -240,7 +249,7 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `function normalizeHubSetup(raw)`) {
 		t.Fatalf("expected index html to include hub setup state normalization")
 	}
-	if !strings.Contains(markup, `async function submitHubSetup(event)`) {
+	if !strings.Contains(markup, `async function submitHubSetup(event, options = {})`) {
 		t.Fatalf("expected index html to include hub setup submit handler")
 	}
 	if !strings.Contains(markup, `async function loadHubSetupStatus()`) {
