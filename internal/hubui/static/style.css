@@ -1377,10 +1377,6 @@ select.prompt-control {
   transition: border-color 0.12s ease, transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease;
 }
 
-.task-copy-link {
-  cursor: pointer;
-}
-
 .task-copy-link img,
 .task-pr-link img {
   display: block;
