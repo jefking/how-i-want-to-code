@@ -74,6 +74,7 @@ type HubSetupState struct {
 	Configured bool   `json:"configured"`
 	AgentMode  string `json:"agent_mode,omitempty"`
 	TokenType  string `json:"token_type,omitempty"`
+	Region     string `json:"region,omitempty"`
 	Handle     string `json:"handle,omitempty"`
 	Profile    struct {
 		Bio         string `json:"bio"`
@@ -90,6 +91,7 @@ type HubSetupState struct {
 type HubSetupRequest struct {
 	AgentMode string `json:"agent_mode"`
 	TokenType string `json:"token_type"`
+	Region    string `json:"region"`
 	Token     string `json:"token"`
 	Handle    string `json:"handle"`
 	Profile   struct {
@@ -190,6 +192,7 @@ func defaultHubSetupState() HubSetupState {
 		Configured:   false,
 		AgentMode:    "existing",
 		TokenType:    "agent",
+		Region:       "na",
 		ConnectURL:   "https://app.molten.bot/signin?target=hub",
 		DashboardURL: "https://app.molten.bot/hub",
 	}

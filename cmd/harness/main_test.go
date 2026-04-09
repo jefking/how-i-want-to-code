@@ -864,6 +864,9 @@ func TestConfigureHubSetupExistingAgentUsesAgentTokenFlow(t *testing.T) {
 	if got, want := state.AgentMode, "existing"; got != want {
 		t.Fatalf("AgentMode = %q, want %q", got, want)
 	}
+	if got, want := state.Region, "na"; got != want {
+		t.Fatalf("Region = %q, want %q", got, want)
+	}
 	if got, want := state.TokenType, "agent"; got != want {
 		t.Fatalf("TokenType = %q, want %q", got, want)
 	}
@@ -884,6 +887,40 @@ func TestConfigureHubSetupExistingAgentUsesAgentTokenFlow(t *testing.T) {
 	}
 	if !strings.Contains(contents, fmt.Sprintf(`"agent_token": %q`, agentToken)) {
 		t.Fatalf("saved config missing agent token: %s", contents)
+	}
+}
+
+func TestCurrentHubSetupStateDerivesRegionFromRuntimeConfigBaseURL(t *testing.T) {
+	t.Parallel()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(`{"base_url":"https://eu.hub.molten.bot/v1","agent_token":"agent_saved"}`), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	state := currentHubSetupState(hub.InitConfig{RuntimeConfigPath: configPath})
+	if got, want := state.Region, "eu"; got != want {
+		t.Fatalf("Region = %q, want %q", got, want)
+	}
+}
+
+func TestHubSetupBaseURLUsesSelectedRegionForDefaultHubEndpoints(t *testing.T) {
+	t.Parallel()
+
+	if got, want := hubSetupBaseURL("", "eu"), "https://eu.hub.molten.bot/v1"; got != want {
+		t.Fatalf("hubSetupBaseURL(empty, eu) = %q, want %q", got, want)
+	}
+	if got, want := hubSetupBaseURL("https://na.hub.molten.bot/v1", "eu"), "https://eu.hub.molten.bot/v1"; got != want {
+		t.Fatalf("hubSetupBaseURL(na, eu) = %q, want %q", got, want)
+	}
+	if got, want := hubSetupBaseURL("https://eu.hub.molten.bot/v1", "na"), "https://na.hub.molten.bot/v1"; got != want {
+		t.Fatalf("hubSetupBaseURL(eu, na) = %q, want %q", got, want)
+	}
+	if got, want := hubSetupBaseURL("http://127.0.0.1:7777/v1", "eu"), "http://127.0.0.1:7777/v1"; got != want {
+		t.Fatalf("hubSetupBaseURL(custom, eu) = %q, want %q", got, want)
 	}
 }
 

@@ -363,6 +363,16 @@
           </div>
         </div>
 
+        <div class="hub-setup-toggle-row">
+          <div class="hub-setup-toggle-heading">
+            <span class="prompt-label">Region</span>
+          </div>
+          <div class="hub-setup-toggle-group" role="tablist" aria-label="Region">
+            <button id="hub-setup-region-na-toggle" class="hub-setup-toggle active" type="button" data-hub-region="na" aria-pressed="true">NA</button>
+            <button id="hub-setup-region-eu-toggle" class="hub-setup-toggle" type="button" data-hub-region="eu" aria-pressed="false">EU</button>
+          </div>
+        </div>
+
         <label class="prompt-field">
           <span id="hub-setup-token-label" class="prompt-label">Token</span>
           <input id="hub-setup-token" class="prompt-control prompt-input w-full font-mono text-[0.84rem]" type="text" inputmode="text" autocapitalize="off" autocomplete="off" autocorrect="off" spellcheck="false" placeholder="Paste token">
@@ -629,9 +639,11 @@
       const hub = raw && typeof raw === "object" ? raw : {};
       const profile = hub.profile && typeof hub.profile === "object" ? hub.profile : {};
       const agentMode = String(hub.agent_mode || hub.agentMode || "").trim() || "existing";
+      const region = String(hub.region || "").trim().toLowerCase() === "eu" ? "eu" : "na";
       return {
         configured: Boolean(hub.configured),
         agentMode,
+        region,
         tokenType: agentMode === "new" ? "bind" : "agent",
         handle: String(hub.handle || "").trim(),
         profile: {
@@ -662,6 +674,58 @@
         hubSetupToken.setCustomValidity(message);
       }
       return message;
+    }
+
+    function currentHubSetupTokenLabel() {
+      return state.hubSetup.agentMode === "new" ? "Bind Token" : "Token";
+    }
+
+    function currentHubSetupTokenPlaceholder() {
+      return state.hubSetup.agentMode === "new" ? "Paste bind token" : "Paste token";
+    }
+
+    function currentHubSetupAutoSubmitKey() {
+      const payload = currentHubSetupPayload();
+      return `${payload.agent_mode}:${payload.region}:${payload.token}`;
+    }
+
+    function clearHubSetupAutoSubmitTimer() {
+      if (state.hubSetupAutoSubmitTimer) {
+        window.clearTimeout(state.hubSetupAutoSubmitTimer);
+        state.hubSetupAutoSubmitTimer = 0;
+      }
+    }
+
+    function scheduleHubSetupAutoSubmit() {
+      clearHubSetupAutoSubmitTimer();
+      if (state.hubSetupBusy || state.hubSetup.agentMode !== "existing") {
+        return;
+      }
+      if (syncHubTokenValidation()) {
+        return;
+      }
+      const payload = currentHubSetupPayload();
+      if (!payload.token) {
+        return;
+      }
+      const autoSubmitKey = currentHubSetupAutoSubmitKey();
+      if (autoSubmitKey === state.hubSetupLastAutoSubmitKey) {
+        return;
+      }
+      state.hubSetupAutoSubmitTimer = window.setTimeout(() => {
+        state.hubSetupAutoSubmitTimer = 0;
+        if (state.hubSetupBusy || state.hubSetup.agentMode !== "existing") {
+          return;
+        }
+        if (syncHubTokenValidation()) {
+          return;
+        }
+        const nextKey = currentHubSetupAutoSubmitKey();
+        if (!nextKey || nextKey === state.hubSetupLastAutoSubmitKey) {
+          return;
+        }
+        void submitHubSetup(null, { autoSubmit: true });
+      }, 180);
     }
 
     function agentAuthLabel(harness) {
@@ -768,6 +832,8 @@
       agentAuthURLLogoBroken: false,
       hubSetupBusy: false,
       hubSetupOpen: false,
+      hubSetupAutoSubmitTimer: 0,
+      hubSetupLastAutoSubmitKey: "",
     };
     let agentAuthRefreshTimer = null;
     let agentAuthAutoSubmitTimer = null;
@@ -843,6 +909,8 @@
     const hubSetupClose = document.getElementById("hub-setup-close");
     const hubSetupExistingToggle = document.getElementById("hub-setup-existing-toggle");
     const hubSetupNewToggle = document.getElementById("hub-setup-new-toggle");
+    const hubSetupRegionNAToggle = document.getElementById("hub-setup-region-na-toggle");
+    const hubSetupRegionEUToggle = document.getElementById("hub-setup-region-eu-toggle");
     const hubSetupTokenLabel = document.getElementById("hub-setup-token-label");
     const hubSetupToken = document.getElementById("hub-setup-token");
     const hubSetupNewAgentFields = document.getElementById("hub-setup-new-agent-fields");
@@ -1184,6 +1252,10 @@
 
     function setHubSetupBusy(busy) {
       state.hubSetupBusy = Boolean(busy);
+      if (hubSetupExistingToggle) hubSetupExistingToggle.disabled = state.hubSetupBusy;
+      if (hubSetupNewToggle) hubSetupNewToggle.disabled = state.hubSetupBusy;
+      if (hubSetupRegionNAToggle) hubSetupRegionNAToggle.disabled = state.hubSetupBusy;
+      if (hubSetupRegionEUToggle) hubSetupRegionEUToggle.disabled = state.hubSetupBusy;
       if (hubSetupToken) hubSetupToken.disabled = state.hubSetupBusy;
       if (hubSetupHandle) hubSetupHandle.disabled = state.hubSetupBusy;
       if (hubSetupDisplayName) hubSetupDisplayName.disabled = state.hubSetupBusy;
@@ -1235,14 +1307,24 @@
         hubSetupNewToggle.classList.toggle("active", isNew);
         hubSetupNewToggle.setAttribute("aria-pressed", String(isNew));
       }
+      if (hubSetupRegionNAToggle) {
+        const selected = state.hubSetup.region !== "eu";
+        hubSetupRegionNAToggle.classList.toggle("active", selected);
+        hubSetupRegionNAToggle.setAttribute("aria-pressed", String(selected));
+      }
+      if (hubSetupRegionEUToggle) {
+        const selected = state.hubSetup.region === "eu";
+        hubSetupRegionEUToggle.classList.toggle("active", selected);
+        hubSetupRegionEUToggle.setAttribute("aria-pressed", String(selected));
+      }
       if (hubSetupNewAgentFields) {
         hubSetupNewAgentFields.classList.toggle("hidden", !isNew);
       }
       if (hubSetupTokenLabel) {
-        hubSetupTokenLabel.textContent = "Token";
+        hubSetupTokenLabel.textContent = currentHubSetupTokenLabel();
       }
       if (hubSetupToken) {
-        hubSetupToken.placeholder = "Paste token";
+        hubSetupToken.placeholder = currentHubSetupTokenPlaceholder();
         syncHubTokenValidation();
       }
       applyHubDockState();
@@ -1257,6 +1339,7 @@
         hubSetupGate.setAttribute("aria-hidden", state.hubSetupOpen ? "false" : "true");
       }
       if (!state.hubSetupOpen) {
+        clearHubSetupAutoSubmitTimer();
         setHubSetupStatus("", "");
       }
     }
@@ -1287,6 +1370,7 @@
       return {
         agent_mode: isNew ? "new" : "existing",
         token_type: isNew ? "bind" : "agent",
+        region: state.hubSetup.region === "eu" ? "eu" : "na",
         token: String(hubSetupToken?.value || "").trim(),
         handle: String(hubSetupHandle?.value || "").trim(),
         profile: {
@@ -1313,10 +1397,11 @@
       };
     }
 
-    async function submitHubSetup(event) {
+    async function submitHubSetup(event, options = {}) {
       if (event && typeof event.preventDefault === "function") {
         event.preventDefault();
       }
+      const autoSubmit = Boolean(options && options.autoSubmit);
       const payload = currentHubSetupPayload();
       if (!payload.token) {
         trackAnalyticsEvent("hub_setup_validation_failed", { agent_mode: payload.agent_mode });
@@ -1351,14 +1436,20 @@
         if (!response.ok) {
           throw new Error(body?.error || `hub setup http ${response.status}`);
         }
+        state.hubSetupLastAutoSubmitKey = currentHubSetupAutoSubmitKey();
         applyHubSetupState(body?.hub);
+        await loadAgentAuthStatus();
         trackAnalyticsEvent("hub_setup_succeeded", { agent_mode: payload.agent_mode, token_type: payload.token_type });
         setHubSetupStatus("ok", state.hubSetup.message || "Molten Hub setup saved.");
         if (hubSetupToken) {
           hubSetupToken.value = "";
         }
+        if (autoSubmit) {
+          setHubSetupOpen(false);
+        }
       } catch (err) {
         trackAnalyticsEvent("hub_setup_failed", { agent_mode: payload.agent_mode, token_type: payload.token_type });
+        state.hubSetupLastAutoSubmitKey = "";
         setHubSetupStatus("error", err && err.message ? err.message : "Hub setup failed.");
       } finally {
         setHubSetupBusy(false);
@@ -4419,12 +4510,30 @@
     }
     if (hubSetupExistingToggle) {
       hubSetupExistingToggle.addEventListener("click", () => {
+        state.hubSetupLastAutoSubmitKey = "";
         applyHubSetupState(currentHubSetupDraft({ agentMode: "existing" }));
+        scheduleHubSetupAutoSubmit();
       });
     }
     if (hubSetupNewToggle) {
       hubSetupNewToggle.addEventListener("click", () => {
+        state.hubSetupLastAutoSubmitKey = "";
         applyHubSetupState(currentHubSetupDraft({ agentMode: "new" }));
+        clearHubSetupAutoSubmitTimer();
+      });
+    }
+    if (hubSetupRegionNAToggle) {
+      hubSetupRegionNAToggle.addEventListener("click", () => {
+        state.hubSetupLastAutoSubmitKey = "";
+        applyHubSetupState(currentHubSetupDraft({ region: "na" }));
+        scheduleHubSetupAutoSubmit();
+      });
+    }
+    if (hubSetupRegionEUToggle) {
+      hubSetupRegionEUToggle.addEventListener("click", () => {
+        state.hubSetupLastAutoSubmitKey = "";
+        applyHubSetupState(currentHubSetupDraft({ region: "eu" }));
+        scheduleHubSetupAutoSubmit();
       });
     }
     if (hubSetupClose) {
@@ -4437,10 +4546,23 @@
     }
     if (hubSetupToken) {
       hubSetupToken.addEventListener("input", () => {
+        if (currentHubSetupAutoSubmitKey() !== state.hubSetupLastAutoSubmitKey) {
+          state.hubSetupLastAutoSubmitKey = "";
+        }
         syncHubTokenValidation();
         if (hubSetupStatus && hubSetupStatus.classList.contains("error")) {
           setHubSetupStatus("", "");
         }
+        scheduleHubSetupAutoSubmit();
+      });
+      hubSetupToken.addEventListener("paste", () => {
+        window.setTimeout(() => {
+          if (currentHubSetupAutoSubmitKey() !== state.hubSetupLastAutoSubmitKey) {
+            state.hubSetupLastAutoSubmitKey = "";
+          }
+          syncHubTokenValidation();
+          scheduleHubSetupAutoSubmit();
+        }, 0);
       });
     }
     window.__hubAuthVerifyClick = (event) => {
