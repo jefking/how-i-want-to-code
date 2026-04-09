@@ -127,7 +127,7 @@
             <span class="metric-copy">
               <span class="metric-label text-xs leading-tight">DISK</span>
               <span id="resource-metrics-text" class="status-value metric-value text-sm leading-tight">--</span>
-              <span class="metric-unit metric-unit-visible text-xs leading-tight">MB/s</span>
+              <span id="resource-metrics-unit" class="metric-unit metric-unit-visible text-xs leading-tight">MB/s</span>
             </span>
           </span>
         </div>
@@ -868,6 +868,7 @@
     const resourceMemText = document.getElementById("resource-mem-text");
     const resourceDiskIcon = document.getElementById("resource-disk-icon");
     const resourceMetricsText = document.getElementById("resource-metrics-text");
+    const resourceMetricsUnit = document.getElementById("resource-metrics-unit");
     const taskList = document.getElementById("task-list");
     const taskPanel = document.getElementById("task-panel");
     const taskFullscreenToggle = document.getElementById("task-fullscreen-toggle");
@@ -2447,6 +2448,31 @@
       return `${Math.round(value)}${suffix}`;
     }
 
+    function formatDiskThroughput(valueInMBs) {
+      if (!Number.isFinite(valueInMBs) || valueInMBs < 0) {
+        return { value: "--", unit: "MB/s" };
+      }
+
+      if (valueInMBs < 1) {
+        return {
+          value: formatCompactMetricNumber(valueInMBs * 1000),
+          unit: "KB/s",
+        };
+      }
+
+      if (valueInMBs >= 1000) {
+        return {
+          value: formatCompactMetricNumber(valueInMBs / 1000),
+          unit: "GB/s",
+        };
+      }
+
+      return {
+        value: formatCompactMetricNumber(valueInMBs),
+        unit: "MB/s",
+      };
+    }
+
     function metricSeverityClass(value) {
       if (!Number.isFinite(value) || value < 0) return "metric-icon-neutral";
       if (value < 65) return "metric-icon-good";
@@ -2468,7 +2494,13 @@
         resourceMemText.textContent = formatCompactMetricNumber(mem, "%");
       }
       if (resourceMetricsText) {
-        resourceMetricsText.textContent = formatCompactMetricNumber(disk);
+        const diskThroughput = formatDiskThroughput(disk);
+        resourceMetricsText.textContent = diskThroughput.value;
+        if (resourceMetricsUnit) {
+          resourceMetricsUnit.textContent = diskThroughput.unit;
+        }
+      } else if (resourceMetricsUnit) {
+        resourceMetricsUnit.textContent = "MB/s";
       }
       setMetricIcon(resourceCPUIcon, cpu);
       setMetricIcon(resourceMemIcon, mem);
