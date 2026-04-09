@@ -339,10 +339,11 @@
     </div>
   </div>
 
-  <button id="theme-toggle" class="theme-toggle" aria-label="Switch theme. Currently: Light">
-    <span class="theme-toggle-icon" id="theme-toggle-icon" aria-hidden="true"></span>
-    <span id="theme-toggle-label">Light</span>
-  </button>
+  <div id="appearance-controls" class="theme-controls" role="group" aria-label="Appearance controls">
+    <button id="theme-cycle" class="theme-cycle-button" type="button" aria-live="polite">
+      <span id="theme-cycle-current" class="theme-cycle-current">Dark</span>
+    </button>
+  </div>
 
   <script>
     const DISMISSED_TASKS_KEY = "hubui.dismissedTaskIds";
@@ -668,9 +669,8 @@
     const agentAuthConfigureInput = document.getElementById("agent-auth-configure-input");
     const agentAuthConfigureError = document.getElementById("agent-auth-configure-error");
     const agentAuthVerify = document.getElementById("agent-auth-verify");
-    const themeToggleButton = document.getElementById("theme-toggle");
-    const themeToggleLabel = document.getElementById("theme-toggle-label");
-    const themeToggleIcon = document.getElementById("theme-toggle-icon");
+    const themeCycleButton = document.getElementById("theme-cycle");
+    const themeCycleCurrent = document.getElementById("theme-cycle-current");
     const hoverSelect = document.getElementById("hover-select");
     let brandLogoRotationTimer = null;
     let brandLogoRotationPhase = 0;
@@ -691,20 +691,17 @@
       return THEME_MODES[(safeIndex + 1) % THEME_MODES.length];
     }
 
-    function syncThemeToggle(theme) {
-      if (!themeToggleButton || !themeToggleLabel || !themeToggleIcon) {
+    function syncThemeCycleButton(theme) {
+      if (!themeCycleButton || !themeCycleCurrent) {
         return;
       }
       const currentTheme = THEME_MODES.includes(theme) ? theme : DEFAULT_THEME_MODE;
+      const nextTheme = nextThemeMode(currentTheme);
       const currentLabel = themeLabel(currentTheme);
-      const icons = {
-        light: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>',
-        dark: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="M12 3a8 8 0 1 0 9 9 6 6 0 0 1-9-9z"/></svg>',
-        night: '<svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"><path d="m12 3 2.5 5 5.5.8-4 3.9.9 5.5-4.9-2.6-4.9 2.6.9-5.5-4-3.9 5.5-.8z"/></svg>'
-      };
-      themeToggleLabel.textContent = currentLabel;
-      themeToggleIcon.innerHTML = icons[currentTheme];
-      themeToggleButton.setAttribute("aria-label", `Switch theme. Currently: ${currentLabel}`);
+      const nextLabel = themeLabel(nextTheme);
+      themeCycleCurrent.textContent = currentLabel;
+      themeCycleButton.setAttribute("aria-label", `Current theme ${currentLabel}. Switch to ${nextLabel}.`);
+      themeCycleButton.setAttribute("title", `Switch theme to ${nextLabel}`);
     }
 
     function applyThemeMode(theme, persist) {
@@ -713,7 +710,7 @@
       root.classList.remove("light", "dark", "night");
       root.classList.add(normalized);
       root.setAttribute("data-theme", normalized);
-      syncThemeToggle(normalized);
+      syncThemeCycleButton(normalized);
       if (persist) {
         try {
           localStorage.setItem(THEME_KEY, normalized);
@@ -743,8 +740,8 @@
       applyThemeMode(loadThemeMode(), false);
       applyHoverMode(loadHoverMode(), false);
 
-      if (themeToggleButton) {
-        themeToggleButton.addEventListener("click", () => {
+      if (themeCycleButton) {
+        themeCycleButton.addEventListener("click", () => {
           applyThemeMode(nextThemeMode(currentThemeMode()), true);
         });
       }
