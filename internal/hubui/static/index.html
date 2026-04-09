@@ -317,13 +317,13 @@
       </div>
 
       <div id="agent-auth-configure" class="mt-5 hidden space-y-3">
-        <div class="text-sm text-hub-text/80">Run in your terminal locally</div>
+        <div id="agent-auth-configure-command-label" class="text-sm text-hub-text/80">Run in your terminal locally</div>
         <div class="flex flex-wrap items-center gap-2.5">
           <div id="agent-auth-configure-command" class="font-mono text-[1rem] tracking-[0.04em] text-hub-text">auggie token print</div>
           <button id="agent-auth-configure-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
         </div>
         <label id="agent-auth-configure-label" class="text-sm font-medium text-hub-text/85" for="agent-auth-configure-input">Paste configuration value</label>
-        <textarea id="agent-auth-configure-input" class="prompt-text min-h-[120px] font-mono text-[0.9rem]" placeholder='{"accessToken":"XXX","tenantURL":"https://YYY/","scopes":["email"]}' spellcheck="false"></textarea>
+        <textarea id="agent-auth-configure-input" class="prompt-text font-mono text-[0.9rem]" placeholder='{"accessToken":"XXX","tenantURL":"https://YYY/","scopes":["email"]}' spellcheck="false" rows="5" wrap="off"></textarea>
         <p id="agent-auth-configure-error" class="hidden text-sm text-rose-200"></p>
       </div>
 
@@ -662,6 +662,7 @@
     const agentAuthBrowserCodeInput = document.getElementById("agent-auth-browser-code-input");
     const agentAuthBrowserCodeError = document.getElementById("agent-auth-browser-code-error");
     const agentAuthConfigure = document.getElementById("agent-auth-configure");
+    const agentAuthConfigureCommandLabel = document.getElementById("agent-auth-configure-command-label");
     const agentAuthConfigureCommand = document.getElementById("agent-auth-configure-command");
     const agentAuthConfigureLabel = document.getElementById("agent-auth-configure-label");
     const agentAuthConfigureCopy = document.getElementById("agent-auth-configure-copy");
@@ -1332,7 +1333,7 @@
         if (needsAuggieConfigure) {
           agentAuthTitle.textContent = "Auggie Configure";
         } else if (needsClaudeGitHubConfigure) {
-          agentAuthTitle.textContent = "GitHub Token Configure";
+          agentAuthTitle.textContent = "Setup GitHub";
         } else if (requiresManualConfigure) {
           agentAuthTitle.textContent = `${currentAgentLabel()} Configure`;
         } else {
@@ -1393,14 +1394,16 @@
         const fallbackCommand = needsAuggieConfigure ? "auggie token print" : "gh auth token";
         agentAuthConfigureCommand.textContent = state.agentAuth.configureCommand || fallbackCommand;
       }
+      if (agentAuthConfigureCommandLabel) {
+        agentAuthConfigureCommandLabel.classList.toggle("hidden", needsClaudeGitHubConfigure);
+      }
       if (agentAuthConfigureLabel) {
         if (needsAuggieConfigure) {
           agentAuthConfigureLabel.textContent = "Paste Auggie session JSON";
-        } else if (needsClaudeGitHubConfigure) {
-          agentAuthConfigureLabel.textContent = "Paste GitHub token";
         } else {
           agentAuthConfigureLabel.textContent = "Paste configuration value";
         }
+        agentAuthConfigureLabel.classList.toggle("hidden", needsClaudeGitHubConfigure);
       }
       if (agentAuthConfigureInput) {
         const fallbackPlaceholder = needsAuggieConfigure
@@ -1408,6 +1411,8 @@
           : "ghp_xxx";
         const placeholder = state.agentAuth.configurePlaceholder || fallbackPlaceholder;
         agentAuthConfigureInput.placeholder = placeholder;
+        agentAuthConfigureInput.classList.toggle("agent-auth-configure-input-github", needsClaudeGitHubConfigure);
+        agentAuthConfigureInput.rows = needsClaudeGitHubConfigure ? 1 : 5;
       }
       if (!requiresManualConfigure) {
         setAuggieConfigureError("");
@@ -1547,7 +1552,7 @@
     function normalizeGitHubTokenPayload(raw) {
       const token = String(raw || "").trim();
       if (!token) {
-        throw new Error("Paste a GitHub token first.");
+        throw new Error("GitHub token is required.");
       }
       if (token.length < 8) {
         throw new Error("GitHub token appears too short.");
