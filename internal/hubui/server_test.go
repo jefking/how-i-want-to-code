@@ -886,8 +886,17 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function clearSubmittedPromptDraft(") {
 		t.Fatalf("expected index html to include submitted prompt clearing helper")
 	}
+	if !strings.Contains(markup, "function resetPromptInputSize(input)") ||
+		!strings.Contains(markup, "input.style.removeProperty(\"height\");") ||
+		!strings.Contains(markup, "input.style.removeProperty(\"width\");") {
+		t.Fatalf("expected index html to include prompt textarea resize reset behavior")
+	}
 	if !strings.Contains(markup, "builderPromptInput.value = \"\";") || !strings.Contains(markup, "localPromptInput.value = \"\";") {
 		t.Fatalf("expected index html to clear builder and raw prompt inputs after submit")
+	}
+	if !strings.Contains(markup, "resetPromptInputSize(builderPromptInput);") ||
+		!strings.Contains(markup, "resetPromptInputSize(localPromptInput);") {
+		t.Fatalf("expected index html to reset prompt textarea size after clearing submitted prompt state")
 	}
 	if !strings.Contains(markup, "function clearSubmittedPromptState(") {
 		t.Fatalf("expected index html to include queued-submit cleanup helper")
