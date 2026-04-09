@@ -743,6 +743,24 @@ body .right-col.prompt-collapsed.task-list-hidden {
   padding-inline: 12px;
 }
 
+.prompt-mode-link-github {
+  position: relative;
+}
+
+.prompt-mode-link-github::before {
+  content: "";
+  display: block;
+  width: 1px;
+  height: 18px;
+  margin-right: 2px;
+  border-radius: 999px;
+  background: rgba(112, 163, 221, 0.32);
+}
+
+.prompt-mode-link-github img {
+  margin-left: 1px;
+}
+
 .prompt-titlebar .prompt-visibility-toggle {
   margin-left: 0;
 }

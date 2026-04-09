@@ -611,6 +611,9 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	if !strings.Contains(css, ".prompt-mode-link-github {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
 		t.Fatalf("expected the icon-only GitHub dock item to align with the main segmented menu")
 	}
+	if !strings.Contains(css, ".prompt-mode-link-github::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
+		t.Fatalf("expected the GitHub dock item to share the segmented main-menu treatment instead of rendering as a detached control")
+	}
 	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 14px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
 		t.Fatalf("expected studio form content to use the full panel now that the mode dock lives outside it")
 	}

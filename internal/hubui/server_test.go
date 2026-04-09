@@ -576,6 +576,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `class="page-bottom-dock"`) || !strings.Contains(markup, `class="prompt-mode-tabs prompt-mode-tabs-dock"`) {
 		t.Fatalf("expected index html to render the mode toggles in the bottom dock")
 	}
+	if !strings.Contains(markup, `aria-label="Main menu"`) {
+		t.Fatalf("expected index html to expose the shared dock as the main menu")
+	}
 	if !strings.Contains(markup, `id="github-profile-link"`) ||
 		!strings.Contains(markup, `href="https://github.com/settings/profile"`) ||
 		!strings.Contains(markup, `target="_blank"`) {
@@ -585,8 +588,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		!strings.Contains(markup, `src="/static/logos/github.svg"`) {
 		t.Fatalf("expected index html to render GitHub as an icon-only item inside the shared segmented dock")
 	}
-	if strings.Contains(markup, `>GitHub<`) {
-		t.Fatalf("expected index html to remove visible GitHub text from the dock menu")
+	if !strings.Contains(markup, `<span class="sr-only">GitHub</span>`) {
+		t.Fatalf("expected index html to keep the GitHub dock item screen-reader accessible without visible text")
 	}
 	if strings.Index(markup, `id="task-panel"`) > strings.Index(markup, `class="panel prompt-wrap`) {
 		t.Fatalf("expected index html to render Task View before Studio in the page layout")
@@ -1064,6 +1067,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".prompt-mode-link-github {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
 		t.Fatalf("expected stylesheet to keep the icon-only GitHub dock item balanced with the text tabs")
+	}
+	if !strings.Contains(css, ".prompt-mode-link-github::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
+		t.Fatalf("expected stylesheet to visually integrate the GitHub icon into the shared dock instead of a detached pill")
 	}
 	if !strings.Contains(css, ".task-fullscreen {\n  position: fixed;\n  inset: 0;\n  z-index: 80;\n  padding: 0;") {
 		t.Fatalf("expected stylesheet to make full screen task layout use full viewport padding")
