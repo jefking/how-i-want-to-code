@@ -1271,10 +1271,9 @@ select.prompt-control {
 }
 
 .task-top {
-  display: flex;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  flex-wrap: wrap;
   gap: 8px;
   margin-bottom: 6px;
   min-width: 0;
@@ -1288,10 +1287,11 @@ select.prompt-control {
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   gap: 6px;
   flex: 0 0 auto;
-  max-width: 100%;
+  min-width: max-content;
+  justify-self: end;
 }
 
 .task-footer {

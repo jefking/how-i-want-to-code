@@ -1010,6 +1010,12 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-body") {
 		t.Fatalf("expected stylesheet to include task body column styles")
 	}
+	if !strings.Contains(css, ".task-top {\n  display: grid;\n  grid-template-columns: minmax(0, 1fr) auto;\n  align-items: center;") {
+		t.Fatalf("expected stylesheet to pin task actions in a dedicated trailing column")
+	}
+	if !strings.Contains(css, ".task-top-actions {\n  display: flex;\n  align-items: center;\n  justify-content: flex-end;\n  flex-wrap: nowrap;") {
+		t.Fatalf("expected stylesheet to keep task action controls on a single right-aligned row")
+	}
 	if !strings.Contains(css, ".task-output-toggle") {
 		t.Fatalf("expected stylesheet to include task output toggle styles")
 	}
