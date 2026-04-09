@@ -184,6 +184,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="moltenhub-logo"`) {
 		t.Fatalf("expected index html to include moltenhub logo rotation anchor id")
 	}
+	if !strings.Contains(markup, `id="configured-agent-logo"`) {
+		t.Fatalf("expected index html to include configured agent logo element")
+	}
+	if !strings.Contains(markup, `class="configured-agent-logo rotating-brand-logo"`) {
+		t.Fatalf("expected configured agent logo to use transparent-only logo classes")
+	}
+	if strings.Contains(markup, `class="brand-logo configured-agent-logo`) {
+		t.Fatalf("expected configured agent logo to avoid inheriting the frosted brand tile styles")
+	}
 	if !strings.Contains(markup, `const LOGO_ROTATION_INTERVAL_MS = 8_000;`) {
 		t.Fatalf("expected index html to rotate brand logos every 8 seconds")
 	}
@@ -1062,10 +1071,10 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".brand-logo") {
 		t.Fatalf("expected stylesheet to include brand logo styles")
 	}
-	if !strings.Contains(css, ".configured-agent-logo {\n  width: 42px;\n  height: 42px;\n  padding: 7px;\n  border-radius: 14px;\n  filter: var(--agent-logo-filter);") {
+	if !strings.Contains(css, ".configured-agent-logo {\n  width: 42px;\n  height: 42px;\n  padding: 7px;\n  border: 0;\n  border-radius: 14px;\n  background: transparent;\n  box-shadow: none;\n  filter: var(--agent-logo-filter);") {
 		t.Fatalf("expected stylesheet to tint rotating configured-agent logos based on active theme")
 	}
-	if !strings.Contains(css, ".agent-auth-url-logo {\n  display: block;\n  width: 58px;\n  height: 58px;\n  padding: 9px;\n  border: 1px solid var(--surface-auth-button-border);\n  border-radius: 16px;\n  background: var(--surface-auth-button-bg);\n  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);\n  filter: var(--agent-logo-filter);") {
+	if !strings.Contains(css, ".agent-auth-url-logo {\n  display: block;\n  width: 58px;\n  height: 58px;\n  padding: 9px;\n  border: 0;\n  border-radius: 16px;\n  background: transparent;\n  box-shadow: none;\n  filter: var(--agent-logo-filter);") {
 		t.Fatalf("expected stylesheet to tint auth-gate agent logos based on active theme")
 	}
 	if !strings.Contains(css, ".rotating-brand-logo") || !strings.Contains(css, ".brand-logo-visible") {

@@ -277,8 +277,13 @@ textarea {
   width: 42px;
   height: 42px;
   padding: 7px;
+  border: 0;
   border-radius: 14px;
+  background: transparent;
+  box-shadow: none;
   filter: var(--agent-logo-filter);
+  display: block;
+  object-fit: contain;
 }
 
 .title {
@@ -2084,16 +2089,16 @@ select.prompt-control {
   width: 58px;
   height: 58px;
   padding: 9px;
-  border: 1px solid var(--surface-auth-button-border);
+  border: 0;
   border-radius: 16px;
-  background: var(--surface-auth-button-bg);
-  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.22);
+  background: transparent;
+  box-shadow: none;
   filter: var(--agent-logo-filter);
 }
 
 .agent-auth-url-logo-link:hover .agent-auth-url-logo,
 .agent-auth-url-logo-link:focus-visible .agent-auth-url-logo {
-  background: var(--surface-auth-button-hover-bg);
+  opacity: 0.85;
 }
 
 .agent-auth-verify {
