@@ -101,6 +101,11 @@
   --surface-fullscreen-close-hover-border: rgba(15, 27, 51, 0.28);
   --surface-fullscreen-close-shadow: 0 16px 36px rgba(10, 44, 102, 0.22);
   --surface-auth-backdrop: rgba(4, 9, 17, 0.85);
+  --surface-auth-panel-bg: linear-gradient(180deg, rgba(255, 255, 255, 0.98), rgba(244, 248, 255, 0.96));
+  --surface-auth-panel-border: rgba(112, 163, 221, 0.28);
+  --surface-auth-panel-shadow:
+    0 24px 54px rgba(10, 44, 102, 0.22),
+    inset 0 1px 0 rgba(255, 255, 255, 0.82);
   --surface-auth-button-border: rgba(255, 255, 255, 0.2);
   --surface-auth-button-bg: rgba(255, 255, 255, 0.05);
   --surface-auth-button-hover-bg: rgba(255, 255, 255, 0.1);
@@ -2131,6 +2136,14 @@ select.prompt-control {
   background: var(--surface-auth-backdrop);
 }
 
+.agent-auth-shell {
+  padding: clamp(24px, 3vw, 32px);
+  border: 1px solid var(--surface-auth-panel-border);
+  border-radius: 24px;
+  background: var(--surface-auth-panel-bg);
+  box-shadow: var(--surface-auth-panel-shadow);
+}
+
 .agent-auth-copy {
   border: 1px solid var(--surface-auth-button-border);
   background: var(--surface-auth-button-bg);
@@ -2197,7 +2210,7 @@ select.prompt-control {
   position: fixed;
   right: 16px;
   bottom: 16px;
-  z-index: 60;
+  z-index: 96;
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -2320,6 +2333,11 @@ html.dark {
   --surface-fullscreen-close-hover-border: rgba(232, 240, 255, 0.24);
   --surface-fullscreen-close-shadow: 0 16px 36px rgba(0, 0, 0, 0.34);
   --surface-auth-backdrop: rgba(4, 9, 17, 0.88);
+  --surface-auth-panel-bg: linear-gradient(180deg, rgba(20, 29, 47, 0.98), rgba(14, 22, 37, 0.96));
+  --surface-auth-panel-border: rgba(108, 148, 224, 0.3);
+  --surface-auth-panel-shadow:
+    0 26px 58px rgba(1, 8, 18, 0.48),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
   --surface-auth-button-border: rgba(232, 240, 255, 0.16);
   --surface-auth-button-bg: rgba(232, 240, 255, 0.06);
   --surface-auth-button-hover-bg: rgba(232, 240, 255, 0.1);
@@ -2441,6 +2459,11 @@ html.night {
   --surface-fullscreen-close-hover-border: rgba(237, 243, 255, 0.24);
   --surface-fullscreen-close-shadow: 0 16px 36px rgba(0, 0, 0, 0.4);
   --surface-auth-backdrop: rgba(2, 5, 11, 0.9);
+  --surface-auth-panel-bg: linear-gradient(180deg, rgba(17, 23, 36, 0.98), rgba(10, 14, 24, 0.98));
+  --surface-auth-panel-border: rgba(88, 109, 147, 0.34);
+  --surface-auth-panel-shadow:
+    0 28px 62px rgba(0, 4, 12, 0.56),
+    inset 0 1px 0 rgba(255, 255, 255, 0.04);
   --surface-auth-button-border: rgba(237, 243, 255, 0.14);
   --surface-auth-button-bg: rgba(237, 243, 255, 0.05);
   --surface-auth-button-hover-bg: rgba(237, 243, 255, 0.1);
