@@ -86,3 +86,12 @@ func TestNonRemediableRepoAccessReasonDetectsGitHub403(t *testing.T) {
 		t.Fatalf("NonRemediableRepoAccessReason() = %q", got)
 	}
 }
+
+func TestNonRemediableRepoAccessReasonDetectsAgentRepoRightsFailures(t *testing.T) {
+	t.Parallel()
+
+	err := errors.New("target repository git@github.com:acme/private.git doesn't have the rights to pull the code or push a PR")
+	if got := NonRemediableRepoAccessReason(err); got != "doesn't have the rights to pull the code" {
+		t.Fatalf("NonRemediableRepoAccessReason() = %q", got)
+	}
+}

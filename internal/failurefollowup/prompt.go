@@ -37,6 +37,8 @@ var nonRemediableRepoAccessMarkers = []string{
 	"requested url returned error: 403",
 	"authentication failed",
 	"could not read username for 'https://github.com'",
+	"doesn't have the rights to pull the code",
+	"doesn't have the rights to push a pr",
 }
 
 var nonRemediableFailureMarkers = []string{
