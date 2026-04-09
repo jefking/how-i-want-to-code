@@ -1554,13 +1554,11 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 			return state, fmt.Errorf("sync hub profile: %w", err)
 		}
 	} else {
-		if err := client.UpdateAgentStatus(ctx, resolvedToken, "online"); err != nil {
-			return state, fmt.Errorf("verify hub login: %w", err)
-		}
 		profile, err := client.AgentProfile(ctx, resolvedToken)
 		if err != nil {
 			return state, fmt.Errorf("load hub profile: %w", err)
 		}
+		_ = client.UpdateAgentStatus(ctx, resolvedToken, "online")
 		finalCfg.Handle = strings.TrimSpace(profile.Handle)
 		finalCfg.Profile = profile.Profile
 	}

@@ -958,21 +958,74 @@ func TestConfigureHubSetupRejectsShortToken(t *testing.T) {
 	}
 }
 
-func TestConfigureHubSetupExistingAgentReturnsLoginVerificationFailure(t *testing.T) {
+func TestConfigureHubSetupExistingAgentIgnoresStatusUpdateFailuresDuringVerification(t *testing.T) {
 	t.Parallel()
 
 	const agentToken = "c9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
 
+	var (
+		getCalls    int
+		statusCalls int
+	)
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		switch {
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
-			_, _ = w.Write([]byte(`{"handle":"existing-agent"}`))
+			getCalls++
+			_, _ = w.Write([]byte(`{"handle":"existing-agent","profile":{"display_name":"Existing Agent","emoji":"🤖","bio":"Owns automation"}}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/agents/me/status":
+			statusCalls++
+			http.Error(w, `{"error":"invalid status payload"}`, http.StatusBadRequest)
+		case r.Method == http.MethodPost && r.URL.Path == "/v1/agents/me/status":
+			statusCalls++
+			http.Error(w, `{"error":"invalid status payload"}`, http.StatusBadRequest)
 		case (r.Method == http.MethodPatch || r.Method == http.MethodPost) &&
-			(r.URL.Path == "/v1/agents/me/status" ||
-				r.URL.Path == "/v1/agents/me" ||
-				r.URL.Path == "/v1/agents/me/metadata"):
+			(r.URL.Path == "/v1/agents/me" || r.URL.Path == "/v1/agents/me/metadata"):
+			statusCalls++
 			http.Error(w, `{"error":"status update not allowed"}`, http.StatusUnauthorized)
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	state, err := configureHubSetup(context.Background(), hub.InitConfig{
+		BaseURL:           server.URL + "/v1",
+		RuntimeConfigPath: configPath,
+	}, hubui.HubSetupRequest{
+		AgentMode: "existing",
+		Token:     agentToken,
+	}, nil)
+	if err != nil {
+		t.Fatalf("configureHubSetup() error = %v", err)
+	}
+	if getCalls < 2 {
+		t.Fatalf("GET /agents/me calls = %d, want at least 2", getCalls)
+	}
+	if statusCalls == 0 {
+		t.Fatal("expected status update attempts during existing-agent setup")
+	}
+	if !state.Configured {
+		t.Fatal("Configured = false, want true")
+	}
+	if got, want := strings.TrimSpace(state.Handle), "existing-agent"; got != want {
+		t.Fatalf("Handle = %q, want %q", got, want)
+	}
+}
+
+func TestConfigureHubSetupExistingAgentReturnsLoginVerificationFailure(t *testing.T) {
+	t.Parallel()
+
+	const agentToken = "d9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		switch {
+		case r.Method == http.MethodPost && (r.URL.Path == "/v1/agents/bind-tokens" || r.URL.Path == "/v1/agents/bind"):
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
+			http.Error(w, `{"error":"unauthorized"}`, http.StatusUnauthorized)
 		default:
 			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
 		}
@@ -989,8 +1042,8 @@ func TestConfigureHubSetupExistingAgentReturnsLoginVerificationFailure(t *testin
 	if err == nil {
 		t.Fatal("configureHubSetup() error = nil, want non-nil")
 	}
-	if !strings.Contains(err.Error(), "verify hub login") {
-		t.Fatalf("configureHubSetup() err = %q, want login verification context", err)
+	if !strings.Contains(err.Error(), "load hub profile") {
+		t.Fatalf("configureHubSetup() err = %q, want profile load context", err)
 	}
 	if !strings.Contains(err.Error(), "status=401") {
 		t.Fatalf("configureHubSetup() err = %q, want HTTP status details", err)
