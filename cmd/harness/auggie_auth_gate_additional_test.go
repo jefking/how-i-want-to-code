@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"strings"
 	"testing"
 
 	"github.com/jef/moltenhub-code/internal/hub"
@@ -43,8 +42,8 @@ func TestAuggieAuthGateStartDeviceAuthAndVerifyRefreshState(t *testing.T) {
 	if startState.State != "needs_configure" || startState.Ready {
 		t.Fatalf("StartDeviceAuth() = %+v", startState)
 	}
-	if !strings.Contains(startState.Message, "Auggie session auth is required") {
-		t.Fatalf("StartDeviceAuth() message = %q", startState.Message)
+	if startState.Message != "" {
+		t.Fatalf("StartDeviceAuth() message = %q, want empty", startState.Message)
 	}
 
 	verifyState, err := g.Verify(context.Background())

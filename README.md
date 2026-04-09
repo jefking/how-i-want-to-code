@@ -161,7 +161,7 @@ Container startup pre-registers auth before any agent stage:
 - for Codex, it reads `openai_api_key` from runtime/init JSON when `OPENAI_API_KEY` is unset and performs `codex login --with-api-key`
 - for Auggie, it reads `augment_session_auth` from runtime/init JSON when `AUGMENT_SESSION_AUTH` is unset and exports it for non-interactive CLI runs
 - for all harnesses (`codex`, `claude`, `auggie`), startup now blocks Studio task submission until GitHub auth is configured
-- when Auggie auth is missing, the UI now shows an `Auggie Configure` screen:
+- when Auggie auth is missing, the UI now shows a `Setup Auggie` screen:
   - copy `auggie token print`, run it locally, and paste the returned JSON
   - the payload is schema-validated and persisted to runtime `config.json` as `augment_session_auth`
 - when Codex auth is still missing, the UI now shows an authorization pre-screen:
