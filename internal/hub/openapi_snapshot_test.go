@@ -1,16 +1,12 @@
 package hub
 
 import (
-	"context"
 	"fmt"
-	"io"
-	"net/http"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
-	"time"
 )
 
 func TestOpenAPISnapshotIncludesRuntimeIntegrationRoutes(t *testing.T) {
@@ -51,39 +47,12 @@ func loadOpenAPIContractForTest() (content string, source string, err error) {
 
 	repoRoot := filepath.Clean(filepath.Join(filepath.Dir(file), "..", ".."))
 	snapshotPath := filepath.Join(repoRoot, "na.hub.molten.bot.openapi.yaml")
-	if data, readErr := os.ReadFile(snapshotPath); readErr == nil {
-		return string(data), snapshotPath, nil
+	data, readErr := os.ReadFile(snapshotPath)
+	if readErr != nil {
+		return "", "", fmt.Errorf("read OpenAPI snapshot %s: %w", snapshotPath, readErr)
 	}
-
-	openAPIURL := strings.TrimSpace(os.Getenv("MOLTENHUB_OPENAPI_URL"))
-	if openAPIURL == "" {
-		openAPIURL = "https://na.hub.molten.bot/openapi.yaml"
+	if len(strings.TrimSpace(string(data))) == 0 {
+		return "", "", fmt.Errorf("OpenAPI snapshot %s is empty", snapshotPath)
 	}
-
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, openAPIURL, nil)
-	if err != nil {
-		return "", "", fmt.Errorf("build OpenAPI request: %w", err)
-	}
-
-	resp, err := http.DefaultClient.Do(req)
-	if err != nil {
-		return "", "", fmt.Errorf("fetch OpenAPI from %s: %w", openAPIURL, err)
-	}
-	defer resp.Body.Close()
-
-	if resp.StatusCode < 200 || resp.StatusCode > 299 {
-		return "", "", fmt.Errorf("fetch OpenAPI from %s returned status=%d", openAPIURL, resp.StatusCode)
-	}
-
-	body, err := io.ReadAll(io.LimitReader(resp.Body, 2<<20))
-	if err != nil {
-		return "", "", fmt.Errorf("read OpenAPI from %s: %w", openAPIURL, err)
-	}
-	if len(strings.TrimSpace(string(body))) == 0 {
-		return "", "", fmt.Errorf("OpenAPI payload from %s is empty", openAPIURL)
-	}
-	return string(body), openAPIURL, nil
+	return string(data), snapshotPath, nil
 }

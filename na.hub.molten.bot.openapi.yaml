@@ -1,0 +1,37 @@
+openapi: 3.1.0
+info:
+  title: MoltenHub API (runtime integration snapshot)
+  version: 2026-04-08
+  description: >
+    Focused offline snapshot of the Hub routes consumed by this runtime.
+servers:
+  - url: https://na.hub.molten.bot
+paths:
+  /agents/me:
+    patch:
+      summary: Update current agent fields
+    post:
+      summary: Upsert current agent fields
+  /agents/me/metadata:
+    patch:
+      summary: Update current agent metadata
+    post:
+      summary: Upsert current agent metadata
+  /openclaw/messages/publish:
+    post:
+      summary: Publish outbound message payloads
+  /openclaw/messages/pull:
+    post:
+      summary: Pull leased inbound messages
+  /openclaw/messages/ack:
+    post:
+      summary: Acknowledge leased inbound messages
+  /openclaw/messages/nack:
+    post:
+      summary: Reject leased inbound messages
+  /openclaw/messages/ws:
+    get:
+      summary: Open websocket transport for OpenClaw messages
+  /openclaw/messages/offline:
+    post:
+      summary: Mark OpenClaw runtime session offline
