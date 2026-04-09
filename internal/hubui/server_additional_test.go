@@ -134,6 +134,33 @@ func TestIndexAndStaticCacheHeaders(t *testing.T) {
 	}
 }
 
+func TestStaticStyleIncludesSharedDockIconStyles(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/static/style.css", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("GET /static/style.css status = %d, want 200", resp.Code)
+	}
+
+	stylesheet := resp.Body.String()
+	if !strings.Contains(stylesheet, `.prompt-mode-link-logo {`) {
+		t.Fatalf("expected stylesheet to define shared dock icon link styles")
+	}
+	if !strings.Contains(stylesheet, `.prompt-mode-link-logo-divider::before {`) {
+		t.Fatalf("expected stylesheet to define the dock icon divider style")
+	}
+	if !strings.Contains(stylesheet, `.prompt-mode-link-logo img {`) {
+		t.Fatalf("expected stylesheet to size dock icon images through shared logo styles")
+	}
+	if !strings.Contains(stylesheet, `filter: var(--agent-logo-filter);`) {
+		t.Fatalf("expected stylesheet to keep dock icons theme-reactive via agent logo filter")
+	}
+}
+
 func TestStreamEndpointCompactsEventsPayload(t *testing.T) {
 	t.Parallel()
 
@@ -666,11 +693,11 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	if !strings.Contains(css, ".prompt-mode-link img {\n  display: block;\n  width: 15px;\n  height: 15px;\n  object-fit: contain;\n  filter: var(--agent-logo-filter);\n}") {
 		t.Fatalf("expected integrated dock icons to inherit the shared monochrome treatment")
 	}
-	if !strings.Contains(css, ".prompt-mode-link-github {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
-		t.Fatalf("expected the icon-only GitHub dock item to align with the main segmented menu")
+	if !strings.Contains(css, ".prompt-mode-link-logo {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
+		t.Fatalf("expected icon-only dock items to align with the main segmented menu")
 	}
-	if !strings.Contains(css, ".prompt-mode-link-github::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
-		t.Fatalf("expected the GitHub dock item to share the segmented main-menu treatment instead of rendering as a detached control")
+	if !strings.Contains(css, ".prompt-mode-link-logo-divider::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
+		t.Fatalf("expected the leading dock icon to share the segmented main-menu treatment instead of rendering as a detached control")
 	}
 	if !strings.Contains(css, ".prompt-form {\n  display: grid;\n  gap: 10px;\n  padding: 14px;\n  min-width: 0;\n  min-height: 0;\n  overflow-y: auto;\n}") {
 		t.Fatalf("expected studio form content to use the full panel now that the mode dock lives outside it")
