@@ -631,6 +631,7 @@
     const promptModeBuilder = document.getElementById("prompt-mode-builder");
     const promptModeLibrary = document.getElementById("prompt-mode-library");
     const promptModeJSON = document.getElementById("prompt-mode-json");
+    const githubProfileLink = document.getElementById("github-profile-link");
     const promptBuilderPanel = document.getElementById("prompt-builder-panel");
     const promptLibraryPanel = document.getElementById("prompt-library-panel");
     const promptRawPanel = document.getElementById("prompt-raw-panel");
@@ -686,6 +687,41 @@
     const hoverSelect = document.getElementById("hover-select");
     let brandLogoRotationTimer = null;
     let brandLogoRotationPhase = 0;
+
+    function applyGitHubProfileLink(profileURL) {
+      if (!githubProfileLink) {
+        return;
+      }
+      const normalized = String(profileURL || "").trim();
+      if (!normalized) {
+        return;
+      }
+      githubProfileLink.href = normalized;
+    }
+
+    async function loadGitHubProfileLink() {
+      if (!githubProfileLink) {
+        return;
+      }
+      try {
+        const response = await fetch("/api/github/profile", { cache: "no-store" });
+        let body = null;
+        try {
+          body = await response.json();
+        } catch (_err) {
+          body = null;
+        }
+        if (!response.ok) {
+          throw new Error(body?.error || `github profile http ${response.status}`);
+        }
+        if (!body || body.ok === false) {
+          throw new Error(body?.error || "github profile request failed");
+        }
+        applyGitHubProfileLink(body.profileUrl || body.profile_url);
+      } catch (_err) {
+        // Keep the static fallback when the authenticated public profile cannot be resolved.
+      }
+    }
 
     function themeLabel(theme) {
       const normalized = THEME_MODES.includes(theme) ? theme : DEFAULT_THEME_MODE;
@@ -1767,6 +1803,7 @@
           }
         }
         applyAgentAuthGate(auth);
+        await loadGitHubProfileLink();
         if (auth.ready) {
           setAuggieConfigureError("");
           if (agentAuthConfigureInput) {
@@ -3691,6 +3728,7 @@
     async function loadInitial() {
       try {
         await loadAgentAuthStatus();
+        await loadGitHubProfileLink();
         await loadLibraryTasks();
         const response = await fetch("/api/state", { cache: "no-store" });
         if (!response.ok) {
