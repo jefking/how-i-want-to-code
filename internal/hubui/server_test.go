@@ -510,7 +510,7 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `hubConnItem.setAttribute("data-href", href);`) {
 		t.Fatalf("expected index html to persist the current hub target url on the indicator")
 	}
-	if !strings.Contains(markup, `setHubConnection("connected", \`Connected to ${target} (transport pending)\`);`) {
+	if !strings.Contains(markup, "setHubConnection(\"connected\", `Connected to ${target} (transport pending)`);") {
 		t.Fatalf("expected index html to treat transport-pending hub state as connected for dashboard linking")
 	}
 	if !strings.Contains(markup, `hubConnItem.classList.toggle("status-item-action", actionable);`) {
