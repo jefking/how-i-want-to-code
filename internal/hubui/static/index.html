@@ -3261,6 +3261,21 @@
         detail.includes("repository does not exist");
     }
 
+    function isRepoAccessError(task) {
+      if (!task) return false;
+      if (String(task.status || "").toLowerCase() !== "error") return false;
+
+      const detail = String(task.error || "").toLowerCase();
+      if (!detail) return false;
+
+      return detail.includes("write access to repository not granted") ||
+        detail.includes("requested url returned error: 403") ||
+        detail.includes("authentication failed") ||
+        detail.includes("could not read username for 'https://github.com'") ||
+        detail.includes("doesn't have the rights to pull the code") ||
+        detail.includes("doesn't have the rights to push a pr");
+    }
+
     function formatTaskRepos(task) {
       const repos = normalizedTaskRepos(task);
       if (!repos.length) return "-";
@@ -4184,15 +4199,15 @@
       state.snapshot = snapshot;
       syncTaskCompletionSparkles(previousSnapshot, snapshot);
       const observedRepos = [];
-      const failedCloneRepos = [];
+      const failedRepoAccessRepos = [];
       for (const task of snapshot.tasks || []) {
-        if (isCloneMissingRepoError(task)) {
-          failedCloneRepos.push(...taskRepoValues(task));
+        if (isCloneMissingRepoError(task) || isRepoAccessError(task)) {
+          failedRepoAccessRepos.push(...taskRepoValues(task));
           continue;
         }
         observedRepos.push(...taskRepoValues(task));
       }
-      dropReposFromHistory(failedCloneRepos);
+      dropReposFromHistory(failedRepoAccessRepos);
       rememberRepos(observedRepos);
       renderHubConnection(snapshot);
       renderResourceMetrics(snapshot);

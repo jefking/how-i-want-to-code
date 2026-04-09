@@ -876,8 +876,14 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function isCloneMissingRepoError(") {
 		t.Fatalf("expected index html to include clone failure repo cleanup matcher")
 	}
-	if !strings.Contains(markup, "dropReposFromHistory(failedCloneRepos);") {
-		t.Fatalf("expected index html to drop missing repositories from history on clone failures")
+	if !strings.Contains(markup, "function isRepoAccessError(") {
+		t.Fatalf("expected index html to include repo access failure cleanup matcher")
+	}
+	if !strings.Contains(markup, "if (isCloneMissingRepoError(task) || isRepoAccessError(task)) {") {
+		t.Fatalf("expected index html to treat clone and repo access failures as saved-repo cleanup triggers")
+	}
+	if !strings.Contains(markup, "dropReposFromHistory(failedRepoAccessRepos);") {
+		t.Fatalf("expected index html to drop inaccessible repositories from history on repo access failures")
 	}
 	if !strings.Contains(markup, "function togglePromptVisibility(") {
 		t.Fatalf("expected index html to include prompt visibility toggle handler")
