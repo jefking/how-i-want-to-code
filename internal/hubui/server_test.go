@@ -604,6 +604,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		!strings.Contains(markup, `target="_blank"`) {
 		t.Fatalf("expected index html to render an integrated GitHub dock link that opens in a new window")
 	}
+	if !strings.Contains(markup, `fetch("/api/github/profile", { cache: "no-store" })`) {
+		t.Fatalf("expected index html to resolve the authenticated GitHub public profile through the hub ui api")
+	}
 	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-github"`) ||
 		!strings.Contains(markup, `src="/static/logos/github.svg"`) {
 		t.Fatalf("expected index html to render GitHub as an icon-only item inside the shared segmented dock")
