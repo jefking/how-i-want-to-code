@@ -758,8 +758,17 @@ func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
 	if !strings.Contains(html, "function agentAuthLabel(harness)") {
 		t.Fatalf("expected auth gate labels to be harness-aware")
 	}
-	if !strings.Contains(html, "Auggie Configure") {
-		t.Fatalf("expected auggie configure heading support")
+	if !strings.Contains(html, "Setup Auggie") {
+		t.Fatalf("expected auggie setup heading support")
+	}
+	if strings.Contains(html, "Auggie Configure") {
+		t.Fatalf("expected legacy auggie configure heading to be removed")
+	}
+	if strings.Contains(html, "Run in your terminal locally") {
+		t.Fatalf("expected legacy auggie configure instruction copy to be removed")
+	}
+	if strings.Contains(html, "Paste Auggie session JSON") {
+		t.Fatalf("expected legacy auggie configure label copy to be removed")
 	}
 	if !strings.Contains(html, "id=\"agent-auth-configure\"") {
 		t.Fatalf("expected auggie configure panel markup")

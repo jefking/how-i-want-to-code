@@ -149,11 +149,7 @@ func (g *auggieAuthGate) Configure(_ context.Context, rawInput string) (hubui.Ag
 		g.state = "needs_configure"
 		g.configureCommand = auggieConfigureCommand
 		g.configurePlaceholder = auggieConfigurePlaceholderValue
-		g.message = fmt.Sprintf(
-			"Auggie session auth is invalid: %v. Run `%s` in your terminal locally, paste the JSON, then click Done.",
-			err,
-			auggieConfigureCommand,
-		)
+		g.message = fmt.Sprintf("Auggie session auth is invalid: %v.", err)
 		g.updatedAt = time.Now().UTC()
 		snap := g.snapshotLocked()
 		g.mu.Unlock()
@@ -206,21 +202,13 @@ func (g *auggieAuthGate) refreshLocked() {
 
 	configuredSessionAuth, source := firstConfiguredAuggieSessionAuth(g.runtimeConfigPath, g.initCfg)
 	if configuredSessionAuth == "" {
-		g.message = fmt.Sprintf(
-			"Auggie session auth is required. Run `%s` in your terminal locally, paste the JSON output below, then click Done.",
-			auggieConfigureCommand,
-		)
+		g.message = ""
 		return
 	}
 
 	canonicalSessionAuth, err := normalizeAuggieSessionAuth(configuredSessionAuth)
 	if err != nil {
-		g.message = fmt.Sprintf(
-			"Auggie session auth from %s is invalid: %v. Run `%s` in your terminal locally, paste the JSON, then click Done.",
-			source,
-			err,
-			auggieConfigureCommand,
-		)
+		g.message = fmt.Sprintf("Auggie session auth from %s is invalid: %v.", source, err)
 		return
 	}
 	if source != "environment" {

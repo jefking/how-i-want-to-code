@@ -316,7 +316,6 @@
       </div>
 
       <div id="agent-auth-configure" class="mt-5 hidden space-y-3">
-        <div id="agent-auth-configure-command-label" class="text-sm text-hub-text/80">Run in your terminal locally</div>
         <div class="flex flex-wrap items-center gap-2.5">
           <div id="agent-auth-configure-command" class="font-mono text-[1rem] tracking-[0.04em] text-hub-text">auggie token print</div>
           <button id="agent-auth-configure-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
@@ -1331,7 +1330,7 @@
       }
       if (agentAuthTitle) {
         if (needsAuggieConfigure) {
-          agentAuthTitle.textContent = "Auggie Configure";
+          agentAuthTitle.textContent = "Setup Auggie";
         } else if (needsClaudeGitHubConfigure) {
           agentAuthTitle.textContent = "Setup GitHub";
         } else if (requiresManualConfigure) {
@@ -1400,8 +1399,8 @@
         agentAuthConfigureCommandLabel.classList.toggle("hidden", needsClaudeGitHubConfigure);
       }
       if (agentAuthConfigureLabel) {
-        if (needsAuggieConfigure) {
-          agentAuthConfigureLabel.textContent = "Paste Auggie session JSON";
+        if (needsClaudeGitHubConfigure) {
+          agentAuthConfigureLabel.textContent = "Paste GitHub token";
         } else {
           agentAuthConfigureLabel.textContent = "Paste configuration value";
         }
@@ -1502,7 +1501,7 @@
     function normalizeAuggieSessionAuthPayload(raw) {
       const trimmed = String(raw || "").trim();
       if (!trimmed) {
-        throw new Error("Paste Auggie session JSON first.");
+        throw new Error("Paste configuration value first.");
       }
 
       let parsed = null;
