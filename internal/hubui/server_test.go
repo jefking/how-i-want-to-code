@@ -412,8 +412,11 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if strings.Contains(markup, "stage.textContent = `stage:") {
 		t.Fatalf("expected index html to remove stage metadata line from task cards")
 	}
-	if !strings.Contains(markup, "branch.textContent = `branches: ${formatTaskBranch(task)}`;") {
-		t.Fatalf("expected index html to render branches metadata in task cards")
+	if !strings.Contains(markup, "branch.textContent = `branch: ${formatTaskBranch(task)}`;") {
+		t.Fatalf("expected index html to render branch metadata in task cards")
+	}
+	if !strings.Contains(markup, "update.textContent = taskTimingSummary(task);") {
+		t.Fatalf("expected index html to render task updated/started timing summary without static label")
 	}
 	if strings.Contains(markup, "return `${id} | ${preview}`;") {
 		t.Fatalf("expected index html to remove request id prefix from task display title")

@@ -1255,6 +1255,24 @@ select.prompt-control {
   max-width: 100%;
 }
 
+.task-footer {
+  margin-top: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-width: 0;
+}
+
+.task-footer .task-meta {
+  flex: 1 1 320px;
+}
+
+.task-footer .task-top-actions {
+  margin-left: auto;
+}
+
 .task-id {
   font-size: 0.78rem;
   color: var(--text);
