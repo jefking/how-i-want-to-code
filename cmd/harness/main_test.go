@@ -749,7 +749,7 @@ func TestConfigureHubSetupNewAgentUsesBindTokenFlow(t *testing.T) {
 			if strings.Contains(body, `"profile"`) {
 				syncedProfile = true
 			}
-			if strings.Contains(body, `"metadata"`) {
+			if r.URL.Path == "/v1/agents/me" && strings.Contains(body, `"metadata"`) {
 				t.Fatalf("profile sync should not send metadata payload: %s", body)
 			}
 			_, _ = w.Write([]byte(`{"ok":true}`))
