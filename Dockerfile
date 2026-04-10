@@ -39,6 +39,7 @@ RUN apk add --no-cache \
           codex) agent_pkg='@openai/codex@latest' ;; \
           claude) agent_pkg='@anthropic-ai/claude-code@latest' ;; \
           auggie) agent_pkg='@augmentcode/auggie@latest' ;; \
+          pi) agent_pkg='@mariozechner/pi-coding-agent@latest' ;; \
           *) echo "unsupported AGENT_HARNESS: ${AGENT_HARNESS}" >&2; exit 2 ;; \
         esac; \
       fi \

@@ -58,6 +58,10 @@ jobs:
             npm_package: '@augmentcode/auggie@latest'
             tag_suffix: auggie
             publish_default_tags: 'false'
+          - harness: pi
+            npm_package: '@mariozechner/pi-coding-agent@latest'
+            tag_suffix: pi
+            publish_default_tags: 'false'
     steps:
       - name: Checkout
         uses: actions/checkout@v6

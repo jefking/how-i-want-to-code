@@ -313,14 +313,14 @@ func requiredSkillPayloadSchema(dispatchType, skillName string, libraryTaskNames
 						"minLength": 1,
 					},
 				},
-				"baseBranch":   propertyNonEmptyString(),
-				"branch":       propertyNonEmptyString(),
+				"baseBranch": propertyNonEmptyString(),
+				"branch":     propertyNonEmptyString(),
 				"prNumber": map[string]any{
 					"type":    "integer",
 					"minimum": 1,
 				},
 				"targetSubdir": propertyNonEmptyString(),
-				"agentHarness": propertyStringEnum("codex", "claude", "auggie"),
+				"agentHarness": propertyStringEnum("codex", "claude", "auggie", "pi"),
 				"agentCommand": propertyNonEmptyString(),
 				"prompt":       propertyNonEmptyString(),
 				"images": map[string]any{

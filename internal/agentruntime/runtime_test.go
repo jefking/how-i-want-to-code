@@ -46,6 +46,7 @@ func TestResolveSupportsKnownHarnesses(t *testing.T) {
 		{name: "claude", harness: HarnessClaude, command: "claude", pkg: "@anthropic-ai/claude-code@latest", reqName: "claude_cli"},
 		{name: "auggie", harness: HarnessAuggie, command: "auggie", pkg: "@augmentcode/auggie@latest", reqName: "auggie_cli"},
 		{name: "codex", harness: HarnessCodex, command: "codex", pkg: "@openai/codex@latest", reqName: "codex_cli"},
+		{name: "pi", harness: HarnessPi, command: "pi", pkg: "@mariozechner/pi-coding-agent@latest", reqName: "pi_cli"},
 	}
 
 	for _, tc := range cases {
@@ -92,7 +93,7 @@ func TestResolveRejectsUnknownHarness(t *testing.T) {
 	if err == nil {
 		t.Fatal("Resolve() error = nil, want unsupported harness error")
 	}
-	for _, supported := range []string{HarnessAuggie, HarnessClaude, HarnessCodex} {
+	for _, supported := range []string{HarnessAuggie, HarnessClaude, HarnessCodex, HarnessPi} {
 		if !strings.Contains(err.Error(), supported) {
 			t.Fatalf("Resolve() error = %v, want supported harness %q listed", err, supported)
 		}
@@ -103,11 +104,12 @@ func TestDisplayName(t *testing.T) {
 	t.Parallel()
 
 	cases := map[string]string{
-		"":              "Codex",
-		HarnessCodex:    "Codex",
-		HarnessClaude:   "Claude",
-		HarnessAuggie:   "Auggie",
-		"  CLAUDE  ":    "Claude",
+		"":            "Codex",
+		HarnessCodex:  "Codex",
+		HarnessClaude: "Claude",
+		HarnessAuggie: "Auggie",
+		HarnessPi:     "Pi",
+		"  CLAUDE  ":  "Claude",
 	}
 	for harness, want := range cases {
 		if got := DisplayName(harness); got != want {
@@ -185,10 +187,28 @@ func TestBuildCommandAuggie(t *testing.T) {
 	}
 }
 
+func TestBuildCommandPi(t *testing.T) {
+	t.Parallel()
+
+	rt, err := Resolve(HarnessPi, "")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+
+	cmd, err := rt.BuildCommand("/tmp/repo", "fix bug", RunOptions{})
+	if err != nil {
+		t.Fatalf("BuildCommand() error = %v", err)
+	}
+	wantArgs := []string{"--print", "fix bug"}
+	if cmd.Name != "pi" || cmd.Dir != "/tmp/repo" || !reflect.DeepEqual(cmd.Args, wantArgs) {
+		t.Fatalf("unexpected pi command: %+v", cmd)
+	}
+}
+
 func TestBuildCommandRejectsImagesForNonCodex(t *testing.T) {
 	t.Parallel()
 
-	for _, harness := range []string{HarnessClaude, HarnessAuggie} {
+	for _, harness := range []string{HarnessClaude, HarnessAuggie, HarnessPi} {
 		harness := harness
 		t.Run(harness, func(t *testing.T) {
 			t.Parallel()
