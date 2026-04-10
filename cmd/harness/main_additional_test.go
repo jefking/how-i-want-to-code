@@ -480,6 +480,7 @@ func TestConfigureHubSetupMarksFailingOnboardingStep(t *testing.T) {
 	t.Parallel()
 
 	const bindToken = "f9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+	var agentProfileReads int
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
@@ -487,6 +488,11 @@ func TestConfigureHubSetupMarksFailingOnboardingStep(t *testing.T) {
 		case r.Method == http.MethodPost && r.URL.Path == "/v1/agents/bind-tokens":
 			_, _ = w.Write([]byte(`{"agent_token":"agent_bound"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
+			agentProfileReads++
+			if agentProfileReads == 1 {
+				_, _ = w.Write([]byte(`{"metadata":{"visibility":"public"}}`))
+				return
+			}
 			http.Error(w, `{"error":"profile unavailable"}`, http.StatusBadGateway)
 		case (r.Method == http.MethodPatch || r.Method == http.MethodPost) &&
 			(r.URL.Path == "/v1/agents/me" || r.URL.Path == "/v1/agents/me/metadata"):
