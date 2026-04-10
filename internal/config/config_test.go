@@ -279,7 +279,7 @@ func TestLoadSupportsStructuredReviewConfig(t *testing.T) {
 	}
 }
 
-func TestLoadRejectsReviewTaskWithoutPullRequestSelector(t *testing.T) {
+func TestLoadTreatsEmptyReviewConfigAsUnset(t *testing.T) {
 	t.Parallel()
 
 	dir := t.TempDir()
@@ -287,20 +287,18 @@ func TestLoadRejectsReviewTaskWithoutPullRequestSelector(t *testing.T) {
 	json := `{
   "repo": "git@github.com:acme/repo.git",
   "prompt": "review pull request",
-  "review": {
-    "headBranch": "feature/improve-tests"
-  }
+  "review": {}
 }`
 	if err := os.WriteFile(path, []byte(json), 0o644); err != nil {
 		t.Fatalf("write config: %v", err)
 	}
 
-	_, err := Load(path)
-	if err == nil {
-		t.Fatal("expected error, got nil")
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
 	}
-	if !strings.Contains(err.Error(), "review.prNumber, review.prUrl, or review.headBranch is required") {
-		t.Fatalf("unexpected error: %v", err)
+	if cfg.Review != nil {
+		t.Fatalf("Review = %#v, want nil", cfg.Review)
 	}
 }
 
