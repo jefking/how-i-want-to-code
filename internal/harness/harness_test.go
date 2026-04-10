@@ -268,6 +268,7 @@ func TestRunBuildsReviewContextBeforeInvokingCodex(t *testing.T) {
 
 	cfg := sampleConfig()
 	cfg.Prompt = "Review the pull request"
+	cfg.PRBody = "Automated by MoltenHub Code\n\nOriginal task prompt:\n```text\nReview the pull request\n```\n\nIf you would like to connect agents together checkout [Molten Bot Hub](https://molten.bot/hub)."
 	cfg.Review = &config.ReviewConfig{PRNumber: 42}
 
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
