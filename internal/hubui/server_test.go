@@ -1063,14 +1063,19 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html to sync default saved repo selection into the repository input")
 	}
 	if !strings.Contains(markup, "Enter reviewers manually") ||
+		!strings.Contains(markup, `option value="none">none</option>`) ||
 		!strings.Contains(markup, "No saved reviewers yet") ||
 		!strings.Contains(markup, "function reviewerListFromValue(") ||
 		!strings.Contains(markup, "payload.reviewers = reviewers;") ||
-		!strings.Contains(markup, "rememberReviewers(dedupeReviewerValues([...(Array.isArray(parsed?.reviewers) ? parsed.reviewers : []), parsed?.githubHandle]));") {
+		!strings.Contains(markup, "rememberReviewers(dedupeReviewerValues([...(Array.isArray(parsed?.reviewers) ? parsed.reviewers : []), parsed?.githubHandle]));") ||
+		!strings.Contains(markup, "return /^none$/i.test(normalized) ? \"\" : normalized;") {
 		t.Fatalf("expected index html to capture reviewers in prompt payloads and persist reviewer history after submission")
 	}
 	if !strings.Contains(markup, "const keepManualSelection = manualSelected && currentReviewers.length > 0;") {
 		t.Fatalf("expected index html to preserve manual reviewer entry while the user is typing")
+	}
+	if !strings.Contains(markup, "const noneSelected = rawSelectedValue === \"none\";") {
+		t.Fatalf("expected index html to preserve an explicit none reviewer selection")
 	}
 	if !strings.Contains(markup, `"reviewers": [`) || !strings.Contains(markup, `"octocat"`) || !strings.Contains(markup, `"hubot"`) {
 		t.Fatalf("expected index html JSON example to include reviewers")

@@ -199,6 +199,7 @@
                   <label id="builder-reviewer-history-field" class="prompt-field prompt-field-repo-history">
                     <span class="prompt-label">Reviewer</span>
                     <select id="builder-reviewer-select" class="prompt-control">
+                      <option value="none">none</option>
                       <option value="">Enter reviewers manually</option>
                     </select>
                   </label>
@@ -241,6 +242,7 @@
                   <label id="library-reviewer-history-field" class="prompt-field prompt-field-repo-history">
                     <span class="prompt-label">Reviewer</span>
                     <select id="library-reviewer-select" class="prompt-control">
+                      <option value="none">none</option>
                       <option value="">Enter reviewers manually</option>
                     </select>
                   </label>
@@ -3018,7 +3020,8 @@
     }
 
     function normalizeReviewerValue(value) {
-      return String(value || "").trim().replace(/^@+/, "");
+      const normalized = String(value || "").trim().replace(/^@+/, "");
+      return /^none$/i.test(normalized) ? "" : normalized;
     }
 
     function reviewerListFromValue(value) {
@@ -3606,6 +3609,7 @@
 
       const currentReviewers = reviewerListFromValue(input.value);
       const currentValue = currentReviewers.length === 1 ? currentReviewers[0] : "";
+      const rawSelectedValue = String(select.value || "").trim();
       const selectedValue = normalizeReviewerValue(select.value);
       const manualSelected = selectedValue === "";
       const unique = dedupeReviewerValues([currentValue, ...state.reviewerHistory]);
@@ -3614,6 +3618,10 @@
       historyField.classList.toggle("hidden", !hasSavedHistory);
 
       select.replaceChildren();
+      const noneOption = document.createElement("option");
+      noneOption.value = "none";
+      noneOption.textContent = "none";
+      select.appendChild(noneOption);
       const manualOption = document.createElement("option");
       manualOption.value = "";
       manualOption.textContent = unique.length ? "Enter reviewers manually" : "No saved reviewers yet";
@@ -3628,8 +3636,9 @@
       }
 
       const keepManualSelection = manualSelected && currentReviewers.length > 0;
-      let nextValue = "";
-      if (!keepManualSelection) {
+      const noneSelected = rawSelectedValue === "none";
+      let nextValue = noneSelected ? "none" : "";
+      if (!keepManualSelection && !noneSelected) {
         if (selectedValue && unique.includes(selectedValue)) {
           nextValue = selectedValue;
         } else if (currentValue && unique.includes(currentValue)) {
@@ -5162,7 +5171,15 @@
     });
 
     builderReviewerSelect.addEventListener("change", () => {
-      const value = normalizeReviewerValue(builderReviewerSelect.value);
+      const rawValue = String(builderReviewerSelect.value || "").trim();
+      const value = normalizeReviewerValue(rawValue);
+      if (rawValue === "none") {
+        builderReviewerInput.value = "";
+        libraryReviewerInput.value = "";
+        syncBuilderDraftClearState();
+        renderReviewerHistoryOptions();
+        return;
+      }
       if (value) {
         builderReviewerInput.value = value;
         libraryReviewerInput.value = value;
@@ -5171,7 +5188,15 @@
     });
 
     libraryReviewerSelect.addEventListener("change", () => {
-      const value = normalizeReviewerValue(libraryReviewerSelect.value);
+      const rawValue = String(libraryReviewerSelect.value || "").trim();
+      const value = normalizeReviewerValue(rawValue);
+      if (rawValue === "none") {
+        libraryReviewerInput.value = "";
+        builderReviewerInput.value = "";
+        syncBuilderDraftClearState();
+        renderReviewerHistoryOptions();
+        return;
+      }
       if (value) {
         libraryReviewerInput.value = value;
         builderReviewerInput.value = value;
@@ -5197,7 +5222,7 @@
 
     builderReviewerInput.addEventListener("input", () => {
       libraryReviewerInput.value = builderReviewerInput.value;
-      if (normalizeReviewerValue(builderReviewerSelect.value) !== "") {
+      if (String(builderReviewerSelect.value || "").trim() !== "") {
         builderReviewerSelect.value = "";
       }
       syncBuilderDraftClearState();
@@ -5206,7 +5231,7 @@
 
     libraryReviewerInput.addEventListener("input", () => {
       builderReviewerInput.value = libraryReviewerInput.value;
-      if (normalizeReviewerValue(libraryReviewerSelect.value) !== "") {
+      if (String(libraryReviewerSelect.value || "").trim() !== "") {
         libraryReviewerSelect.value = "";
       }
       syncBuilderDraftClearState();

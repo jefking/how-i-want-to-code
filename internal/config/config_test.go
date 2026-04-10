@@ -247,6 +247,29 @@ func TestLoadSupportsGitHubHandleAsReviewer(t *testing.T) {
 	}
 }
 
+func TestLoadTreatsNoneReviewerAsUnset(t *testing.T) {
+	t.Parallel()
+
+	dir := t.TempDir()
+	path := filepath.Join(dir, "config.json")
+	json := `{
+  "repo": "git@github.com:acme/repo.git",
+  "prompt": "ship change",
+  "reviewers": ["none"]
+}`
+	if err := os.WriteFile(path, []byte(json), 0o644); err != nil {
+		t.Fatalf("write config: %v", err)
+	}
+
+	cfg, err := Load(path)
+	if err != nil {
+		t.Fatalf("Load() error = %v", err)
+	}
+	if cfg.Reviewers != nil {
+		t.Fatalf("Reviewers = %#v, want nil", cfg.Reviewers)
+	}
+}
+
 func TestLoadSupportsStructuredReviewConfig(t *testing.T) {
 	t.Parallel()
 
@@ -404,6 +427,31 @@ func TestApplyDefaultsMergesGitHubHandleIntoReviewers(t *testing.T) {
 	}
 	if got, want := cfg.Reviewers[1], "Acme/Platform"; got != want {
 		t.Fatalf("Reviewers[1] = %q, want %q", got, want)
+	}
+}
+
+func TestApplyDefaultsTreatsNoneReviewerAsUnset(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		RepoURL:       "git@github.com:acme/repo.git",
+		Prompt:        "x",
+		GitHubHandle:  "@none",
+		Reviewers:     []string{"none", "@octocat"},
+		CommitMessage: "commit",
+		PRTitle:       "title",
+		PRBody:        "body",
+	}
+	cfg.ApplyDefaults()
+
+	if got := cfg.GitHubHandle; got != "" {
+		t.Fatalf("GitHubHandle = %q, want empty", got)
+	}
+	if got, want := len(cfg.Reviewers), 1; got != want {
+		t.Fatalf("len(Reviewers) = %d, want %d (%#v)", got, want, cfg.Reviewers)
+	}
+	if got, want := cfg.Reviewers[0], "octocat"; got != want {
+		t.Fatalf("Reviewers[0] = %q, want %q", got, want)
 	}
 }
 

@@ -624,7 +624,11 @@ func normalizeReviewerList(values []string) []string {
 func normalizeReviewer(value string) string {
 	value = strings.TrimSpace(value)
 	value = strings.TrimPrefix(value, "@")
-	return strings.TrimSpace(value)
+	value = strings.TrimSpace(value)
+	if strings.EqualFold(value, "none") {
+		return ""
+	}
+	return value
 }
 
 func firstNonEmptyTrimmed(values ...string) string {
