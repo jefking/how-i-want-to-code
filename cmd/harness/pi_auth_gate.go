@@ -10,11 +10,14 @@ import (
 	"time"
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
+	"github.com/jef/moltenhub-code/internal/execx"
 	"github.com/jef/moltenhub-code/internal/hub"
 	"github.com/jef/moltenhub-code/internal/hubui"
 )
 
 const piProviderAuthField = "pi_provider_auth"
+const piAuthProbeTimeout = 20 * time.Second
+const piAuthProbePrompt = "Reply with OK."
 
 type piProviderOption struct {
 	EnvVar      string
@@ -70,6 +73,10 @@ type piProviderAuth struct {
 type piAuthGate struct {
 	mu sync.Mutex
 
+	runner  execx.Runner
+	command string
+	logf    func(string, ...any)
+
 	runtimeConfigPath string
 	initCfg           hub.InitConfig
 
@@ -80,10 +87,35 @@ type piAuthGate struct {
 
 	configureOptions []hubui.AgentAuthOption
 	updatedAt        time.Time
+	validatedAuth    string
 }
 
 func newPiAuthGate(runtimeConfigPath string, initCfg hub.InitConfig) *piAuthGate {
+	return newPiAuthGateWithRuntime(nil, "", runtimeConfigPath, initCfg, nil)
+}
+
+func newPiAuthGateWithRuntime(
+	runner execx.Runner,
+	command string,
+	runtimeConfigPath string,
+	initCfg hub.InitConfig,
+	logf func(string, ...any),
+) *piAuthGate {
+	if runner == nil {
+		runner = execx.OSRunner{}
+	}
+	if logf == nil {
+		logf = func(string, ...any) {}
+	}
+	command = strings.TrimSpace(command)
+	if command == "" {
+		command = agentruntime.HarnessPi
+	}
+
 	g := &piAuthGate{
+		runner:            runner,
+		command:           command,
+		logf:              logf,
 		runtimeConfigPath: strings.TrimSpace(runtimeConfigPath),
 		initCfg:           initCfg,
 		required:          true,
@@ -98,25 +130,22 @@ func newPiAuthGate(runtimeConfigPath string, initCfg hub.InitConfig) *piAuthGate
 	return g
 }
 
-func (g *piAuthGate) Status(_ context.Context) (hubui.AgentAuthState, error) {
+func (g *piAuthGate) Status(ctx context.Context) (hubui.AgentAuthState, error) {
 	if g == nil {
 		return readyAgentAuthState(), nil
 	}
-	g.mu.Lock()
-	defer g.mu.Unlock()
-	g.refreshLocked()
-	return g.snapshotLocked(), nil
+	return g.refreshAndSnapshot(ctx)
 }
 
-func (g *piAuthGate) StartDeviceAuth(_ context.Context) (hubui.AgentAuthState, error) {
-	return g.Status(context.Background())
+func (g *piAuthGate) StartDeviceAuth(ctx context.Context) (hubui.AgentAuthState, error) {
+	return g.refreshAndSnapshot(ctx)
 }
 
-func (g *piAuthGate) Verify(_ context.Context) (hubui.AgentAuthState, error) {
-	return g.Status(context.Background())
+func (g *piAuthGate) Verify(ctx context.Context) (hubui.AgentAuthState, error) {
+	return g.refreshAndSnapshot(ctx)
 }
 
-func (g *piAuthGate) Configure(_ context.Context, rawInput string) (hubui.AgentAuthState, error) {
+func (g *piAuthGate) Configure(ctx context.Context, rawInput string) (hubui.AgentAuthState, error) {
 	if g == nil {
 		return readyAgentAuthState(), nil
 	}
@@ -165,9 +194,54 @@ func (g *piAuthGate) Configure(_ context.Context, rawInput string) (hubui.AgentA
 		g.mu.Unlock()
 		return snap, err
 	}
+	if err := g.probe(ctx); err != nil {
+		g.mu.Lock()
+		g.ready = false
+		g.state = "needs_configure"
+		g.message = fmt.Sprintf("launch pi with %s: %v", auth.EnvVar, err)
+		g.updatedAt = time.Now().UTC()
+		snap := g.snapshotLocked()
+		g.mu.Unlock()
+		return snap, err
+	}
 
 	g.mu.Lock()
 	g.initCfg.PiProviderAuth = canonical
+	g.validatedAuth = canonical
+	g.refreshLocked()
+	snap := g.snapshotLocked()
+	g.mu.Unlock()
+	return snap, nil
+}
+
+func (g *piAuthGate) refreshAndSnapshot(ctx context.Context) (hubui.AgentAuthState, error) {
+	if g == nil {
+		return readyAgentAuthState(), nil
+	}
+
+	g.mu.Lock()
+	g.refreshLocked()
+	if g.ready || g.state == "error" || strings.TrimSpace(g.initCfg.PiProviderAuth) == "" {
+		snap := g.snapshotLocked()
+		g.mu.Unlock()
+		return snap, nil
+	}
+	canonical := strings.TrimSpace(g.initCfg.PiProviderAuth)
+	g.mu.Unlock()
+
+	if err := g.probe(ctx); err != nil {
+		g.mu.Lock()
+		g.ready = false
+		g.state = "needs_configure"
+		g.message = fmt.Sprintf("launch pi: %v", err)
+		g.updatedAt = time.Now().UTC()
+		snap := g.snapshotLocked()
+		g.mu.Unlock()
+		return snap, nil
+	}
+
+	g.mu.Lock()
+	g.validatedAuth = canonical
 	g.refreshLocked()
 	snap := g.snapshotLocked()
 	g.mu.Unlock()
@@ -184,23 +258,30 @@ func (g *piAuthGate) refreshLocked() {
 
 	auth, source, err := firstConfiguredPiProviderAuth(g.runtimeConfigPath, g.initCfg)
 	if err != nil {
+		g.state = "error"
 		g.message = fmt.Sprintf("PI provider auth from %s is invalid: %v.", source, err)
 		return
 	}
 	if auth.EnvVar != "" {
 		if err := os.Setenv(auth.EnvVar, auth.Value); err != nil {
+			g.state = "error"
 			g.message = fmt.Sprintf("set %s: %v", auth.EnvVar, err)
 			return
 		}
 		canonical, err := encodePiProviderAuth(auth)
 		if err != nil {
+			g.state = "error"
 			g.message = fmt.Sprintf("PI provider auth from %s is invalid: %v.", source, err)
 			return
 		}
 		g.initCfg.PiProviderAuth = canonical
-		g.ready = true
-		g.state = "ready"
-		g.message = fmt.Sprintf("PI provider auth is ready via %s.", auth.EnvVar)
+		if g.validatedAuth == canonical {
+			g.ready = true
+			g.state = "ready"
+			g.message = fmt.Sprintf("PI provider auth is ready via %s.", auth.EnvVar)
+			return
+		}
+		g.message = fmt.Sprintf("PI provider auth is configured via %s. Validating Pi launch.", auth.EnvVar)
 		return
 	}
 }
@@ -308,4 +389,41 @@ func encodePiProviderAuth(auth piProviderAuth) (string, error) {
 		return "", fmt.Errorf("encode pi provider auth: %w", err)
 	}
 	return string(encoded), nil
+}
+
+func (g *piAuthGate) probe(ctx context.Context) error {
+	if g == nil {
+		return nil
+	}
+	runner := g.runner
+	if runner == nil {
+		runner = execx.OSRunner{}
+	}
+	command := strings.TrimSpace(g.command)
+	if command == "" {
+		command = agentruntime.HarnessPi
+	}
+	if ctx == nil {
+		ctx = context.Background()
+	}
+
+	probeCtx, cancel := context.WithTimeout(ctx, piAuthProbeTimeout)
+	defer cancel()
+
+	dir, err := os.MkdirTemp("", "moltenhub-pi-auth-*")
+	if err != nil {
+		return fmt.Errorf("create pi probe dir: %w", err)
+	}
+	defer os.RemoveAll(dir)
+
+	runtime := agentruntime.Runtime{Harness: agentruntime.HarnessPi, Command: command}
+	cmd, err := runtime.BuildCommand(dir, piAuthProbePrompt, agentruntime.RunOptions{})
+	if err != nil {
+		return fmt.Errorf("build pi probe command: %w", err)
+	}
+	if _, err := runner.Run(probeCtx, cmd); err != nil {
+		g.logf("hub.auth status=warn harness=pi action=probe err=%q", err)
+		return err
+	}
+	return nil
 }

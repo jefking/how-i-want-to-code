@@ -1457,7 +1457,7 @@ func maybeStartAgentAuth(ctx context.Context, runtime agentruntime.Runtime, gate
 
 func shouldEnableAgentAuthConfigure(harness string) bool {
 	switch strings.TrimSpace(strings.ToLower(harness)) {
-	case agentruntime.HarnessCodex, agentruntime.HarnessClaude, agentruntime.HarnessAuggie:
+	case agentruntime.HarnessCodex, agentruntime.HarnessClaude, agentruntime.HarnessAuggie, agentruntime.HarnessPi:
 		return true
 	default:
 		return false
