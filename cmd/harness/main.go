@@ -976,6 +976,9 @@ func failureFollowUpRepos(failedResult harness.Result, failedRunCfg config.Confi
 		}
 		return []string{repo}
 	}
+	if repo := strings.TrimSpace(config.DefaultRepositoryURL); repo != "" {
+		return []string{repo}
+	}
 	return nil
 }
 

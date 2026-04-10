@@ -517,8 +517,8 @@ func TestFailureFollowUpReposFallsBackToConfigRepoWhenResultIsAmbiguous(t *testi
 func TestFailureFollowUpReposReturnsNilWhenNoRepoFound(t *testing.T) {
 	t.Parallel()
 
-	if got := failureFollowUpRepos(harness.Result{}, config.Config{}); got != nil {
-		t.Fatalf("failureFollowUpRepos() = %v, want nil", got)
+	if got, want := failureFollowUpRepos(harness.Result{}, config.Config{}), []string{config.DefaultRepositoryURL}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("failureFollowUpRepos() = %v, want %v", got, want)
 	}
 }
 
