@@ -645,3 +645,21 @@ func TestApplyDefaultsDoesNotDuplicateOriginalPromptInCustomPRBody(t *testing.T)
 		t.Fatalf("PRBody contains %d prompt copies, want 1: %q", got, cfg.PRBody)
 	}
 }
+
+func TestApplyDefaultsReplacesStaleOriginalPromptBlock(t *testing.T) {
+	t.Parallel()
+
+	cfg := Config{
+		RepoURL: "git@github.com:acme/repo.git",
+		Prompt:  "review the pull request",
+		PRBody:  "Custom PR body.\n\nOriginal task prompt:\n```text\nfix tests\n```",
+	}
+	cfg.ApplyDefaults()
+
+	if strings.Contains(cfg.PRBody, "fix tests") {
+		t.Fatalf("PRBody retained stale prompt block: %q", cfg.PRBody)
+	}
+	if !strings.Contains(cfg.PRBody, "Original task prompt:\n```text\nreview the pull request\n```") {
+		t.Fatalf("PRBody = %q, want updated prompt block", cfg.PRBody)
+	}
+}
