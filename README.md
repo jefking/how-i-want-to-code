@@ -74,7 +74,7 @@ Common optional fields:
 - `baseBranch` (default `main`)
 - `branch` (alias for `baseBranch`)
 - `targetSubdir` (default `.`)
-- `agentHarness` (`codex`, `claude`, `auggie`)
+- `agentHarness` (`codex`, `claude`, `auggie`, `pi`)
 - `agentCommand`
 - `commitMessage`
 - `prTitle`
@@ -104,6 +104,12 @@ Example: [`init.example.json`](init.example.json)
 
 ## Hub OpenAPI Snapshot
 
+Supported harness packages:
+- `codex`: `@openai/codex@latest`
+- `claude`: `@anthropic-ai/claude-code@latest`
+- `auggie`: `@augmentcode/auggie@latest`
+- `pi`: `@mariozechner/pi-coding-agent@latest`
+
 Live spec:
 - `https://na.hub.molten.bot/openapi.yaml`
 
@@ -122,6 +128,13 @@ Run hub mode (default UI on `:7777`):
 
 ```bash
 docker run --rm -p 7777:7777 moltenai/moltenhub-code:latest-codex
+```
+
+Pi variant:
+
+```bash
+docker run --rm -p 7777:7777 moltenai/moltenhub-code:latest-pi
+```
 ```
 
 For persistent local runtime config, mount `./.moltenhub` to `/workspace/config`.

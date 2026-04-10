@@ -2010,8 +2010,25 @@ func TestAgentCommandWithOptionsUsesConfiguredRuntime(t *testing.T) {
 	if got, want := auggieCmd.Args[len(auggieCmd.Args)-1], withCompletionGatePrompt(prompt); got != want {
 		t.Fatalf("auggie prompt arg = %q, want completion-gated prompt", got)
 	}
+	piRuntime, err := agentruntime.Resolve(agentruntime.HarnessPi, "")
+	if err != nil {
+		t.Fatalf("Resolve(pi) error = %v", err)
+	}
+	piCmd, err := agentCommandWithOptions(piRuntime, targetDir, prompt, codexRunOptions{})
+	if err != nil {
+		t.Fatalf("agentCommandWithOptions(pi) error = %v", err)
+	}
+	if piCmd.Name != "pi" || piCmd.Dir != targetDir {
+		t.Fatalf("unexpected pi command: %+v", piCmd)
+	}
+	if got, want := piCmd.Args[len(piCmd.Args)-1], withCompletionGatePrompt(prompt); got != want {
+		t.Fatalf("pi prompt arg = %q, want completion-gated prompt", got)
+	}
 	if _, err := agentCommandWithOptions(claudeRuntime, targetDir, prompt, codexRunOptions{ImagePaths: []string{"x.png"}}); err == nil {
 		t.Fatal("agentCommandWithOptions(claude with images) error = nil, want non-nil")
+	}
+	if _, err := agentCommandWithOptions(piRuntime, targetDir, prompt, codexRunOptions{ImagePaths: []string{"x.png"}}); err == nil {
+		t.Fatal("agentCommandWithOptions(pi with images) error = nil, want non-nil")
 	}
 }
 
