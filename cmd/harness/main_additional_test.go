@@ -489,7 +489,7 @@ func TestConfigureHubSetupMarksFailingOnboardingStep(t *testing.T) {
 			_, _ = w.Write([]byte(`{"agent_token":"agent_bound"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
 			agentProfileReads++
-			if agentProfileReads == 1 {
+			if agentProfileReads <= 2 {
 				_, _ = w.Write([]byte(`{"metadata":{"visibility":"public"}}`))
 				return
 			}
