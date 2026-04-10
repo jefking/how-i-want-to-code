@@ -199,7 +199,7 @@ func TestBuildCommandPi(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildCommand() error = %v", err)
 	}
-	wantArgs := []string{"--print", "fix bug"}
+	wantArgs := []string{"--print", "--mode", "text", "--no-session", "fix bug"}
 	if cmd.Name != "pi" || cmd.Dir != "/tmp/repo" || !reflect.DeepEqual(cmd.Args, wantArgs) {
 		t.Fatalf("unexpected pi command: %+v", cmd)
 	}

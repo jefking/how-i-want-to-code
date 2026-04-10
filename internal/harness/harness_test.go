@@ -2021,6 +2021,9 @@ func TestAgentCommandWithOptionsUsesConfiguredRuntime(t *testing.T) {
 	if piCmd.Name != "pi" || piCmd.Dir != targetDir {
 		t.Fatalf("unexpected pi command: %+v", piCmd)
 	}
+	if got, want := piCmd.Args[:len(piCmd.Args)-1], []string{"--print", "--mode", "text", "--no-session"}; !reflect.DeepEqual(got, want) {
+		t.Fatalf("unexpected pi args prefix = %#v, want %#v", got, want)
+	}
 	if got, want := piCmd.Args[len(piCmd.Args)-1], withCompletionGatePrompt(prompt); got != want {
 		t.Fatalf("pi prompt arg = %q, want completion-gated prompt", got)
 	}
