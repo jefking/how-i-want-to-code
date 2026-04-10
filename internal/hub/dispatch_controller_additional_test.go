@@ -47,6 +47,83 @@ func TestIncludeLinuxDiskDeviceAdditionalCases(t *testing.T) {
 	}
 }
 
+func TestShouldDisableLinuxDiskSampling(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name            string
+		containerEnv    string
+		markerFile      bool
+		cgroupSnapshot  string
+		wantDisableDisk bool
+	}{
+		{
+			name:            "enabled on host",
+			containerEnv:    "",
+			markerFile:      false,
+			cgroupSnapshot:  "0::/\n",
+			wantDisableDisk: false,
+		},
+		{
+			name:            "disabled by container env",
+			containerEnv:    "docker",
+			markerFile:      false,
+			cgroupSnapshot:  "0::/\n",
+			wantDisableDisk: true,
+		},
+		{
+			name:            "disabled by marker file",
+			containerEnv:    "",
+			markerFile:      true,
+			cgroupSnapshot:  "0::/\n",
+			wantDisableDisk: true,
+		},
+		{
+			name:            "disabled by cgroup marker",
+			containerEnv:    "",
+			markerFile:      false,
+			cgroupSnapshot:  "1:name=systemd:/docker/abcdef\n",
+			wantDisableDisk: true,
+		},
+	}
+
+	for _, tc := range tests {
+		tc := tc
+		t.Run(tc.name, func(t *testing.T) {
+			t.Parallel()
+			got := shouldDisableLinuxDiskSampling(tc.containerEnv, tc.markerFile, tc.cgroupSnapshot)
+			if got != tc.wantDisableDisk {
+				t.Fatalf(
+					"shouldDisableLinuxDiskSampling(%q, %v, %q) = %v, want %v",
+					tc.containerEnv,
+					tc.markerFile,
+					tc.cgroupSnapshot,
+					got,
+					tc.wantDisableDisk,
+				)
+			}
+		})
+	}
+}
+
+func TestContainsContainerCGroupMarker(t *testing.T) {
+	t.Parallel()
+
+	for _, snapshot := range []string{
+		"1:name=systemd:/docker/abcdef\n",
+		"1:name=systemd:/kubepods.slice/pod-123\n",
+		"1:name=systemd:/containerd/io.containerd.runtime.v2.task\n",
+		"1:name=systemd:/libpod-123.scope\n",
+	} {
+		if !containsContainerCGroupMarker(snapshot) {
+			t.Fatalf("containsContainerCGroupMarker(%q) = false, want true", snapshot)
+		}
+	}
+	if containsContainerCGroupMarker("0::/\n") {
+		t.Fatal("containsContainerCGroupMarker(host cgroup) = true, want false")
+	}
+}
+
 func TestSampleWindowsParsesTypeperfOutput(t *testing.T) {
 	tmp := t.TempDir()
 	scriptPath := filepath.Join(tmp, "typeperf")

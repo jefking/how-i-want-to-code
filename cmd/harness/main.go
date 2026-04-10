@@ -904,14 +904,9 @@ func failureFollowUpRunConfig(
 	logRoot string,
 ) config.Config {
 	logPaths := failurefollowup.TaskLogPaths(logRoot, failedRequestID)
-	baseBranch, _ := failurefollowup.FollowUpTargeting(
-		failedRunCfg.BaseBranch,
-		".",
-		failedResult.Branch,
-	)
 	return config.Config{
 		Repos:        failureFollowUpRepos(failedResult, failedRunCfg),
-		BaseBranch:   baseBranch,
+		BaseBranch:   "main",
 		TargetSubdir: ".",
 		Prompt:       failureFollowUpPrompt(logPaths, failedResult, failedRunCfg),
 	}
