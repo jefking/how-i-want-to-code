@@ -2430,11 +2430,12 @@ select.prompt-control {
 .hub-setup-profile-grid {
   display: grid;
   gap: 14px;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;
 }
 
 .hub-emoji-picker {
   position: relative;
+  width: fit-content;
   min-width: 0;
 }
 
@@ -2442,13 +2443,17 @@ select.prompt-control {
   position: relative;
   display: flex;
   align-items: center;
-  width: 100%;
+  width: fit-content;
 }
 
 .hub-emoji-picker-input {
   position: relative;
   z-index: 1;
-  padding-right: 56px;
+  width: 5.75rem;
+  min-width: 5.75rem;
+  padding-left: 12px;
+  padding-right: 52px;
+  text-align: center;
 }
 
 .hub-emoji-picker-toggle {
@@ -2503,7 +2508,7 @@ select.prompt-control {
   top: calc(100% + 10px);
   left: 0;
   z-index: 35;
-  width: min(360px, min(88vw, 100%));
+  width: min(360px, 88vw);
   padding: 12px;
   border: 1px solid rgba(112, 163, 221, 0.28);
   border-radius: 20px;
@@ -2851,7 +2856,7 @@ select.prompt-control {
   }
 
   .hub-emoji-picker-panel {
-    width: min(100%, 340px);
+    width: min(340px, 88vw);
   }
 
   .hub-dock-group[data-configured="true"] .hub-profile-button {

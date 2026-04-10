@@ -168,6 +168,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `src="/static/emoji-picker.js"`) {
 		t.Fatalf("expected index html to include the external emoji picker script")
 	}
+	if strings.Contains(markup, `src="/static/emoji-picker.js" defer`) {
+		t.Fatalf("expected emoji picker script to load before inline app bootstrapping so picker attach is available")
+	}
 	if !strings.Contains(markup, `src="https://www.googletagmanager.com/gtag/js?id=G-BY33RFG2WB"`) {
 		t.Fatalf("expected index html to load the google analytics tag script")
 	}
