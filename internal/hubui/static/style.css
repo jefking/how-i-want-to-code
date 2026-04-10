@@ -117,8 +117,21 @@
   --surface-auth-verify-hover-shadow: 0 16px 28px rgba(10, 132, 255, 0.28);
   --surface-auth-verify-text: #ffffff;
   --radius: 6px;
+  --radius-card: 15px;
+  --radius-sm: calc(var(--radius) - 2px);
+  --foreground: rgba(26, 26, 26, 1);
   --glass-bg: rgba(255, 255, 255, 0.45);
   --glass-border: rgba(255, 255, 255, 0.5);
+  --glass-shadow:
+    0 0 0 0.5px rgba(0, 0, 0, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.04),
+    0 12px 40px rgba(0, 0, 0, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.6);
+  --glass-icon-bg: rgba(255, 255, 255, 0.7);
+  --glass-icon-border: rgba(255, 255, 255, 0.8);
+  --glass-icon-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.06),
+    0 4px 12px rgba(0, 0, 0, 0.04);
   --elevation-sm: 0 1px 3px rgba(0, 0, 0, 0.2);
   --muted-foreground: rgba(77, 77, 77, 1);
   --text-label: 11px;
@@ -778,46 +791,93 @@ body .right-col.prompt-collapsed.task-list-hidden {
 
 .prompt-mode-tabs {
   display: inline-flex;
-  gap: 4px;
-  padding: 5px;
-  border-radius: 14px;
-  border: 1px solid var(--surface-tab-border);
-  background: var(--surface-tab-bg);
-  box-shadow: var(--surface-tab-shadow);
+  align-items: center;
+  gap: 6px;
+  padding: 8px 10px;
+  border-radius: var(--radius-card);
+  border: 1px solid var(--glass-border);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-shadow);
+  backdrop-filter: blur(60px) saturate(180%);
+  -webkit-backdrop-filter: blur(60px) saturate(180%);
 }
 
 .prompt-mode-link {
+  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 8px;
-  color: var(--surface-tab-text);
-  padding: 9px 12px;
-  font-size: 0.73rem;
-  font-weight: 800;
-  letter-spacing: 0.06em;
-  line-height: 1;
-  text-transform: uppercase;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  color: var(--muted-foreground);
   text-decoration: none;
-  border-radius: 999px;
-  transition: color 0.14s ease, opacity 0.14s ease, box-shadow 0.14s ease;
+  border-radius: var(--radius);
+  transition: transform 0.2s ease, color 0.2s ease;
 }
 
-.prompt-mode-link:hover {
-  color: var(--surface-tab-hover-text);
-  opacity: 1;
+.prompt-mode-link:hover,
+.prompt-mode-link:focus-visible {
+  transform: translateY(-2px) scale(1.12);
+}
+
+.prompt-mode-link:active {
+  transform: scale(0.95);
 }
 
 .prompt-mode-link.active {
-  color: var(--surface-tab-active-text);
-  box-shadow: inset 0 -2px 0 var(--surface-tab-active-text);
+  color: var(--running);
 }
 
-.prompt-mode-link:not(.active) {
-  opacity: 0.86;
+.prompt-mode-link-shell {
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius);
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: var(--muted);
 }
 
-.prompt-mode-link img {
+.prompt-mode-link:hover .prompt-mode-link-shell,
+.prompt-mode-link:focus-visible .prompt-mode-link-shell {
+  opacity: 1;
+}
+
+.prompt-mode-link.active .prompt-mode-link-shell {
+  opacity: 0;
+}
+
+.prompt-mode-link-icon {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  overflow: hidden;
+  border-radius: 999px;
+  border: 1px solid var(--glass-icon-border);
+  background: var(--glass-bg);
+  box-shadow: var(--glass-icon-shadow);
+}
+
+.prompt-mode-link.active .prompt-mode-link-icon {
+  background: var(--glass-icon-bg);
+}
+
+.prompt-mode-link-icon svg {
+  display: block;
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.prompt-mode-link-icon img {
   display: block;
   width: 15px;
   height: 15px;
@@ -825,9 +885,64 @@ body .right-col.prompt-collapsed.task-list-hidden {
   filter: var(--agent-logo-filter);
 }
 
+.prompt-mode-link-line {
+  position: absolute;
+  left: 50%;
+  width: 16px;
+  height: 1px;
+  transform: translateX(-50%);
+  pointer-events: none;
+  opacity: 0.45;
+  background: var(--glass-icon-border);
+}
+
+.prompt-mode-link-line-top {
+  top: 6px;
+}
+
+.prompt-mode-link-line-bottom {
+  bottom: 6px;
+}
+
+.prompt-mode-link-tooltip {
+  position: absolute;
+  top: -32px;
+  left: 50%;
+  z-index: 20;
+  padding: 2px 8px;
+  border-radius: var(--radius-sm);
+  pointer-events: none;
+  opacity: 0;
+  white-space: nowrap;
+  transform: translateX(-50%);
+  transition: opacity 0.2s ease;
+  font-family: var(--font-family);
+  font-size: var(--text-label);
+  font-weight: var(--font-weight-medium);
+  color: var(--foreground);
+  background: var(--glass-bg);
+  backdrop-filter: blur(20px);
+  border: 1px solid var(--glass-border);
+  box-shadow: var(--glass-icon-shadow);
+}
+
+.prompt-mode-link:hover .prompt-mode-link-tooltip,
+.prompt-mode-link:focus-visible .prompt-mode-link-tooltip {
+  opacity: 1;
+}
+
+.prompt-mode-divider {
+  width: 1px;
+  height: 24px;
+  margin-inline: 4px;
+  border-radius: 999px;
+  flex: 0 0 1px;
+  background: var(--border);
+}
+
 .prompt-mode-link-logo {
   min-width: 40px;
-  padding-inline: 12px;
+  padding-inline: 0;
 }
 
 .prompt-mode-link-logo {
@@ -835,17 +950,7 @@ body .right-col.prompt-collapsed.task-list-hidden {
 }
 
 .prompt-mode-link-logo-divider::before {
-  content: "";
-  display: block;
-  width: 1px;
-  height: 18px;
-  margin-right: 2px;
-  border-radius: 999px;
-  background: rgba(112, 163, 221, 0.32);
-}
-
-.prompt-mode-link-logo img {
-  margin-left: 1px;
+  content: none;
 }
 
 .hub-dock-plus {
@@ -869,33 +974,40 @@ body .right-col.prompt-collapsed.task-list-hidden {
 .hub-dock-group {
   display: inline-flex;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
 }
 
 .hub-profile-button {
   opacity: 0;
   pointer-events: none;
+  transform: translateX(-6px) scale(0.96);
   transition:
     opacity 180ms ease,
-    color 180ms ease;
+    color 180ms ease,
+    transform 180ms ease;
 }
 
 .hub-profile-button svg {
-  width: 18px;
-  height: 18px;
+  width: 15px;
+  height: 15px;
   display: block;
-  fill: currentColor;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 
 .hub-dock-group[data-configured="true"]:hover .hub-profile-button,
 .hub-dock-group[data-configured="true"]:focus-within .hub-profile-button {
   opacity: 1;
   pointer-events: auto;
+  transform: translateX(0) scale(1);
 }
 
 .hub-profile-button:hover,
 .hub-profile-button:focus-visible {
-  color: var(--surface-tab-active-text);
+  color: var(--running);
   background: transparent;
   box-shadow: none;
 }
@@ -935,7 +1047,7 @@ body .right-col.prompt-collapsed.task-list-hidden {
 .prompt-mode-tabs-dock {
   width: max-content;
   max-width: calc(100vw - 28px);
-  overflow-x: auto;
+  overflow: visible;
 }
 
 #task-panel {
@@ -3001,9 +3113,20 @@ html.dark {
   --surface-auth-verify-border: rgba(61, 155, 255, 0.28);
   --surface-auth-verify-shadow: 0 14px 28px rgba(10, 132, 255, 0.24);
   --surface-auth-verify-hover-shadow: 0 18px 34px rgba(10, 132, 255, 0.3);
+  --foreground: rgba(245, 245, 247, 1);
   --muted-foreground: rgba(152, 152, 157, 1);
   --glass-bg: rgba(50, 50, 52, 0.55);
   --glass-border: rgba(255, 255, 255, 0.08);
+  --glass-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.04),
+    0 2px 8px rgba(0, 0, 0, 0.15),
+    0 12px 40px rgba(0, 0, 0, 0.25),
+    inset 0 1px 0 rgba(255, 255, 255, 0.06);
+  --glass-icon-bg: rgba(255, 255, 255, 0.08);
+  --glass-icon-border: rgba(255, 255, 255, 0.1);
+  --glass-icon-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.2),
+    0 4px 12px rgba(0, 0, 0, 0.12);
   --theme-dock-border: rgba(104, 122, 159, 0.36);
   --theme-dock-bg: linear-gradient(180deg, rgba(23, 29, 43, 0.94), rgba(15, 20, 31, 0.94));
   --theme-dock-shadow:
@@ -3130,10 +3253,21 @@ html.night {
   --surface-auth-verify-border: rgba(61, 155, 255, 0.28);
   --surface-auth-verify-shadow: 0 14px 28px rgba(10, 132, 255, 0.24);
   --surface-auth-verify-hover-shadow: 0 18px 34px rgba(10, 132, 255, 0.3);
+  --foreground: rgba(220, 220, 225, 1);
   --muted-foreground: rgba(118, 118, 128, 1);
   --elevation-sm: 0px 1px 3px 0px rgba(0, 0, 0, 0.7);
   --glass-bg: rgba(22, 22, 26, 0.6);
   --glass-border: rgba(255, 255, 255, 0.05);
+  --glass-shadow:
+    0 0 0 0.5px rgba(255, 255, 255, 0.02),
+    0 2px 8px rgba(0, 0, 0, 0.25),
+    0 12px 40px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.03);
+  --glass-icon-bg: rgba(255, 255, 255, 0.05);
+  --glass-icon-border: rgba(255, 255, 255, 0.07);
+  --glass-icon-shadow:
+    0 1px 3px rgba(0, 0, 0, 0.35),
+    0 4px 12px rgba(0, 0, 0, 0.2);
   --theme-dock-border: rgba(88, 109, 147, 0.38);
   --theme-dock-bg: linear-gradient(180deg, rgba(17, 23, 36, 0.96), rgba(10, 14, 24, 0.96));
   --theme-dock-shadow:
@@ -3226,6 +3360,8 @@ html[data-hover-mode="off"] .prompt-visibility-toggle:hover {
 
   .prompt-mode-tabs-dock {
     max-width: calc(100vw - 24px);
+    overflow-x: auto;
+    overflow-y: visible;
   }
 
   .theme-toggle {

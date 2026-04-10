@@ -315,8 +315,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `const hubSetupEmojiPicker = window.MoltenEmojiPicker && hubSetupEmojiPickerRoot`) {
 		t.Fatalf("expected index html to initialize the included emoji picker")
 	}
-	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-logo prompt-mode-link-logo-divider"`) {
-		t.Fatalf("expected first dock logo link to use shared icon-link styling with divider")
+	if !strings.Contains(markup, `class="prompt-mode-divider"`) {
+		t.Fatalf("expected dock to include a shared divider between internal and external links")
 	}
 	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-logo"`) {
 		t.Fatalf("expected dock logo links to use shared icon-link styling")
@@ -845,8 +845,11 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="prompt-mode-builder"`) {
 		t.Fatalf("expected index html to include builder mode toggle")
 	}
-	if !strings.Contains(markup, `id="prompt-mode-builder" class="prompt-mode-link active" href="#studio-builder" aria-selected="true">Prompt</a>`) {
-		t.Fatalf("expected index html to render Prompt as the primary dock label")
+	if !strings.Contains(markup, `id="prompt-mode-builder" class="prompt-mode-link active" href="#studio-builder" aria-selected="true" title="Prompt"`) {
+		t.Fatalf("expected index html to render Prompt as the primary dock icon action")
+	}
+	if !strings.Contains(markup, `<span class="prompt-mode-link-tooltip" aria-hidden="true">Prompt</span>`) {
+		t.Fatalf("expected index html to expose Prompt through dock tooltip text")
 	}
 	if !strings.Contains(markup, `id="prompt-mode-library"`) {
 		t.Fatalf("expected index html to include library mode toggle")
@@ -860,13 +863,13 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `promptPanelTitle.textContent = promptModeTitle(state.promptMode);`) {
 		t.Fatalf("expected index html to update the panel heading when the prompt mode changes")
 	}
-	if !strings.Contains(markup, `class="prompt-mode-link active" href="#studio-builder" aria-selected="true"`) {
+	if !strings.Contains(markup, `id="prompt-mode-builder" class="prompt-mode-link active" href="#studio-builder" aria-selected="true"`) {
 		t.Fatalf("expected builder mode to render as an anchor-style control inside the shared segmented dock")
 	}
-	if !strings.Contains(markup, `class="prompt-mode-link" href="#studio-library" aria-selected="false"`) {
+	if !strings.Contains(markup, `id="prompt-mode-library" class="prompt-mode-link" href="#studio-library" aria-selected="false"`) {
 		t.Fatalf("expected library mode to render as an anchor-style control inside the shared segmented dock")
 	}
-	if !strings.Contains(markup, `class="prompt-mode-link" href="#studio-json" aria-selected="false"`) {
+	if !strings.Contains(markup, `id="prompt-mode-json" class="prompt-mode-link" href="#studio-json" aria-selected="false"`) {
 		t.Fatalf("expected json mode to render as an anchor-style control inside the shared segmented dock")
 	}
 	if !strings.Contains(markup, `class="page-bottom-dock"`) || !strings.Contains(markup, `class="prompt-mode-tabs prompt-mode-tabs-dock"`) {
@@ -1510,17 +1513,17 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".page-bottom-dock {\n  position: fixed;\n  left: 50%;\n  bottom: max(16px, env(safe-area-inset-bottom));\n  z-index: 61;\n  display: flex;\n  align-items: center;\n  gap: 10px;\n  justify-content: center;") {
 		t.Fatalf("expected stylesheet to align the bottom dock tabs and GitHub profile link on a shared row")
 	}
-	if !strings.Contains(css, ".prompt-mode-link {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  gap: 8px;") {
-		t.Fatalf("expected segmented dock links to support icon-and-text spacing within the shared menu")
+	if !strings.Contains(css, ".prompt-mode-link {\n  position: relative;\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 40px;\n  height: 40px;") {
+		t.Fatalf("expected segmented dock links to use icon pill sizing within the shared menu")
 	}
-	if !strings.Contains(css, ".prompt-mode-link img {\n  display: block;\n  width: 15px;\n  height: 15px;") {
+	if !strings.Contains(css, ".prompt-mode-link-icon img {\n  display: block;\n  width: 15px;\n  height: 15px;") {
 		t.Fatalf("expected stylesheet to size dock icons for integrated menu items")
 	}
-	if !strings.Contains(css, ".prompt-mode-link-logo {\n  min-width: 40px;\n  padding-inline: 12px;\n}") {
+	if !strings.Contains(css, ".prompt-mode-link-logo {\n  min-width: 40px;\n  padding-inline: 0;\n}") {
 		t.Fatalf("expected stylesheet to keep icon-only dock items balanced with the text tabs")
 	}
-	if !strings.Contains(css, ".prompt-mode-link-logo-divider::before {\n  content: \"\";\n  display: block;\n  width: 1px;\n  height: 18px;") {
-		t.Fatalf("expected stylesheet to visually integrate the leading icon-only dock item into the shared dock instead of a detached pill")
+	if !strings.Contains(css, ".prompt-mode-divider {\n  width: 1px;\n  height: 24px;\n  margin-inline: 4px;") {
+		t.Fatalf("expected stylesheet to visually integrate the leading icon-only dock item into the shared dock with a divider element")
 	}
 	if !strings.Contains(css, ".task-fullscreen {\n  position: fixed;\n  inset: 0;\n  z-index: 80;\n  padding: 0;") {
 		t.Fatalf("expected stylesheet to make full screen task layout use full viewport padding")
