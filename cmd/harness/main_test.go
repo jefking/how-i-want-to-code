@@ -408,7 +408,7 @@ func TestFailureFollowUpRunConfigUsesRequiredPayloadShapeAndLogContext(t *testin
 	}
 }
 
-func TestFailureFollowUpRunConfigPreservesExistingNonMainBranchAndTarget(t *testing.T) {
+func TestFailureFollowUpRunConfigPreservesExistingNonMainBranchAndNormalizesTarget(t *testing.T) {
 	t.Parallel()
 
 	logRoot := filepath.Join(t.TempDir(), ".log")
@@ -427,8 +427,8 @@ func TestFailureFollowUpRunConfigPreservesExistingNonMainBranchAndTarget(t *test
 	if cfg.BaseBranch != "moltenhub-add-slight-padding-between-prompt-and-lo" {
 		t.Fatalf("BaseBranch = %q, want preserved branch", cfg.BaseBranch)
 	}
-	if cfg.TargetSubdir != "internal/hubui" {
-		t.Fatalf("TargetSubdir = %q, want %q", cfg.TargetSubdir, "internal/hubui")
+	if cfg.TargetSubdir != "." {
+		t.Fatalf("TargetSubdir = %q, want %q", cfg.TargetSubdir, ".")
 	}
 	for _, want := range []string{
 		"- target_subdir=internal/hubui",
