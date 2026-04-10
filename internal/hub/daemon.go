@@ -34,6 +34,8 @@ const dispatchDedupTTL = 2 * time.Hour
 const agentStatusUpdateTimeout = 5 * time.Second
 const failureFollowUpPromptBase = failurefollowup.RequiredPrompt
 const failureFollowUpNoPathGuidance = "No workspace or log path was captured before the failure. Investigate the task history and runtime error details first."
+const unexpectedNoChangesFollowUpPromptBase = failurefollowup.UnexpectedNoChangesRequiredPrompt
+const unexpectedNoChangesFollowUpNoPathGuidance = "No local task log path was captured before the task completed without changes. Review the task history and runtime logs first."
 
 // NewDaemon returns a hub daemon with defaults.
 func NewDaemon(runner execx.Runner) Daemon {
@@ -641,6 +643,24 @@ func (d Daemon) handleDispatch(
 	}
 	d.recordGitHubTaskCompleteActivity(ctx, api, dispatch.RequestID)
 	if res.NoChanges {
+		if ok, reason := shouldQueueUnexpectedNoChangesFollowUp(dispatch, res); !ok {
+			d.logf(
+				"dispatch status=warn action=skip_no_changes_followup request_id=%s err=%q",
+				dispatch.RequestID,
+				reason,
+			)
+		} else if err := queueUnexpectedNoChangesFollowUp(ctx, api, cfg, dispatch, res, d.TaskLogRoot); err != nil {
+			d.logf("dispatch status=follow_up_error request_id=%s err=%q", dispatch.RequestID, err)
+		}
+		if ok, _ := shouldEscalateNoChangesFollowUp(dispatch, res); ok {
+			escalationResult := res
+			if escalationResult.Err == nil {
+				escalationResult.Err = fmt.Errorf("no-changes follow-up completed without file changes or a pull request")
+			}
+			if err := queueFailureFollowUp(ctx, api, cfg, dispatch, escalationResult, d.TaskLogRoot); err != nil {
+				d.logf("dispatch status=follow_up_error request_id=%s err=%q", dispatch.RequestID, err)
+			}
+		}
 		d.logf(
 			"dispatch status=no_changes request_id=%s workspace=%s branch=%s pr_url=%s pr_urls=%s",
 			dispatch.RequestID,
@@ -746,12 +766,47 @@ func shouldQueueFailureFollowUp(dispatch SkillDispatch, res harness.Result) (boo
 	return true, ""
 }
 
+func shouldQueueUnexpectedNoChangesFollowUp(dispatch SkillDispatch, res harness.Result) (bool, string) {
+	if ok, reason := isUnexpectedNoChangesResult(res); !ok {
+		return false, reason
+	}
+	if isNoChangesFollowUpRequestID(dispatch.RequestID) {
+		return false, "run is already a no-changes follow-up"
+	}
+	return true, ""
+}
+
+func shouldEscalateNoChangesFollowUp(dispatch SkillDispatch, res harness.Result) (bool, string) {
+	if !isNoChangesFollowUpRequestID(dispatch.RequestID) {
+		return false, "run is not a no-changes follow-up"
+	}
+	return isUnexpectedNoChangesResult(res)
+}
+
+func isUnexpectedNoChangesResult(res harness.Result) (bool, string) {
+	if !res.NoChanges {
+		return false, "task did not complete with no changes"
+	}
+	if strings.TrimSpace(joinAllRepoPRURLs(res.RepoResults)) != "" || strings.TrimSpace(res.PRURL) != "" {
+		return false, "task already has a pull request"
+	}
+	return true, ""
+}
+
 func isFailureFollowUpRequestID(requestID string) bool {
 	requestID = strings.ToLower(strings.TrimSpace(requestID))
 	if requestID == "" {
 		return false
 	}
 	return requestID == "failure-review" || strings.HasSuffix(requestID, "-failure-review")
+}
+
+func isNoChangesFollowUpRequestID(requestID string) bool {
+	requestID = strings.ToLower(strings.TrimSpace(requestID))
+	if requestID == "" {
+		return false
+	}
+	return requestID == "no-changes-review" || strings.HasSuffix(requestID, "-no-changes-review")
 }
 
 func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig, dispatch SkillDispatch, res harness.Result, taskLogRoot string) error {
@@ -762,16 +817,11 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 	if len(repos) == 0 {
 		return fmt.Errorf("failed dispatch is missing repository context")
 	}
-	baseBranch, targetSubdir := failurefollowup.FollowUpTargeting(
-		dispatch.Config.BaseBranch,
-		dispatch.Config.TargetSubdir,
-		res.Branch,
-	)
 
 	runConfig := map[string]any{
 		"repos":        repos,
-		"baseBranch":   baseBranch,
-		"targetSubdir": targetSubdir,
+		"baseBranch":   "main",
+		"targetSubdir": ".",
 		"prompt":       failureFollowUpPrompt(taskLogRoot, dispatch, res),
 	}
 
@@ -785,24 +835,40 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 	return api.PublishResult(ctx, payload)
 }
 
-func failureFollowUpRepos(res harness.Result, runCfg config.Config) []string {
-	if repo := singleRepoFromResults(res.RepoResults); repo != "" {
-		return []string{repo}
+func queueUnexpectedNoChangesFollowUp(
+	ctx context.Context,
+	api MoltenHubAPI,
+	cfg InitConfig,
+	dispatch SkillDispatch,
+	res harness.Result,
+	taskLogRoot string,
+) error {
+	if api == nil {
+		return fmt.Errorf("moltenhub api client is required")
 	}
-	for _, repo := range runCfg.RepoList() {
-		repo = strings.TrimSpace(repo)
-		if repo == "" {
-			continue
-		}
-		return []string{repo}
+	repos := failureFollowUpRepos(res, dispatch.Config)
+	if len(repos) == 0 {
+		return fmt.Errorf("dispatch is missing repository context")
 	}
-	for _, repoResult := range res.RepoResults {
-		repo := strings.TrimSpace(repoResult.RepoURL)
-		if repo == "" {
-			continue
-		}
-		return []string{repo}
+
+	runConfig := map[string]any{
+		"repos":        repos,
+		"baseBranch":   "main",
+		"targetSubdir": ".",
+		"prompt":       unexpectedNoChangesFollowUpPrompt(taskLogRoot, dispatch, res),
 	}
+
+	payload := map[string]any{
+		"type":       firstNonEmpty(cfg.Skill.DispatchType, defaultRuntimeDispatchType),
+		"skill":      firstNonEmpty(cfg.Skill.Name, dispatch.Skill),
+		"request_id": noChangesFollowUpRequestID(dispatch.RequestID),
+		"config":     runConfig,
+	}
+
+	return api.PublishResult(ctx, payload)
+}
+
+func failureFollowUpRepos(_ harness.Result, _ config.Config) []string {
 	if repo := strings.TrimSpace(config.DefaultRepositoryURL); repo != "" {
 		return []string{repo}
 	}
@@ -838,6 +904,17 @@ func failureFollowUpPrompt(logRoot string, dispatch SkillDispatch, res harness.R
 	)
 }
 
+func unexpectedNoChangesFollowUpPrompt(logRoot string, dispatch SkillDispatch, res harness.Result) string {
+	paths := failureLogPaths(logRoot, dispatch.RequestID, dispatch.Config, res)
+	return failurefollowup.ComposePrompt(
+		unexpectedNoChangesFollowUpPromptBase,
+		paths,
+		nil,
+		unexpectedNoChangesFollowUpNoPathGuidance,
+		unexpectedNoChangesFollowUpContext(dispatch, res),
+	)
+}
+
 func failureFollowUpContext(dispatch SkillDispatch, res harness.Result) string {
 	lines := []string{
 		"Observed failure context:",
@@ -855,6 +932,30 @@ func failureFollowUpContext(dispatch SkillDispatch, res harness.Result) string {
 	}
 	if prURL := strings.TrimSpace(res.PRURL); prURL != "" {
 		lines = append(lines, fmt.Sprintf("- pr_url=%s", prURL))
+	}
+	if repos := dispatch.Config.RepoList(); len(repos) > 0 {
+		lines = append(lines, fmt.Sprintf("- repos=%s", strings.Join(repos, ",")))
+	}
+	if targetSubdir := strings.TrimSpace(dispatch.Config.TargetSubdir); targetSubdir != "" {
+		lines = append(lines, fmt.Sprintf("- target_subdir=%s", targetSubdir))
+	}
+	if prompt := strings.TrimSpace(dispatch.Config.Prompt); prompt != "" {
+		lines = append(lines, "Original task prompt:")
+		lines = append(lines, prompt)
+	}
+	return strings.Join(lines, "\n")
+}
+
+func unexpectedNoChangesFollowUpContext(dispatch SkillDispatch, res harness.Result) string {
+	lines := []string{
+		"Observed no-change context:",
+		fmt.Sprintf("- request_id=%s", strings.TrimSpace(dispatch.RequestID)),
+	}
+	if workspaceDir := strings.TrimSpace(res.WorkspaceDir); workspaceDir != "" {
+		lines = append(lines, fmt.Sprintf("- workspace_dir=%s", workspaceDir))
+	}
+	if branch := strings.TrimSpace(res.Branch); branch != "" {
+		lines = append(lines, fmt.Sprintf("- branch=%s", branch))
 	}
 	if repos := dispatch.Config.RepoList(); len(repos) > 0 {
 		lines = append(lines, fmt.Sprintf("- repos=%s", strings.Join(repos, ",")))
@@ -906,6 +1007,14 @@ func failureFollowUpRequestID(requestID string) string {
 		return "failure-review"
 	}
 	return requestID + "-failure-review"
+}
+
+func noChangesFollowUpRequestID(requestID string) string {
+	requestID = strings.TrimSpace(requestID)
+	if requestID == "" {
+		return "no-changes-review"
+	}
+	return requestID + "-no-changes-review"
 }
 
 func joinRepoPRURLs(results []harness.RepoResult) string {

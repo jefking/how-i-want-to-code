@@ -336,14 +336,14 @@ func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *test
 	if runConfig == nil {
 		t.Fatalf("follow-up config missing: %#v", followUpPayload)
 	}
-	if got := runConfig["baseBranch"]; got != "release" {
+	if got := runConfig["baseBranch"]; got != "main" {
 		t.Fatalf("follow-up baseBranch = %#v", got)
 	}
-	if got := runConfig["targetSubdir"]; got != "internal/hub" {
+	if got := runConfig["targetSubdir"]; got != "." {
 		t.Fatalf("follow-up targetSubdir = %#v", got)
 	}
 	repos, _ := runConfig["repos"].([]string)
-	if len(repos) != 1 || repos[0] != "git@github.com:acme/repo.git" {
+	if len(repos) != 1 || repos[0] != config.DefaultRepositoryURL {
 		t.Fatalf("follow-up repos = %#v", runConfig["repos"])
 	}
 	prompt, _ := runConfig["prompt"].(string)
@@ -486,8 +486,80 @@ func TestQueueFailureFollowUpUsesSingleRepoPayloadForMultiRepoFailures(t *testin
 		t.Fatalf("follow-up config missing: %#v", api.published[0])
 	}
 	repos, _ := runConfig["repos"].([]string)
-	if len(repos) != 1 || repos[0] != "git@github.com:acme/repo-b.git" {
+	if len(repos) != 1 || repos[0] != config.DefaultRepositoryURL {
 		t.Fatalf("follow-up repos = %#v", runConfig["repos"])
+	}
+}
+
+func TestQueueUnexpectedNoChangesFollowUpUsesSingleRepoPayload(t *testing.T) {
+	t.Parallel()
+
+	api := &stubMoltenHubAPI{token: "t"}
+	cfg := InitConfig{
+		Skill: SkillConfig{
+			Name:         "code_for_me",
+			DispatchType: "skill_request",
+		},
+	}
+	dispatch := SkillDispatch{
+		RequestID: "req-no-change",
+		Skill:     "code_for_me",
+		Config: config.Config{
+			Repos:        []string{"git@github.com:acme/repo-a.git"},
+			TargetSubdir: "internal/hub",
+			Prompt:       "fix the no-change remediation flow",
+		},
+	}
+	dispatch.Config.ApplyDefaults()
+	res := harness.Result{
+		NoChanges:    true,
+		WorkspaceDir: "/tmp/run-no-change",
+		Branch:       "release/2026.04-hotfix",
+	}
+
+	if err := queueUnexpectedNoChangesFollowUp(context.Background(), api, cfg, dispatch, res, "/tmp/.log"); err != nil {
+		t.Fatalf("queueUnexpectedNoChangesFollowUp() error = %v", err)
+	}
+
+	api.mu.Lock()
+	defer api.mu.Unlock()
+
+	if len(api.published) != 1 {
+		t.Fatalf("published payload count = %d, want 1", len(api.published))
+	}
+	if got := api.published[0]["request_id"]; got != "req-no-change-no-changes-review" {
+		t.Fatalf("follow-up request_id = %#v", got)
+	}
+	runConfig, _ := api.published[0]["config"].(map[string]any)
+	if runConfig == nil {
+		t.Fatalf("follow-up config missing: %#v", api.published[0])
+	}
+	repos, _ := runConfig["repos"].([]string)
+	if len(repos) != 1 || repos[0] != config.DefaultRepositoryURL {
+		t.Fatalf("follow-up repos = %#v", runConfig["repos"])
+	}
+	if got := runConfig["baseBranch"]; got != "main" {
+		t.Fatalf("follow-up baseBranch = %#v", got)
+	}
+	if got := runConfig["targetSubdir"]; got != "." {
+		t.Fatalf("follow-up targetSubdir = %#v", got)
+	}
+	prompt, _ := runConfig["prompt"].(string)
+	for _, want := range []string{
+		unexpectedNoChangesFollowUpPromptBase,
+		"Relevant failing log path(s):",
+		"/tmp/.log/req/no/change",
+		"Observed no-change context:",
+		"- request_id=req-no-change",
+		"- workspace_dir=/tmp/run-no-change",
+		"- branch=release/2026.04-hotfix",
+		"- target_subdir=internal/hub",
+		"Original task prompt:\nfix the no-change remediation flow",
+		"Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.",
+	} {
+		if !strings.Contains(prompt, want) {
+			t.Fatalf("follow-up prompt missing %q: %q", want, prompt)
+		}
 	}
 }
 

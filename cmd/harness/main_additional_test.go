@@ -369,7 +369,7 @@ func TestFailureFollowUpPromptDefaultWhenNoPaths(t *testing.T) {
 	if !strings.Contains(got, `When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.`) {
 		t.Fatalf("prompt missing failure response instruction: %q", got)
 	}
-	if !strings.Contains(got, `"repos":["<same_repo_as_failed_task>"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."`) {
+	if !strings.Contains(got, `"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."`) {
 		t.Fatalf("prompt missing follow-up payload shape: %q", got)
 	}
 	if !strings.Contains(got, "If no file changes are required, return a clear no-op result with concrete evidence instead of forcing an empty PR.") {
@@ -598,13 +598,13 @@ func TestUnexpectedNoChangesFollowUpRunConfigPreservesTaskTargetingAndAddsContex
 	}
 
 	cfg := unexpectedNoChangesFollowUpRunConfig("local-1712345678-000001", result, runCfg, logRoot)
-	if got, want := cfg.BaseBranch, "release/2026.04-hotfix"; got != want {
+	if got, want := cfg.BaseBranch, "main"; got != want {
 		t.Fatalf("BaseBranch = %q, want %q", got, want)
 	}
-	if got, want := cfg.TargetSubdir, "cmd/harness"; got != want {
+	if got, want := cfg.TargetSubdir, "."; got != want {
 		t.Fatalf("TargetSubdir = %q, want %q", got, want)
 	}
-	if got, want := cfg.Repos, []string{"git@github.com:acme/repo.git"}; len(got) != len(want) || got[0] != want[0] {
+	if got, want := cfg.Repos, []string{config.DefaultRepositoryURL}; len(got) != len(want) || got[0] != want[0] {
 		t.Fatalf("Repos = %v, want %v", got, want)
 	}
 
@@ -642,7 +642,7 @@ func TestUnexpectedNoChangesFollowUpRunConfigReusesObservedNonMainBranch(t *test
 		t.TempDir(),
 	)
 
-	if got, want := cfg.BaseBranch, "moltenhub-add-the-emoji-picker-to-the-agent-profil"; got != want {
+	if got, want := cfg.BaseBranch, "main"; got != want {
 		t.Fatalf("BaseBranch = %q, want %q", got, want)
 	}
 }

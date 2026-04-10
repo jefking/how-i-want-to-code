@@ -913,15 +913,10 @@ func failureFollowUpRunConfig(
 	logRoot string,
 ) config.Config {
 	logPaths := failurefollowup.TaskLogPaths(logRoot, failedRequestID)
-	baseBranch, targetSubdir := failurefollowup.FollowUpTargeting(
-		failedRunCfg.BaseBranch,
-		failedRunCfg.TargetSubdir,
-		failedResult.Branch,
-	)
 	return config.Config{
 		Repos:        failureFollowUpRepos(failedResult, failedRunCfg),
-		BaseBranch:   baseBranch,
-		TargetSubdir: targetSubdir,
+		BaseBranch:   "main",
+		TargetSubdir: ".",
 		Prompt:       failureFollowUpPrompt(logPaths, failedResult, failedRunCfg),
 	}
 }
@@ -934,15 +929,10 @@ func unexpectedNoChangesFollowUpRunConfig(
 ) config.Config {
 	runCfg.ApplyDefaults()
 	logPaths := failurefollowup.TaskLogPaths(logRoot, requestID)
-	baseBranch := strings.TrimSpace(runCfg.BaseBranch)
-	resultBranch := strings.TrimSpace(result.Branch)
-	if baseBranch == "main" && resultBranch != "" && resultBranch != "main" {
-		baseBranch = resultBranch
-	}
 	return config.Config{
 		Repos:        failureFollowUpRepos(result, runCfg),
-		BaseBranch:   baseBranch,
-		TargetSubdir: runCfg.TargetSubdir,
+		BaseBranch:   "main",
+		TargetSubdir: ".",
 		Prompt:       unexpectedNoChangesFollowUpPrompt(logPaths, requestID, result, runCfg),
 	}
 }
@@ -976,24 +966,7 @@ func shouldEscalateNoChangesFollowUp(source string, result harness.Result) (bool
 	return shouldQueueUnexpectedNoChangesFollowUp(result)
 }
 
-func failureFollowUpRepos(failedResult harness.Result, failedRunCfg config.Config) []string {
-	if repo := singleRepoFromResults(failedResult.RepoResults); repo != "" {
-		return []string{repo}
-	}
-	for _, repo := range failedRunCfg.RepoList() {
-		repo = strings.TrimSpace(repo)
-		if repo == "" {
-			continue
-		}
-		return []string{repo}
-	}
-	for _, repoResult := range failedResult.RepoResults {
-		repo := strings.TrimSpace(repoResult.RepoURL)
-		if repo == "" {
-			continue
-		}
-		return []string{repo}
-	}
+func failureFollowUpRepos(_ harness.Result, _ config.Config) []string {
 	if repo := strings.TrimSpace(config.DefaultRepositoryURL); repo != "" {
 		return []string{repo}
 	}
@@ -1019,8 +992,6 @@ func singleRepoFromResults(results []harness.RepoResult) string {
 }
 
 func unexpectedNoChangesFollowUpPrompt(logPaths []string, requestID string, result harness.Result, runCfg config.Config) string {
-	const requiredPrompt = "Review the previous local task logs first. The prior run completed with no file changes and no pull request, which is unexpected for this task. Identify why the task produced no repository changes, fix the underlying issue, complete the requested work, validate locally where possible, and summarize the verified results. If the request is already satisfied, return a clear no-op result with concrete evidence."
-
 	var contextLines []string
 	if requestID = strings.TrimSpace(requestID); requestID != "" {
 		contextLines = append(contextLines, fmt.Sprintf("- request_id=%s", requestID))
@@ -1052,7 +1023,7 @@ func unexpectedNoChangesFollowUpPrompt(logPaths []string, requestID string, resu
 	}
 
 	return failurefollowup.ComposePrompt(
-		requiredPrompt,
+		failurefollowup.UnexpectedNoChangesRequiredPrompt,
 		logPaths,
 		nil,
 		"No local task log path was captured before the task completed without changes. Review the task history and runtime logs first.",

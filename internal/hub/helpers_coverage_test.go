@@ -24,6 +24,30 @@ func TestFailureFollowUpHelperBranches(t *testing.T) {
 	if ok, reason := shouldQueueFailureFollowUp(SkillDispatch{RequestID: "req-1-failure-review"}, harness.Result{Err: errors.New("boom")}); ok || !strings.Contains(reason, "nested follow-up") {
 		t.Fatalf("shouldQueueFailureFollowUp(nested) = (%v, %q)", ok, reason)
 	}
+	if ok, reason := shouldQueueUnexpectedNoChangesFollowUp(SkillDispatch{RequestID: "req-1"}, harness.Result{NoChanges: true}); !ok || reason != "" {
+		t.Fatalf("shouldQueueUnexpectedNoChangesFollowUp(no PR) = (%v, %q), want (true, \"\")", ok, reason)
+	}
+	if ok, reason := shouldQueueUnexpectedNoChangesFollowUp(SkillDispatch{RequestID: "req-1-no-changes-review"}, harness.Result{NoChanges: true}); ok || !strings.Contains(reason, "already a no-changes follow-up") {
+		t.Fatalf("shouldQueueUnexpectedNoChangesFollowUp(nested) = (%v, %q)", ok, reason)
+	}
+	if ok, reason := shouldEscalateNoChangesFollowUp(SkillDispatch{RequestID: "req-1"}, harness.Result{NoChanges: true}); ok || !strings.Contains(reason, "not a no-changes follow-up") {
+		t.Fatalf("shouldEscalateNoChangesFollowUp(non-follow-up) = (%v, %q)", ok, reason)
+	}
+	if ok, reason := shouldEscalateNoChangesFollowUp(SkillDispatch{RequestID: "req-1-no-changes-review"}, harness.Result{NoChanges: true}); !ok || reason != "" {
+		t.Fatalf("shouldEscalateNoChangesFollowUp(nested,no PR) = (%v, %q), want (true, \"\")", ok, reason)
+	}
+	if ok, reason := shouldEscalateNoChangesFollowUp(SkillDispatch{RequestID: "req-1-no-changes-review"}, harness.Result{NoChanges: true, PRURL: "https://github.com/acme/repo/pull/9"}); ok || !strings.Contains(reason, "already has a pull request") {
+		t.Fatalf("shouldEscalateNoChangesFollowUp(existing PR) = (%v, %q)", ok, reason)
+	}
+	if got := noChangesFollowUpRequestID(""); got != "no-changes-review" {
+		t.Fatalf("noChangesFollowUpRequestID(empty) = %q, want no-changes-review", got)
+	}
+	if got := noChangesFollowUpRequestID("req-1"); got != "req-1-no-changes-review" {
+		t.Fatalf("noChangesFollowUpRequestID(req-1) = %q, want req-1-no-changes-review", got)
+	}
+	if got := isNoChangesFollowUpRequestID("req-1-no-changes-review"); !got {
+		t.Fatal("isNoChangesFollowUpRequestID(req-1-no-changes-review) = false, want true")
+	}
 
 	res := harness.Result{
 		ExitCode:     7,
@@ -36,10 +60,15 @@ func TestFailureFollowUpHelperBranches(t *testing.T) {
 			{RepoURL: "git@github.com:acme/repo.git", RepoDir: "/tmp/work/repo", Changed: false, PRURL: "https://github.com/acme/repo/pull/2"},
 		},
 	}
-	runCfg := config.Config{RepoURL: "git@github.com:acme/repo.git", TargetSubdir: "internal/hub"}
+	runCfg := config.Config{
+		RepoURL:      "git@github.com:acme/repo.git",
+		TargetSubdir: "internal/hub",
+		Prompt:       "fix follow-up behavior",
+	}
 	runCfg.ApplyDefaults()
+	dispatch.Config = runCfg
 
-	if got := failureFollowUpRepos(res, config.Config{}); len(got) != 1 || got[0] != "git@github.com:acme/repo.git" {
+	if got := failureFollowUpRepos(res, config.Config{}); len(got) != 1 || got[0] != config.DefaultRepositoryURL {
 		t.Fatalf("failureFollowUpRepos() = %#v", got)
 	}
 	if got := singleRepoFromResults([]harness.RepoResult{{RepoURL: "a"}, {RepoURL: "b"}}); got != "" {
@@ -59,6 +88,16 @@ func TestFailureFollowUpHelperBranches(t *testing.T) {
 	for _, want := range []string{"Observed failure context:", "request_id=req-1", "exit_code=7", `error="boom"`, "workspace_dir=/tmp/work", "branch=moltenhub-fix", "pr_url=https://github.com/acme/repo/pull/1"} {
 		if !strings.Contains(context, want) {
 			t.Fatalf("failureFollowUpContext() missing %q in %q", want, context)
+		}
+	}
+	noChangeContext := unexpectedNoChangesFollowUpContext(dispatch, harness.Result{
+		NoChanges:    true,
+		WorkspaceDir: "/tmp/work",
+		Branch:       "release/2026.04-hotfix",
+	})
+	for _, want := range []string{"Observed no-change context:", "request_id=req-1", "workspace_dir=/tmp/work", "branch=release/2026.04-hotfix", "target_subdir=internal/hub", "Original task prompt:"} {
+		if !strings.Contains(noChangeContext, want) {
+			t.Fatalf("unexpectedNoChangesFollowUpContext() missing %q in %q", want, noChangeContext)
 		}
 	}
 
