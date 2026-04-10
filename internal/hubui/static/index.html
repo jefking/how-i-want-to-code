@@ -55,6 +55,7 @@
     })();
   </script>
   <script src="https://cdn.tailwindcss.com" defer></script>
+  <script src="/static/emoji-picker.js" defer></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="min-h-screen antialiased">
@@ -400,15 +401,16 @@
           </label>
           <label class="prompt-field">
             <span class="prompt-label">Emoji</span>
-            <input id="hub-setup-emoji" class="prompt-control prompt-input" type="text" spellcheck="false" placeholder="🔥" list="hub-setup-emoji-options">
-            <datalist id="hub-setup-emoji-options">
-              <option value="🔥"></option>
-              <option value="🤖"></option>
-              <option value="🛠️"></option>
-              <option value="⚡"></option>
-              <option value="🧠"></option>
-              <option value="🚀"></option>
-            </datalist>
+            <div id="hub-setup-emoji-picker" class="hub-emoji-picker" data-emoji-picker>
+              <div class="hub-emoji-picker-control">
+                <input id="hub-setup-emoji" class="prompt-control prompt-input hub-emoji-picker-input" type="text" spellcheck="false" placeholder="🔥" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" aria-describedby="hub-setup-emoji-help">
+                <button id="hub-setup-emoji-toggle" class="hub-emoji-picker-toggle" type="button" aria-label="Choose emoji" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="hub-setup-emoji-preview" class="hub-emoji-picker-toggle-preview" aria-hidden="true">😀</span>
+                </button>
+              </div>
+              <div id="hub-setup-emoji-panel" class="hub-emoji-picker-panel hidden" role="dialog" aria-label="Choose emoji" hidden></div>
+            </div>
+            <span id="hub-setup-emoji-help" class="sr-only">Type or choose one emoji for this agent.</span>
           </label>
           <label class="prompt-field hub-setup-profile-text">
             <span class="prompt-label">Profile</span>
@@ -434,8 +436,8 @@
             <span class="sr-only">Open Molten Hub sign-in</span>
           </a>
           <div class="hub-setup-actions">
+            <button id="hub-setup-connection-toggle" class="hub-setup-connection-toggle prompt-action-button hidden" type="button">Disconnect</button>
             <span id="hub-setup-status" class="hub-setup-status submit-status submit-status-inline min-h-[1.3em] text-[0.74rem] leading-[1.3] text-hub-muted"></span>
-            <button id="hub-setup-connection-toggle" class="hub-setup-connection-toggle hidden" type="button">Disconnect</button>
             <button id="hub-setup-submit" class="prompt-action-button prompt-submit" type="submit">Done</button>
           </div>
         </div>
@@ -1041,6 +1043,7 @@
     const hubSetupNewAgentFields = document.getElementById("hub-setup-new-agent-fields");
     const hubSetupHandle = document.getElementById("hub-setup-handle");
     const hubSetupDisplayName = document.getElementById("hub-setup-display-name");
+    const hubSetupEmojiPickerRoot = document.getElementById("hub-setup-emoji-picker");
     const hubSetupEmoji = document.getElementById("hub-setup-emoji");
     const hubSetupProfile = document.getElementById("hub-setup-profile");
     const hubSetupOnboarding = document.getElementById("hub-setup-onboarding");
@@ -1081,6 +1084,9 @@
     const hoverSelect = document.getElementById("hover-select");
     let brandLogoRotationTimer = null;
     let brandLogoRotationPhase = 0;
+    const hubSetupEmojiPicker = window.MoltenEmojiPicker && hubSetupEmojiPickerRoot
+      ? window.MoltenEmojiPicker.attach(hubSetupEmojiPickerRoot)
+      : null;
 
     function applyGitHubProfileLink(profileURL) {
       if (!githubProfileLink) {
@@ -1425,6 +1431,9 @@
         hubSetupEmoji.readOnly = state.hubSetupBusy;
         hubSetupEmoji.setAttribute("aria-readonly", state.hubSetupBusy ? "true" : "false");
       }
+      if (hubSetupEmojiPicker && typeof hubSetupEmojiPicker.setDisabled === "function") {
+        hubSetupEmojiPicker.setDisabled(state.hubSetupBusy);
+      }
       if (hubSetupConnectionToggle) hubSetupConnectionToggle.disabled = state.hubSetupBusy;
       if (hubSetupProfile) {
         hubSetupProfile.readOnly = state.hubSetupBusy;
@@ -1506,6 +1515,9 @@
       }
       if (hubSetupEmoji) {
         hubSetupEmoji.value = state.hubSetup.profile.emoji || "";
+        if (hubSetupEmojiPicker && typeof hubSetupEmojiPicker.sync === "function") {
+          hubSetupEmojiPicker.sync();
+        }
       }
       if (hubSetupProfile) {
         hubSetupProfile.value = state.hubSetup.profile.profileText || "";
