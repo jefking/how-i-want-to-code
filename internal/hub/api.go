@@ -706,18 +706,30 @@ func extractInboundOpenClawMessage(root map[string]any) PulledOpenClawMessage {
 			stringAtPath(root, "delivery", "deliveryId"),
 		),
 		MessageID: firstNonEmpty(
+			stringAt(result, "client_msg_id"),
+			stringAt(result, "clientMsgId"),
 			stringAt(result, "message_id"),
 			stringAt(result, "messageId"),
+			stringAt(root, "client_msg_id"),
+			stringAt(root, "clientMsgId"),
 			stringAt(root, "message_id"),
 			stringAt(root, "messageId"),
-			stringAtPath(result, "openclaw_message", "message_id"),
-			stringAtPath(result, "openclaw_message", "messageId"),
+			stringAtPath(result, "delivery", "client_msg_id"),
+			stringAtPath(result, "delivery", "clientMsgId"),
 			stringAtPath(result, "delivery", "message_id"),
 			stringAtPath(result, "delivery", "messageId"),
+			stringAtPath(root, "delivery", "client_msg_id"),
+			stringAtPath(root, "delivery", "clientMsgId"),
 			stringAtPath(root, "delivery", "message_id"),
 			stringAtPath(root, "delivery", "messageId"),
+			stringAtPath(result, "openclaw_message", "client_msg_id"),
+			stringAtPath(result, "openclaw_message", "clientMsgId"),
+			stringAtPath(result, "openclaw_message", "message_id"),
+			stringAtPath(result, "openclaw_message", "messageId"),
+			stringAt(message, "client_msg_id"),
+			stringAt(message, "clientMsgId"),
 			stringAt(message, "message_id"),
-			stringAt(message, "id"),
+			stringAt(message, "messageId"),
 		),
 		Message: message,
 	}
@@ -751,6 +763,10 @@ func enrichInboundMessageRouting(message, result, root map[string]any) map[strin
 	copyIfMissing("from_agent_uri", "from_agent_uri")
 	copyIfMissing("from_agent_uuid", "from_agent_uuid")
 	copyIfMissing("from_agent_id", "from_agent_id")
+	copyIfMissing("client_msg_id", "client_msg_id")
+	copyIfMissing("clientMsgId", "clientMsgId")
+	copyIfMissing("message_id", "message_id")
+	copyIfMissing("messageId", "messageId")
 	copyIfMissing("source_agent_uri", "from_agent_uri")
 	copyIfMissing("source_agent_uuid", "from_agent_uuid")
 	copyIfMissing("source_agent_id", "from_agent_id")
@@ -1170,11 +1186,11 @@ func buildRuntimeSkillCatalog(skillCfg SkillConfig, libraryTasks []library.TaskS
 		"mode":        "prompt",
 		"description": "Prompt-driven repository task run.",
 		"activation": buildActivation(skillCfg.Name, map[string]any{
-			"repos":      []string{"<git@github.com:owner/repo.git>"},
-			"branch":     "main",
-			"prompt":     "<describe the requested change>",
-			"reviewers":  []string{"<githubhandle>"},
-			"images":     []any{},
+			"repos":     []string{"<git@github.com:owner/repo.git>"},
+			"branch":    "main",
+			"prompt":    "<describe the requested change>",
+			"reviewers": []string{"<githubhandle>"},
+			"images":    []any{},
 		}),
 	})
 

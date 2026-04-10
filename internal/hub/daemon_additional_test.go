@@ -202,6 +202,72 @@ func TestProcessInboundMessageDuplicateDeliveryIsAckedWithoutDispatch(t *testing
 	}
 }
 
+func TestProcessInboundMessageDoesNotDedupeDistinctClientMsgIDWithSharedEnvelopeID(t *testing.T) {
+	t.Parallel()
+
+	d := NewDaemon(failingRunner{err: errors.New("runner exploded")})
+	api := &stubMoltenHubAPI{token: "t"}
+	cfg := InitConfig{
+		Skill: SkillConfig{
+			Name:         "code_for_me",
+			DispatchType: "skill_request",
+			ResultType:   "skill_result",
+		},
+	}
+	var workers sync.WaitGroup
+	deduper := newDispatchDeduper(time.Hour)
+
+	msgA := map[string]any{
+		"type":          "skill_request",
+		"skill":         "code_for_me",
+		"id":            "sender-agent-static-id",
+		"client_msg_id": "msg-a",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "fix tests A",
+		},
+	}
+	msgB := map[string]any{
+		"type":          "skill_request",
+		"skill":         "code_for_me",
+		"id":            "sender-agent-static-id",
+		"client_msg_id": "msg-b",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "fix tests B",
+		},
+	}
+
+	d.processInboundMessage(context.Background(), api, cfg, msgA, "", "", nil, &workers, deduper)
+	d.processInboundMessage(context.Background(), api, cfg, msgB, "", "", nil, &workers, deduper)
+	workers.Wait()
+
+	api.mu.Lock()
+	defer api.mu.Unlock()
+
+	// Each failing dispatch publishes one failure result plus one follow-up task request.
+	if got, want := len(api.published), 4; got != want {
+		t.Fatalf("published payload count = %d, want %d", got, want)
+	}
+	gotRequestIDs := map[string]bool{}
+	for _, payload := range api.published {
+		requestID, _ := payload["request_id"].(string)
+		if requestID != "" {
+			gotRequestIDs[requestID] = true
+		}
+	}
+	for _, expected := range []string{
+		"msg-a",
+		"msg-a-failure-review",
+		"msg-b",
+		"msg-b-failure-review",
+	} {
+		if !gotRequestIDs[expected] {
+			t.Fatalf("missing request_id %q in published payloads: %#v", expected, gotRequestIDs)
+		}
+	}
+}
+
 func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *testing.T) {
 	t.Parallel()
 
