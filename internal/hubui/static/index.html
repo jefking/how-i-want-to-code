@@ -3648,7 +3648,7 @@
         }
       }
       select.value = nextValue;
-      if (nextValue && currentReviewers.length <= 1) {
+      if (nextValue && nextValue !== "none" && currentReviewers.length <= 1) {
         input.value = nextValue;
       }
 

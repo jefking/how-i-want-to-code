@@ -1077,6 +1077,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "const noneSelected = rawSelectedValue === \"none\";") {
 		t.Fatalf("expected index html to preserve an explicit none reviewer selection")
 	}
+	if !strings.Contains(markup, "if (nextValue && nextValue !== \"none\" && currentReviewers.length <= 1) {") {
+		t.Fatalf("expected index html to avoid copying the none reviewer sentinel into manual reviewer input")
+	}
 	if !strings.Contains(markup, `"reviewers": [`) || !strings.Contains(markup, `"octocat"`) || !strings.Contains(markup, `"hubot"`) {
 		t.Fatalf("expected index html JSON example to include reviewers")
 	}
