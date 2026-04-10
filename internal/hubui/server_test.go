@@ -165,6 +165,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `href="/static/style.css"`) {
 		t.Fatalf("expected index html to include external stylesheet link")
 	}
+	if !strings.Contains(markup, `src="/static/emoji-picker.js"`) {
+		t.Fatalf("expected index html to include the external emoji picker script")
+	}
 	if !strings.Contains(markup, `src="https://www.googletagmanager.com/gtag/js?id=G-BY33RFG2WB"`) {
 		t.Fatalf("expected index html to load the google analytics tag script")
 	}
@@ -225,6 +228,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="hub-setup-form"`) {
 		t.Fatalf("expected index html to include hub setup form")
 	}
+	if !strings.Contains(markup, `id="hub-setup-emoji-picker"`) || !strings.Contains(markup, `id="hub-setup-emoji-panel"`) {
+		t.Fatalf("expected index html to include the emoji picker control shell")
+	}
 	if !strings.Contains(markup, `id="hub-setup-signin-link"`) || !strings.Contains(markup, `https://app.molten.bot/signin?target=hub`) {
 		t.Fatalf("expected index html to include molten hub sign-in shortcut inside the setup dialog")
 	}
@@ -263,6 +269,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `async function loadHubSetupStatus()`) {
 		t.Fatalf("expected index html to include hub setup status loader")
+	}
+	if !strings.Contains(markup, `const hubSetupEmojiPicker = window.MoltenEmojiPicker && hubSetupEmojiPickerRoot`) {
+		t.Fatalf("expected index html to initialize the included emoji picker")
 	}
 	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-logo prompt-mode-link-logo-divider"`) {
 		t.Fatalf("expected first dock logo link to use shared icon-link styling with divider")
@@ -306,11 +315,26 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `<span class="prompt-label">Profile</span>`) {
 		t.Fatalf("expected index html to relabel the agent summary field as Profile")
 	}
+	if !strings.Contains(markup, `id="hub-setup-profile" class="prompt-text prompt-control hub-setup-profile-input`) || !strings.Contains(markup, `rows="2"`) {
+		t.Fatalf("expected index html to render a two-line stretching profile textarea")
+	}
 	if !strings.Contains(markup, `hubSetupHandle.readOnly = profileEditor;`) {
 		t.Fatalf("expected index html to make the handle field readonly in profile edit mode")
 	}
+	if !strings.Contains(markup, `if (hubSetupForm) hubSetupForm.setAttribute("aria-busy", state.hubSetupBusy ? "true" : "false");`) {
+		t.Fatalf("expected index html to mark the hub setup form busy while saving")
+	}
+	if !strings.Contains(markup, `if (hubSetupClose) hubSetupClose.disabled = state.hubSetupBusy;`) {
+		t.Fatalf("expected index html to lock the setup dialog close control during save")
+	}
 	if !strings.Contains(markup, `hubSetupSubmit.textContent = profileEditor ? "Save" : "Done";`) {
 		t.Fatalf("expected index html to relabel the profile editor submit button to Save")
+	}
+	if !strings.Contains(markup, `hubSetupStatus.className = kind ? `+"`hub-setup-status submit-status submit-status-inline ${kind}`"+` : "hub-setup-status submit-status submit-status-inline";`) {
+		t.Fatalf("expected index html to preserve hub setup status styling while updating tones")
+	}
+	if !strings.Contains(markup, `if (autoSubmit || isHubProfileDialogMode()) {`) || !strings.Contains(markup, `await new Promise((resolve) => window.setTimeout(resolve, 700));`) {
+		t.Fatalf("expected index html to close the profile dialog after a successful save confirmation")
 	}
 	hubSetupDisconnectIndex := strings.Index(markup, `id="hub-setup-connection-toggle"`)
 	hubSetupStatusIndex := strings.Index(markup, `id="hub-setup-status"`)
@@ -938,7 +962,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html Clear button to reset the full builder draft")
 	}
 	if !strings.Contains(markup, "builderPromptInput.addEventListener(\"input\", syncBuilderDraftClearState);") ||
-		!strings.Contains(markup, "builderTargetSubdir.addEventListener(\"input\", syncBuilderDraftClearState);") ||
+		!strings.Contains(markup, "builderTargetSubdir.addEventListener(\"input\", () => {") ||
+		!strings.Contains(markup, "libraryTargetSubdir.addEventListener(\"input\", () => {") ||
 		!strings.Contains(markup, "localPromptInput.addEventListener(\"input\", syncBuilderDraftClearState);") {
 		t.Fatalf("expected index html to update shared Clear availability as prompt fields change")
 	}
@@ -1199,6 +1224,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-close") {
 		t.Fatalf("expected stylesheet to include task close styles")
 	}
+	if !strings.Contains(css, ".hub-emoji-picker-panel") || !strings.Contains(css, ".hub-emoji-picker-grid") {
+		t.Fatalf("expected stylesheet to include emoji picker styles")
+	}
 	if !strings.Contains(css, ".panel-header,\n.task-head {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  gap: 8px;\n  padding: 13px 16px;\n  border-bottom: 1px solid var(--surface-header-border);\n  background: var(--surface-header);\n  color: var(--surface-label);") {
 		t.Fatalf("expected stylesheet to style task and output headers with theme-aware surface tokens")
 	}
@@ -1444,6 +1472,33 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 }
 
+func TestHandlerServesStaticEmojiPickerScript(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/static/emoji-picker.js", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d", resp.Code)
+	}
+	if ct := resp.Header().Get("Content-Type"); !strings.Contains(ct, "text/javascript") && !strings.Contains(ct, "application/javascript") {
+		t.Fatalf("content-type = %q", ct)
+	}
+
+	body := resp.Body.String()
+	if !strings.Contains(body, "global.MoltenEmojiPicker") {
+		t.Fatalf("expected emoji picker script to expose the picker API")
+	}
+	if !strings.Contains(body, `hub.ui.emoji.recent`) {
+		t.Fatalf("expected emoji picker script to persist recent emoji selections")
+	}
+	if !strings.Contains(body, `toggle.addEventListener("mousedown", (event) => {`) || !strings.Contains(body, `event.preventDefault();`) {
+		t.Fatalf("expected emoji picker script to preserve toggle activation while preventing input focus conflicts")
+	}
+}
+
 func TestHandlerServesStaticLogoAsset(t *testing.T) {
 	t.Parallel()
 
@@ -1505,6 +1560,23 @@ func TestIndexLibraryModeUsesDedicatedRunEndpointAndShowsLoadErrors(t *testing.T
 	}
 	if !strings.Contains(markup, `state.libraryLoadError || "No library tasks are available."`) {
 		t.Fatalf("expected index html to surface library load errors in the task list")
+	}
+	if !strings.Contains(markup, `id="library-target-subdir"`) {
+		t.Fatalf("expected index html to render a directory input in library mode")
+	}
+	if !strings.Contains(markup, `targetSubdir: String(libraryTargetSubdir.value || "").trim() || ".",`) {
+		t.Fatalf("expected index html to include targetSubdir in the library payload")
+	}
+	if !strings.Contains(markup, `libraryTargetSubdir.value = targetSubdir;`) {
+		t.Fatalf("expected index html to restore the library directory when syncing from JSON payloads")
+	}
+	if !strings.Contains(markup, `builderTargetSubdir.addEventListener("input", () => {`) ||
+		!strings.Contains(markup, `libraryTargetSubdir.value = builderTargetSubdir.value;`) {
+		t.Fatalf("expected index html to mirror prompt directory changes into library mode")
+	}
+	if !strings.Contains(markup, `libraryTargetSubdir.addEventListener("input", () => {`) ||
+		!strings.Contains(markup, `builderTargetSubdir.value = libraryTargetSubdir.value;`) {
+		t.Fatalf("expected index html to mirror library directory changes back into prompt mode")
 	}
 }
 
@@ -1717,7 +1789,7 @@ func TestHandlerLibraryRunSubmitAccepted(t *testing.T) {
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
-	payload := `{"repos":["git@github.com:acme/repo.git","git@github.com:acme/repo-two.git"],"branch":"main","libraryTaskName":"unit-test-coverage"}`
+	payload := `{"repos":["git@github.com:acme/repo.git","git@github.com:acme/repo-two.git"],"branch":"main","targetSubdir":"internal/hub","libraryTaskName":"unit-test-coverage"}`
 	resp, err := http.Post(ts.URL+"/api/library/run", "application/json", bytes.NewBufferString(payload))
 	if err != nil {
 		t.Fatalf("POST /api/library/run error = %v", err)

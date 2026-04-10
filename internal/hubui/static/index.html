@@ -55,6 +55,7 @@
     })();
   </script>
   <script src="https://cdn.tailwindcss.com" defer></script>
+  <script src="/static/emoji-picker.js" defer></script>
   <link rel="stylesheet" href="/static/style.css">
 </head>
 <body class="min-h-screen antialiased">
@@ -219,6 +220,10 @@
                   <label class="prompt-field prompt-field-base-branch">
                     <span class="prompt-label">Branch</span>
                     <input id="library-base-branch" class="prompt-control prompt-input" type="text" value="main" spellcheck="false" placeholder="main">
+                  </label>
+                  <label class="prompt-field prompt-field-target-subdir">
+                    <span class="prompt-label">Directory</span>
+                    <input id="library-target-subdir" class="prompt-control prompt-input" type="text" value="." spellcheck="false" placeholder=".">
                   </label>
                 </div>
                 <div class="prompt-field">
@@ -400,19 +405,20 @@
           </label>
           <label class="prompt-field">
             <span class="prompt-label">Emoji</span>
-            <input id="hub-setup-emoji" class="prompt-control prompt-input" type="text" spellcheck="false" placeholder="🔥" list="hub-setup-emoji-options">
-            <datalist id="hub-setup-emoji-options">
-              <option value="🔥"></option>
-              <option value="🤖"></option>
-              <option value="🛠️"></option>
-              <option value="⚡"></option>
-              <option value="🧠"></option>
-              <option value="🚀"></option>
-            </datalist>
+            <div id="hub-setup-emoji-picker" class="hub-emoji-picker" data-emoji-picker>
+              <div class="hub-emoji-picker-control">
+                <input id="hub-setup-emoji" class="prompt-control prompt-input hub-emoji-picker-input" type="text" spellcheck="false" placeholder="🔥" inputmode="text" autocomplete="off" autocorrect="off" autocapitalize="off" aria-describedby="hub-setup-emoji-help">
+                <button id="hub-setup-emoji-toggle" class="hub-emoji-picker-toggle" type="button" aria-label="Choose emoji" aria-haspopup="dialog" aria-expanded="false">
+                  <span id="hub-setup-emoji-preview" class="hub-emoji-picker-toggle-preview" aria-hidden="true">😀</span>
+                </button>
+              </div>
+              <div id="hub-setup-emoji-panel" class="hub-emoji-picker-panel hidden" role="dialog" aria-label="Choose emoji" hidden></div>
+            </div>
+            <span id="hub-setup-emoji-help" class="sr-only">Type or choose one emoji for this agent.</span>
           </label>
           <label class="prompt-field hub-setup-profile-text">
             <span class="prompt-label">Profile</span>
-            <textarea id="hub-setup-profile" class="prompt-text prompt-control min-h-[96px] w-full rounded-lg border border-hub-border p-2.5 text-[0.84rem] leading-[1.4]" rows="4" spellcheck="false" placeholder="What this runtime is for"></textarea>
+            <textarea id="hub-setup-profile" class="prompt-text prompt-control hub-setup-profile-input min-h-[96px] w-full rounded-lg border border-hub-border p-2.5 text-[0.84rem] leading-[1.4]" rows="2" spellcheck="false" placeholder="What this runtime is for"></textarea>
           </label>
         </div>
 
@@ -935,6 +941,7 @@
     const libraryRepositoryField = document.getElementById("library-repo-field");
     const libraryRepoInput = document.getElementById("library-repo-input");
     const libraryBaseBranch = document.getElementById("library-base-branch");
+    const libraryTargetSubdir = document.getElementById("library-target-subdir");
     const libraryTaskList = document.getElementById("library-task-list");
     const rightCol = document.querySelector(".right-col");
     const promptWrap = document.querySelector(".prompt-wrap");
@@ -957,6 +964,7 @@
     const hubSetupNewAgentFields = document.getElementById("hub-setup-new-agent-fields");
     const hubSetupHandle = document.getElementById("hub-setup-handle");
     const hubSetupDisplayName = document.getElementById("hub-setup-display-name");
+    const hubSetupEmojiPickerRoot = document.getElementById("hub-setup-emoji-picker");
     const hubSetupEmoji = document.getElementById("hub-setup-emoji");
     const hubSetupProfile = document.getElementById("hub-setup-profile");
     const hubSetupSigninLink = document.getElementById("hub-setup-signin-link");
@@ -995,6 +1003,9 @@
     const hoverSelect = document.getElementById("hover-select");
     let brandLogoRotationTimer = null;
     let brandLogoRotationPhase = 0;
+    const hubSetupEmojiPicker = window.MoltenEmojiPicker && hubSetupEmojiPickerRoot
+      ? window.MoltenEmojiPicker.attach(hubSetupEmojiPickerRoot)
+      : null;
 
     function applyGitHubProfileLink(profileURL) {
       if (!githubProfileLink) {
@@ -1290,12 +1301,13 @@
 
     function setHubSetupStatus(kind, text) {
       if (!hubSetupStatus) return;
-      hubSetupStatus.className = kind ? `submit-status submit-status-inline ${kind}` : "submit-status submit-status-inline";
+      hubSetupStatus.className = kind ? `hub-setup-status submit-status submit-status-inline ${kind}` : "hub-setup-status submit-status submit-status-inline";
       hubSetupStatus.textContent = String(text || "").trim();
     }
 
     function setHubSetupBusy(busy) {
       state.hubSetupBusy = Boolean(busy);
+      if (hubSetupForm) hubSetupForm.setAttribute("aria-busy", state.hubSetupBusy ? "true" : "false");
       if (hubSetupExistingToggle) hubSetupExistingToggle.disabled = state.hubSetupBusy;
       if (hubSetupNewToggle) hubSetupNewToggle.disabled = state.hubSetupBusy;
       if (hubSetupRegionNAToggle) hubSetupRegionNAToggle.disabled = state.hubSetupBusy;
@@ -1304,9 +1316,13 @@
       if (hubSetupHandle) hubSetupHandle.disabled = state.hubSetupBusy;
       if (hubSetupDisplayName) hubSetupDisplayName.disabled = state.hubSetupBusy;
       if (hubSetupEmoji) hubSetupEmoji.disabled = state.hubSetupBusy;
+      if (hubSetupEmojiPicker && typeof hubSetupEmojiPicker.setDisabled === "function") {
+        hubSetupEmojiPicker.setDisabled(state.hubSetupBusy);
+      }
       if (hubSetupConnectionToggle) hubSetupConnectionToggle.disabled = state.hubSetupBusy;
       if (hubSetupProfile) hubSetupProfile.disabled = state.hubSetupBusy;
       if (hubSetupSubmit) hubSetupSubmit.disabled = state.hubSetupBusy;
+      if (hubSetupClose) hubSetupClose.disabled = state.hubSetupBusy;
     }
 
     function hubConnectionIsLive(snapshot = state.snapshot) {
@@ -1378,6 +1394,9 @@
       }
       if (hubSetupEmoji) {
         hubSetupEmoji.value = state.hubSetup.profile.emoji || "";
+        if (hubSetupEmojiPicker && typeof hubSetupEmojiPicker.sync === "function") {
+          hubSetupEmojiPicker.sync();
+        }
       }
       if (hubSetupProfile) {
         hubSetupProfile.value = state.hubSetup.profile.profileText || "";
@@ -1539,11 +1558,13 @@
         applyHubSetupState(body?.hub);
         await loadAgentAuthStatus();
         trackAnalyticsEvent("hub_setup_succeeded", { agent_mode: payload.agent_mode, token_type: payload.token_type });
-        setHubSetupStatus("ok", state.hubSetup.message || "Molten Hub setup saved.");
+        const successMessage = state.hubSetup.message || "Molten Hub setup saved.";
+        setHubSetupStatus("ok", successMessage);
         if (hubSetupToken) {
           hubSetupToken.value = "";
         }
-        if (autoSubmit) {
+        if (autoSubmit || isHubProfileDialogMode()) {
+          await new Promise((resolve) => window.setTimeout(resolve, 700));
           setHubSetupOpen(false);
         }
       } catch (err) {
@@ -3130,6 +3151,7 @@
       return {
         repo,
         branch,
+        targetSubdir: String(libraryTargetSubdir.value || "").trim() || ".",
         libraryTaskName: libraryTaskName,
       };
     }
@@ -3158,7 +3180,9 @@
       libraryRepoInput.value = repo;
       libraryBaseBranch.value = branch;
       syncBaseBranchClearState();
-      builderTargetSubdir.value = String(payload.targetSubdir || ".").trim() || ".";
+      const targetSubdir = String(payload.targetSubdir || ".").trim() || ".";
+      builderTargetSubdir.value = targetSubdir;
+      libraryTargetSubdir.value = targetSubdir;
       builderPromptInput.value = String(payload.prompt || "").trim();
       setPromptImages(payload.images);
       syncBuilderDraftClearState();
@@ -3181,6 +3205,7 @@
 
     function resetBuilderTargetSubdir() {
       builderTargetSubdir.value = ".";
+      libraryTargetSubdir.value = ".";
       syncBuilderDraftClearState();
     }
 
@@ -4623,7 +4648,14 @@
 
     builderPromptInput.addEventListener("input", syncBuilderDraftClearState);
     builderPromptInput.addEventListener("keydown", submitBuilderPromptOnEnter);
-    builderTargetSubdir.addEventListener("input", syncBuilderDraftClearState);
+    builderTargetSubdir.addEventListener("input", () => {
+      libraryTargetSubdir.value = builderTargetSubdir.value;
+      syncBuilderDraftClearState();
+    });
+    libraryTargetSubdir.addEventListener("input", () => {
+      builderTargetSubdir.value = libraryTargetSubdir.value;
+      syncBuilderDraftClearState();
+    });
     builderPromptInput.addEventListener("paste", handlePromptImagePaste);
     builderImagePasteTarget.addEventListener("paste", handlePromptImagePaste);
     builderImagesClear.addEventListener("click", clearBuilderPromptDraft);
@@ -4840,6 +4872,7 @@
     localPromptForm.addEventListener("submit", submitLocalPrompt);
     libraryRepoInput.value = builderRepoInput.value;
     libraryBaseBranch.value = builderBaseBranch.value;
+    libraryTargetSubdir.value = builderTargetSubdir.value;
     renderRepoHistoryOptions();
     renderLibraryTaskOptions();
     renderPromptImages();
