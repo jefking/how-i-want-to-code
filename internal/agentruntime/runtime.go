@@ -203,7 +203,7 @@ func buildPiCommand(targetDir, prompt string, opts RunOptions) (execx.Command, e
 		return execx.Command{}, fmt.Errorf("agent harness %q does not support prompt images", HarnessPi)
 	}
 
-	args := []string{"--print", prompt}
+	args := []string{"--print", "--mode", "text", "--no-session", prompt}
 	return execx.Command{Dir: targetDir, Args: args}, nil
 }
 
