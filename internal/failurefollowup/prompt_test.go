@@ -131,3 +131,12 @@ func TestNonRemediableRepoAccessReasonDetectsAgentRepoRightsFailures(t *testing.
 		t.Fatalf("NonRemediableRepoAccessReason() = %q", got)
 	}
 }
+
+func TestNonRemediableRepoAccessReasonDetectsWorkflowScopeRejection(t *testing.T) {
+	t.Parallel()
+
+	err := errors.New("remote: refusing to allow an OAuth App to create or update workflow `.github/workflows/docker-release.yml` without `workflow` scope")
+	if got := NonRemediableRepoAccessReason(err); got != "refusing to allow an oauth app to create or update workflow" {
+		t.Fatalf("NonRemediableRepoAccessReason() = %q", got)
+	}
+}
