@@ -1072,17 +1072,6 @@ select.prompt-control {
   background: var(--surface-control-bg-strong);
 }
 
-.prompt-image-chip {
-  border-radius: 14px;
-  border: 1px solid var(--border);
-  background: var(--surface-glass-strong);
-  color: var(--text-soft);
-  padding: 9px 12px;
-  font-size: 0.74rem;
-  line-height: 1.35;
-  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.72);
-}
-
 .prompt-hint,
 .submit-status,
 .placeholder,
@@ -1135,6 +1124,10 @@ select.prompt-control {
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.prompt-action-paste[data-empty="false"] {
+  color: var(--text);
 }
 
 .submit-status-inline {
