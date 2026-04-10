@@ -405,8 +405,8 @@ func TestRegisterRuntimePublishesLibraryTaskMetadata(t *testing.T) {
 	if got := secondConfig["branch"]; got != "main" {
 		t.Fatalf("skill_catalog[1].activation.input.config.branch = %#v, want main", got)
 	}
-	if _, exists := secondConfig["prNumber"]; exists {
-		t.Fatalf("skill_catalog[1].activation.input.config unexpectedly includes prNumber: %#v", secondConfig["prNumber"])
+	if got := secondConfig["prNumber"]; got != float64(123) {
+		t.Fatalf("skill_catalog[1].activation.input.config.prNumber = %#v, want 123", got)
 	}
 	third, ok := skillCatalog[2].(map[string]any)
 	if !ok || third["handle"] != "library_task" {

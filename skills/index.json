@@ -33,7 +33,8 @@
           "repos": [
             "<git@github.com:owner/repo.git>"
           ],
-          "branch": "main"
+          "branch": "main",
+          "prNumber": 123
         }
       }
     }

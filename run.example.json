@@ -15,7 +15,7 @@
   //   "git@github.com:Molten-Bot/moltenhub-code.git"
   // ],
   // "libraryTaskName": "unit-test-coverage",
-  // code review example:
+  // code review example: provide either "branch" or "prNumber"
   // "prNumber": 123,
   // "review": {
   //   "prNumber": 123
