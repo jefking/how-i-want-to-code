@@ -320,6 +320,9 @@ func TestStaticStyleIncludesSharedDockIconStyles(t *testing.T) {
 	if !strings.Contains(stylesheet, `.hub-profile-button svg {`) {
 		t.Fatalf("expected stylesheet to define hub profile button icon sizing")
 	}
+	if !strings.Contains(stylesheet, ".hub-profile-button:hover,\n.hub-profile-button:focus-visible {\n  color: var(--surface-tab-active-text);\n  background: transparent;\n  box-shadow: none;\n}") {
+		t.Fatalf("expected hub profile button hover treatment to avoid background and box-shadow")
+	}
 	if !strings.Contains(stylesheet, `.hub-setup-toggle {`) {
 		t.Fatalf("expected stylesheet to include hub setup toggle styles")
 	}

@@ -875,13 +875,9 @@ body .right-col.prompt-collapsed.task-list-hidden {
 .hub-profile-button {
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-8px) scale(0.96);
   transition:
     opacity 180ms ease,
-    transform 180ms ease,
-    color 180ms ease,
-    background 180ms ease,
-    box-shadow 180ms ease;
+    color 180ms ease;
 }
 
 .hub-profile-button svg {
@@ -895,14 +891,13 @@ body .right-col.prompt-collapsed.task-list-hidden {
 .hub-dock-group[data-configured="true"]:focus-within .hub-profile-button {
   opacity: 1;
   pointer-events: auto;
-  transform: translateX(0) scale(1);
 }
 
 .hub-profile-button:hover,
 .hub-profile-button:focus-visible {
   color: var(--surface-tab-active-text);
-  background: var(--surface-tab-active-bg);
-  box-shadow: var(--surface-tab-active-shadow);
+  background: transparent;
+  box-shadow: none;
 }
 
 #moltenbot-hub-link img {
