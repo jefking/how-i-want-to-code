@@ -1319,6 +1319,7 @@ func TestHandlerIndexIncludesClaudeBrowserCodeFlow(t *testing.T) {
 		`id="agent-auth-browser-command-primary-copy"`,
 		`id="agent-auth-browser-command-secondary"`,
 		`id="agent-auth-browser-command-secondary-copy"`,
+		`id="agent-auth-configure-option"`,
 		`const useClaudeLogoLink = authHarness(state.agentAuth) === "claude" && authURL !== "" && !useClaudeCommandFlow;`,
 		`const code = claudeBrowserCodeValue();`,
 		`agentAuthURL.addEventListener("click", markAgentAuthInteraction);`,
