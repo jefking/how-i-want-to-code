@@ -769,9 +769,10 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 	)
 
 	runConfig := map[string]any{
-		"repos":  repos,
-		"branch": baseBranch,
-		"prompt": failureFollowUpPrompt(taskLogRoot, dispatch, res),
+		"repos":        repos,
+		"baseBranch":   baseBranch,
+		"targetSubdir": ".",
+		"prompt":       failureFollowUpPrompt(taskLogRoot, dispatch, res),
 	}
 
 	payload := map[string]any{

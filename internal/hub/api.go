@@ -1159,10 +1159,11 @@ func buildRuntimeSkillCatalog(skillCfg SkillConfig, libraryTasks []library.TaskS
 		"mode":        "prompt",
 		"description": "Prompt-driven repository task run.",
 		"activation": buildActivation(skillCfg.Name, map[string]any{
-			"repos":  []string{"<git@github.com:owner/repo.git>"},
-			"branch": "main",
-			"prompt": "<describe the requested change>",
-			"images": []any{},
+			"repos":      []string{"<git@github.com:owner/repo.git>"},
+			"branch":     "main",
+			"prompt":     "<describe the requested change>",
+			"reviewers":  []string{"<githubhandle>"},
+			"images":     []any{},
 		}),
 	})
 
@@ -1202,6 +1203,7 @@ func buildRuntimeSkillCatalog(skillCfg SkillConfig, libraryTasks []library.TaskS
 			"repos":           []string{"<git@github.com:owner/repo.git>"},
 			"branch":          "main",
 			"libraryTaskName": "<library-handle>",
+			"reviewers":       []string{"<githubhandle>"},
 		}),
 	})
 
