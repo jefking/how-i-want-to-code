@@ -165,6 +165,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `href="/static/style.css"`) {
 		t.Fatalf("expected index html to include external stylesheet link")
 	}
+	if !strings.Contains(markup, `src="/static/emoji-picker.js"`) {
+		t.Fatalf("expected index html to include the external emoji picker script")
+	}
 	if !strings.Contains(markup, `src="https://www.googletagmanager.com/gtag/js?id=G-BY33RFG2WB"`) {
 		t.Fatalf("expected index html to load the google analytics tag script")
 	}
@@ -225,6 +228,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="hub-setup-form"`) {
 		t.Fatalf("expected index html to include hub setup form")
 	}
+	if !strings.Contains(markup, `id="hub-setup-emoji-picker"`) || !strings.Contains(markup, `id="hub-setup-emoji-panel"`) {
+		t.Fatalf("expected index html to include the emoji picker control shell")
+	}
 	if !strings.Contains(markup, `id="hub-setup-signin-link"`) || !strings.Contains(markup, `https://app.molten.bot/signin?target=hub`) {
 		t.Fatalf("expected index html to include molten hub sign-in shortcut inside the setup dialog")
 	}
@@ -263,6 +269,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `async function loadHubSetupStatus()`) {
 		t.Fatalf("expected index html to include hub setup status loader")
+	}
+	if !strings.Contains(markup, `const hubSetupEmojiPicker = window.MoltenEmojiPicker && hubSetupEmojiPickerRoot`) {
+		t.Fatalf("expected index html to initialize the included emoji picker")
 	}
 	if !strings.Contains(markup, `class="prompt-mode-link prompt-mode-link-logo prompt-mode-link-logo-divider"`) {
 		t.Fatalf("expected first dock logo link to use shared icon-link styling with divider")
@@ -1199,6 +1208,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-close") {
 		t.Fatalf("expected stylesheet to include task close styles")
 	}
+	if !strings.Contains(css, ".hub-emoji-picker-panel") || !strings.Contains(css, ".hub-emoji-picker-grid") {
+		t.Fatalf("expected stylesheet to include emoji picker styles")
+	}
 	if !strings.Contains(css, ".panel-header,\n.task-head {\n  display: flex;\n  justify-content: space-between;\n  align-items: center;\n  gap: 8px;\n  padding: 13px 16px;\n  border-bottom: 1px solid var(--surface-header-border);\n  background: var(--surface-header);\n  color: var(--surface-label);") {
 		t.Fatalf("expected stylesheet to style task and output headers with theme-aware surface tokens")
 	}
@@ -1441,6 +1453,30 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if strings.Contains(css, "cursor-not-allowed") {
 		t.Fatalf("expected stylesheet to avoid cursor utility classes")
+	}
+}
+
+func TestHandlerServesStaticEmojiPickerScript(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	req := httptest.NewRequest(http.MethodGet, "/static/emoji-picker.js", nil)
+	resp := httptest.NewRecorder()
+	srv.Handler().ServeHTTP(resp, req)
+
+	if resp.Code != http.StatusOK {
+		t.Fatalf("status = %d", resp.Code)
+	}
+	if ct := resp.Header().Get("Content-Type"); !strings.Contains(ct, "text/javascript") && !strings.Contains(ct, "application/javascript") {
+		t.Fatalf("content-type = %q", ct)
+	}
+
+	body := resp.Body.String()
+	if !strings.Contains(body, "global.MoltenEmojiPicker") {
+		t.Fatalf("expected emoji picker script to expose the picker API")
+	}
+	if !strings.Contains(body, `hub.ui.emoji.recent`) {
+		t.Fatalf("expected emoji picker script to persist recent emoji selections")
 	}
 }
 
