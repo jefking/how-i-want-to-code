@@ -336,10 +336,10 @@ func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *test
 	if runConfig == nil {
 		t.Fatalf("follow-up config missing: %#v", followUpPayload)
 	}
-	if got := runConfig["baseBranch"]; got != "main" {
+	if got := runConfig["baseBranch"]; got != "release" {
 		t.Fatalf("follow-up baseBranch = %#v", got)
 	}
-	if got := runConfig["targetSubdir"]; got != "." {
+	if got := runConfig["targetSubdir"]; got != "internal/hub" {
 		t.Fatalf("follow-up targetSubdir = %#v", got)
 	}
 	repos, _ := runConfig["repos"].([]string)
