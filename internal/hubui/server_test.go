@@ -234,6 +234,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="hub-setup-token-label"`) {
 		t.Fatalf("expected index html to include the dynamic hub setup token label")
 	}
+	if !strings.Contains(markup, `id="hub-setup-onboarding"`) || !strings.Contains(markup, `id="hub-setup-onboarding-steps"`) {
+		t.Fatalf("expected index html to include hub setup onboarding progress elements")
+	}
 	if !strings.Contains(markup, `id="hub-setup-region-na-toggle"`) || !strings.Contains(markup, `id="hub-setup-region-eu-toggle"`) {
 		t.Fatalf("expected index html to include hub setup region toggles")
 	}
@@ -254,6 +257,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `function normalizeHubSetup(raw)`) {
 		t.Fatalf("expected index html to include hub setup state normalization")
+	}
+	if !strings.Contains(markup, `function defaultHubSetupOnboarding(agentMode)`) {
+		t.Fatalf("expected index html to include default hub setup onboarding steps")
+	}
+	if !strings.Contains(markup, `function renderHubSetupOnboarding()`) {
+		t.Fatalf("expected index html to include hub setup onboarding renderer")
 	}
 	if !strings.Contains(markup, `function normalizeHubSetupDialogMode(mode)`) {
 		t.Fatalf("expected index html to include hub setup dialog mode normalization")
@@ -300,8 +309,11 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `<span class="prompt-label">Profile</span>`) {
 		t.Fatalf("expected index html to relabel the agent summary field as Profile")
 	}
-	if !strings.Contains(markup, `hubSetupHandle.readOnly = profileEditor;`) {
+	if !strings.Contains(markup, `hubSetupHandle.readOnly = profileEditor || state.hubSetupBusy;`) {
 		t.Fatalf("expected index html to make the handle field readonly in profile edit mode")
+	}
+	if !strings.Contains(markup, `hubSetupToken.readOnly = state.hubSetupBusy;`) {
+		t.Fatalf("expected index html to switch hub setup token entry to readonly while onboarding runs")
 	}
 	if !strings.Contains(markup, `hubSetupSubmit.textContent = profileEditor ? "Save" : "Done";`) {
 		t.Fatalf("expected index html to relabel the profile editor submit button to Save")
