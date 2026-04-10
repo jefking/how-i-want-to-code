@@ -1039,6 +1039,9 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		!strings.Contains(markup, "rememberReviewers(dedupeReviewerValues([...(Array.isArray(parsed?.reviewers) ? parsed.reviewers : []), parsed?.githubHandle]));") {
 		t.Fatalf("expected index html to capture reviewers in prompt payloads and persist reviewer history after submission")
 	}
+	if !strings.Contains(markup, "const keepManualSelection = manualSelected && currentReviewers.length > 0;") {
+		t.Fatalf("expected index html to preserve manual reviewer entry while the user is typing")
+	}
 	if !strings.Contains(markup, `"reviewers": [`) || !strings.Contains(markup, `"octocat"`) || !strings.Contains(markup, `"hubot"`) {
 		t.Fatalf("expected index html JSON example to include reviewers")
 	}
