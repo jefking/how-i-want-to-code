@@ -4432,12 +4432,86 @@
       render(state.snapshot);
     }
 
+    function nodeContainsTarget(node, target) {
+      if (!node || !target) {
+        return false;
+      }
+      if (target === node) {
+        return true;
+      }
+      const parent = target.nodeType === Node.TEXT_NODE ? target.parentNode : target;
+      return Boolean(parent && typeof node.contains === "function" && node.contains(parent));
+    }
+
+    function nodeContainsActiveSelection(node) {
+      if (!node || typeof document.getSelection !== "function") {
+        return false;
+      }
+      const selection = document.getSelection();
+      if (!selection || selection.isCollapsed || selection.rangeCount < 1) {
+        return false;
+      }
+      for (let i = 0; i < selection.rangeCount; i += 1) {
+        const range = selection.getRangeAt(i);
+        if (nodeContainsTarget(node, range.commonAncestorContainer)) {
+          return true;
+        }
+      }
+      return false;
+    }
+
+    function taskCollectionRenderSig(tasks, options = {}) {
+      const showOutputAction = options.showOutputAction !== false;
+      const allowCollapse = options.allowCollapse !== false;
+      return JSON.stringify({
+        selectedTaskId: state.selectedTaskId,
+        showOutputAction,
+        allowCollapse,
+        tasks: tasks.map((task) => {
+          const requestID = String(task?.request_id || "").trim();
+          return {
+            requestID,
+            selected: requestID === state.selectedTaskId,
+            collapsed: allowCollapse && isMinimizedTask(task),
+            closing: isTaskClosing(requestID),
+            sparkle: shouldSparkleTask(task),
+            status: String(task?.status || ""),
+            stage: String(task?.stage || ""),
+            prompt: taskDisplayLabel(task),
+            repos: formatTaskRepos(task),
+            branch: formatTaskBranch(task),
+            skill: String(task?.skill || ""),
+            timing: taskTimingSummary(task),
+            prURL: String(task?.pr_url || "").trim(),
+            canRerun: canRerunTask(task),
+            canCopyClone: canCopyTaskCloneCommand(task),
+            taskControlBusy: isTaskControlInFlight(requestID),
+            closePending: isTaskClosePending(requestID),
+          };
+        }),
+      });
+    }
+
     function renderTaskCollection(tasks, listNode, countNode, options = {}) {
       const showOutputAction = options.showOutputAction !== false;
       const allowCollapse = options.allowCollapse !== false;
       if (countNode) {
         countNode.textContent = String(tasks.length);
       }
+      if (!state.selectedTaskId || !tasks.some(t => t.request_id === state.selectedTaskId)) {
+        state.selectedTaskId = tasks.length ? tasks[0].request_id : "";
+      }
+      const renderSig = taskCollectionRenderSig(tasks, options);
+      if (listNode.dataset.renderSig === renderSig) {
+        listNode.dataset.pendingRenderSig = "";
+        return;
+      }
+      if (nodeContainsActiveSelection(listNode)) {
+        listNode.dataset.pendingRenderSig = renderSig;
+        return;
+      }
+      listNode.dataset.renderSig = renderSig;
+      listNode.dataset.pendingRenderSig = "";
       listNode.replaceChildren();
 
       if (!tasks.length) {
@@ -4446,10 +4520,6 @@
         empty.textContent = "No tasks started yet.";
         listNode.appendChild(empty);
         return;
-      }
-
-      if (!state.selectedTaskId || !tasks.some(t => t.request_id === state.selectedTaskId)) {
-        state.selectedTaskId = tasks[0].request_id;
       }
 
       for (const task of tasks) {
@@ -4730,6 +4800,7 @@
         headLabelNode.textContent = "Task output";
         clearTaskResult(resultNode);
         terminalNode.dataset.renderSig = "";
+        terminalNode.dataset.pendingRenderSig = "";
         terminalNode.textContent = "";
         return;
       }
@@ -4748,9 +4819,15 @@
         lastLog?.text || "",
       ].join("|");
       if (terminalNode.dataset.renderSig === renderSig) {
+        terminalNode.dataset.pendingRenderSig = "";
+        return;
+      }
+      if (nodeContainsActiveSelection(terminalNode)) {
+        terminalNode.dataset.pendingRenderSig = renderSig;
         return;
       }
       terminalNode.dataset.renderSig = renderSig;
+      terminalNode.dataset.pendingRenderSig = "";
 
       headLabelNode.textContent = `${selectedLabel} | ${selected.status || "pending"} | ${selected.stage || "-"}`;
       renderTaskResult(selected, resultNode);
@@ -4787,6 +4864,30 @@
     function renderFullscreenTerminal(snapshot) {
       const tasks = fullscreenTasks(snapshot);
       renderTerminalForTasks(tasks, taskFullscreenHeadLabel, taskFullscreenResult, taskFullscreenTerminal);
+    }
+
+    function flushDeferredSelectionRenders() {
+      if (!state.snapshot) {
+        return;
+      }
+
+      const shouldRenderTaskPanels = [taskList, taskFullscreenList].some((node) => {
+        return node &&
+          node.dataset.pendingRenderSig &&
+          !nodeContainsActiveSelection(node);
+      });
+      if (shouldRenderTaskPanels) {
+        renderTasks(state.snapshot);
+        renderFullscreenTasks(state.snapshot);
+      }
+
+      if (
+        taskFullscreenTerminal &&
+        taskFullscreenTerminal.dataset.pendingRenderSig &&
+        !nodeContainsActiveSelection(taskFullscreenTerminal)
+      ) {
+        renderFullscreenTerminal(state.snapshot);
+      }
     }
 
     function render(snapshot) {
@@ -5261,6 +5362,7 @@
         state.hubSetupDialogMode = "connect";
       }
     });
+    document.addEventListener("selectionchange", flushDeferredSelectionRenders);
 
     promptModeBuilder.addEventListener("click", (event) => {
       event.preventDefault();

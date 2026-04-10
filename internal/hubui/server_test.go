@@ -453,6 +453,18 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function fullscreenTasks(") {
 		t.Fatalf("expected index html to include full screen task list renderer")
 	}
+	if !strings.Contains(markup, "function taskCollectionRenderSig(tasks, options = {})") {
+		t.Fatalf("expected index html to compute stable task collection render signatures")
+	}
+	if !strings.Contains(markup, "if (nodeContainsActiveSelection(listNode)) {") {
+		t.Fatalf("expected index html to defer task list redraws while text is selected")
+	}
+	if !strings.Contains(markup, "terminalNode.dataset.pendingRenderSig = renderSig;") {
+		t.Fatalf("expected index html to defer task output redraws while text is selected")
+	}
+	if !strings.Contains(markup, "document.addEventListener(\"selectionchange\", flushDeferredSelectionRenders);") {
+		t.Fatalf("expected index html to flush deferred task renders after text selection clears")
+	}
 	if !strings.Contains(markup, "const taskPanel = document.getElementById(\"task-panel\");") {
 		t.Fatalf("expected index html to cache the task panel element")
 	}
