@@ -368,7 +368,7 @@ func TestFailureFollowUpPromptDefaultWhenNoPaths(t *testing.T) {
 	if !strings.Contains(got, `When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.`) {
 		t.Fatalf("prompt missing failure response instruction: %q", got)
 	}
-	if !strings.Contains(got, `"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."`) {
+	if !strings.Contains(got, `"repos":["<same_repo_as_failed_task>"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."`) {
 		t.Fatalf("prompt missing follow-up payload shape: %q", got)
 	}
 	if !strings.Contains(got, "If no file changes are required, return a clear no-op result with concrete evidence instead of forcing an empty PR.") {
@@ -557,10 +557,10 @@ func TestUnexpectedNoChangesFollowUpRunConfigPreservesTaskTargetingAndAddsContex
 
 	logRoot := filepath.Join(t.TempDir(), ".log")
 	runCfg := config.Config{
-		Repos:       []string{"git@github.com:acme/repo.git"},
-		BaseBranch:  "release/2026.04-hotfix",
+		Repos:        []string{"git@github.com:acme/repo.git"},
+		BaseBranch:   "release/2026.04-hotfix",
 		TargetSubdir: "cmd/harness",
-		Prompt:      "fix the broken local no changes task handling",
+		Prompt:       "fix the broken local no changes task handling",
 	}
 	result := harness.Result{
 		NoChanges:    true,
@@ -836,8 +836,8 @@ func TestRunHubBootDiagnosticsMentionsGitHubCLIPackageWhenPreflightFails(t *test
 
 	runner := &stubExecRunner{
 		results: map[string]stubExecResult{
-			stubCommandKey(execx.Command{Name: "git", Args: []string{"--version"}}):       {result: execx.Result{Stdout: "git version"}},
-			stubCommandKey(execx.Command{Name: "codex", Args: []string{"--help"}}):       {result: execx.Result{Stdout: "codex help"}},
+			stubCommandKey(execx.Command{Name: "git", Args: []string{"--version"}}):     {result: execx.Result{Stdout: "git version"}},
+			stubCommandKey(execx.Command{Name: "codex", Args: []string{"--help"}}):      {result: execx.Result{Stdout: "codex help"}},
 			stubCommandKey(execx.Command{Name: "gh", Args: []string{"auth", "status"}}): {result: execx.Result{Stdout: "Logged in to github.com as test\n"}},
 		},
 	}

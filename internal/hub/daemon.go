@@ -786,9 +786,6 @@ func queueFailureFollowUp(ctx context.Context, api MoltenHubAPI, cfg InitConfig,
 }
 
 func failureFollowUpRepos(res harness.Result, runCfg config.Config) []string {
-	if repo := strings.TrimSpace(config.DefaultRepositoryURL); repo != "" {
-		return []string{repo}
-	}
 	if repo := singleRepoFromResults(res.RepoResults); repo != "" {
 		return []string{repo}
 	}
@@ -804,6 +801,9 @@ func failureFollowUpRepos(res harness.Result, runCfg config.Config) []string {
 		if repo == "" {
 			continue
 		}
+		return []string{repo}
+	}
+	if repo := strings.TrimSpace(config.DefaultRepositoryURL); repo != "" {
 		return []string{repo}
 	}
 	return nil
