@@ -9,10 +9,10 @@ func TestParseSkillDispatchFromPayloadConfig(t *testing.T) {
 	t.Parallel()
 
 	msg := map[string]any{
-		"type":  "skill_request",
-		"skill": "moltenhub_code_run",
-		"id":    "req-1",
-		"from":  "agent-alpha",
+		"type":       "skill_request",
+		"skill":      "moltenhub_code_run",
+		"request_id": "req-1",
+		"from":       "agent-alpha",
 		"payload": map[string]any{
 			"config": map[string]any{
 				"repo":         "git@github.com:acme/repo.git",
@@ -48,9 +48,9 @@ func TestParseSkillDispatchFromPayloadConfigWithReposArray(t *testing.T) {
 	t.Parallel()
 
 	msg := map[string]any{
-		"type":  "skill_request",
-		"skill": "moltenhub_code_run",
-		"id":    "req-multi",
+		"type":       "skill_request",
+		"skill":      "moltenhub_code_run",
+		"request_id": "req-multi",
 		"payload": map[string]any{
 			"config": map[string]any{
 				"repos": []any{
@@ -102,9 +102,9 @@ func TestParseSkillDispatchMissingPayloadIsValidationError(t *testing.T) {
 	t.Parallel()
 
 	msg := map[string]any{
-		"type":  "skill_request",
-		"skill": "moltenhub_code_run",
-		"id":    "req-2",
+		"type":       "skill_request",
+		"skill":      "moltenhub_code_run",
+		"request_id": "req-2",
 	}
 
 	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", "moltenhub_code_run")
@@ -123,9 +123,9 @@ func TestParseSkillDispatchWrongTypeIsValidationError(t *testing.T) {
 	t.Parallel()
 
 	msg := map[string]any{
-		"type":  "not_skill_request",
-		"skill": "moltenhub_code_run",
-		"id":    "req-3",
+		"type":       "not_skill_request",
+		"skill":      "moltenhub_code_run",
+		"request_id": "req-3",
 		"config": map[string]any{
 			"repo":   "git@github.com:acme/repo.git",
 			"prompt": "x",

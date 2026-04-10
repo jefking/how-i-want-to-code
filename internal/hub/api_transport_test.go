@@ -165,6 +165,41 @@ func TestExtractInboundOpenClawMessageCopiesReplyRoutingFromTransportMessage(t *
 	}
 }
 
+func TestExtractInboundOpenClawMessageUsesClientMsgIDAndIgnoresGenericEnvelopeID(t *testing.T) {
+	t.Parallel()
+
+	root := map[string]any{
+		"result": map[string]any{
+			"delivery": map[string]any{
+				"delivery_id": "d-23",
+			},
+			"message": map[string]any{
+				"client_msg_id": "client-msg-23",
+			},
+			"openclaw_message": map[string]any{
+				"type":  "skill_request",
+				"skill": "code_for_me",
+				"id":    "sender-agent-static-id",
+				"input": map[string]any{
+					"repo":   "git@github.com:acme/repo.git",
+					"prompt": "x",
+				},
+			},
+		},
+	}
+
+	got := extractInboundOpenClawMessage(root)
+	if got.DeliveryID != "d-23" {
+		t.Fatalf("DeliveryID = %q", got.DeliveryID)
+	}
+	if got.MessageID != "client-msg-23" {
+		t.Fatalf("MessageID = %q, want client-msg-23", got.MessageID)
+	}
+	if corr := got.Message["client_msg_id"]; corr != "client-msg-23" {
+		t.Fatalf("message.client_msg_id = %#v, want client-msg-23", corr)
+	}
+}
+
 func TestPullOpenClawMessageNoContent(t *testing.T) {
 	t.Parallel()
 
@@ -300,8 +335,8 @@ func TestRegisterRuntimePublishesLibraryTaskMetadata(t *testing.T) {
 
 	type captured struct {
 		Method string
-		Path string
-		Body map[string]any
+		Path   string
+		Body   map[string]any
 	}
 	var calls []captured
 	client := NewAPIClient("http://example.test/v1")

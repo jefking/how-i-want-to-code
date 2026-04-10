@@ -200,3 +200,54 @@ func TestParseSkillDispatchAcceptsJSONStringPayload(t *testing.T) {
 		t.Fatalf("Prompt = %q, want %q", got, want)
 	}
 }
+
+func TestParseSkillDispatchUsesClientMsgIDForRequestCorrelation(t *testing.T) {
+	t.Parallel()
+
+	msg := map[string]any{
+		"type":          "skill_request",
+		"skill":         "code_for_me",
+		"id":            "sender-agent-static-id",
+		"client_msg_id": "msg-123",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "ship the fix",
+		},
+	}
+
+	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", "code_for_me")
+	if err != nil {
+		t.Fatalf("ParseSkillDispatch() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("matched = false, want true")
+	}
+	if got, want := dispatch.RequestID, "msg-123"; got != want {
+		t.Fatalf("RequestID = %q, want %q", got, want)
+	}
+}
+
+func TestParseSkillDispatchIgnoresGenericIDWithoutMessageCorrelationFields(t *testing.T) {
+	t.Parallel()
+
+	msg := map[string]any{
+		"type":  "skill_request",
+		"skill": "code_for_me",
+		"id":    "sender-agent-static-id",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "ship the fix",
+		},
+	}
+
+	dispatch, matched, err := ParseSkillDispatch(msg, "skill_request", "code_for_me")
+	if err != nil {
+		t.Fatalf("ParseSkillDispatch() error = %v", err)
+	}
+	if !matched {
+		t.Fatal("matched = false, want true")
+	}
+	if dispatch.RequestID != "" {
+		t.Fatalf("RequestID = %q, want empty", dispatch.RequestID)
+	}
+}
