@@ -922,10 +922,14 @@ body .right-col.prompt-collapsed.task-list-hidden {
   min-width: 280px;
 }
 
-.prompt-field-base-branch,
-.prompt-field-target-subdir {
+.prompt-field-base-branch {
   flex: 0 1 clamp(150px, 17%, 220px);
   max-width: clamp(180px, 18%, 220px);
+}
+
+.prompt-field-target-subdir {
+  flex: 0 1 clamp(75px, 8.5%, 110px);
+  max-width: clamp(90px, 9%, 110px);
 }
 
 .prompt-label {
