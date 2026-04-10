@@ -61,6 +61,9 @@ type defaultResourceSampler struct {
 	lastDiskTS   time.Time
 	haveCPU      bool
 	haveDisk     bool
+
+	diskSamplingConfigured bool
+	diskSamplingEnabled    bool
 }
 
 // NewAdaptiveDispatchController returns a queue-aware, adaptive dispatcher.
@@ -447,9 +450,13 @@ func (s *defaultResourceSampler) sampleLinux() (resourceSample, error) {
 	if err != nil {
 		return resourceSample{}, err
 	}
-	diskTotalBytes, err := readLinuxDiskIOBytes("/proc/diskstats")
-	if err != nil {
-		return resourceSample{}, err
+	if !s.diskSamplingConfigured {
+		s.diskSamplingEnabled = !shouldDisableLinuxDiskSampling(
+			os.Getenv("container"),
+			linuxContainerMarkerFileExists(),
+			readLinuxCGroupSnapshot("/proc/1/cgroup"),
+		)
+		s.diskSamplingConfigured = true
 	}
 
 	sample := resourceSample{
@@ -468,16 +475,24 @@ func (s *defaultResourceSampler) sampleLinux() (resourceSample, error) {
 	s.lastCPUIdle = cpuIdle
 	s.haveCPU = true
 
-	now := time.Now()
-	if s.haveDisk {
-		if elapsed := now.Sub(s.lastDiskTS).Seconds(); elapsed > 0 {
-			bytesDelta := diskTotalBytes - s.lastDiskIO
-			sample.DiskIOMBs = float64(bytesDelta) / elapsed / (1024 * 1024)
+	if s.diskSamplingEnabled {
+		diskTotalBytes, err := readLinuxDiskIOBytes("/proc/diskstats")
+		if err != nil {
+			return resourceSample{}, err
 		}
+		now := time.Now()
+		if s.haveDisk {
+			if elapsed := now.Sub(s.lastDiskTS).Seconds(); elapsed > 0 {
+				bytesDelta := diskTotalBytes - s.lastDiskIO
+				sample.DiskIOMBs = float64(bytesDelta) / elapsed / (1024 * 1024)
+			}
+		}
+		s.lastDiskIO = diskTotalBytes
+		s.lastDiskTS = now
+		s.haveDisk = true
+	} else {
+		s.haveDisk = false
 	}
-	s.lastDiskIO = diskTotalBytes
-	s.lastDiskTS = now
-	s.haveDisk = true
 
 	return sample, nil
 }
@@ -677,6 +692,54 @@ func includeLinuxDiskDevice(name string) bool {
 	}
 	if mmcWholeDiskRE.MatchString(name) {
 		return true
+	}
+	return false
+}
+
+func shouldDisableLinuxDiskSampling(containerEnv string, markerFileExists bool, cgroupSnapshot string) bool {
+	containerEnv = strings.ToLower(strings.TrimSpace(containerEnv))
+	if containerEnv != "" && containerEnv != "0" && containerEnv != "false" {
+		return true
+	}
+	if markerFileExists {
+		return true
+	}
+	return containsContainerCGroupMarker(cgroupSnapshot)
+}
+
+func linuxContainerMarkerFileExists() bool {
+	for _, path := range []string{"/.dockerenv", "/run/.containerenv"} {
+		if _, err := os.Stat(path); err == nil {
+			return true
+		}
+	}
+	return false
+}
+
+func readLinuxCGroupSnapshot(path string) string {
+	data, err := os.ReadFile(path)
+	if err != nil {
+		return ""
+	}
+	return string(data)
+}
+
+func containsContainerCGroupMarker(snapshot string) bool {
+	snapshot = strings.ToLower(snapshot)
+	if strings.TrimSpace(snapshot) == "" {
+		return false
+	}
+	for _, marker := range []string{
+		"docker",
+		"containerd",
+		"kubepods",
+		"podman",
+		"libpod",
+		"lxc",
+	} {
+		if strings.Contains(snapshot, marker) {
+			return true
+		}
 	}
 	return false
 }

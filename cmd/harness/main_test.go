@@ -408,7 +408,7 @@ func TestFailureFollowUpRunConfigUsesRequiredPayloadShapeAndLogContext(t *testin
 	}
 }
 
-func TestFailureFollowUpRunConfigPreservesExistingNonMainBranchAndNormalizesTarget(t *testing.T) {
+func TestFailureFollowUpRunConfigUsesMainBranchAndNormalizesTarget(t *testing.T) {
 	t.Parallel()
 
 	logRoot := filepath.Join(t.TempDir(), ".log")
@@ -424,8 +424,8 @@ func TestFailureFollowUpRunConfigPreservesExistingNonMainBranchAndNormalizesTarg
 	}
 
 	cfg := failureFollowUpRunConfig("local-1712345678-000001", failedResult, failedRunCfg, logRoot)
-	if cfg.BaseBranch != "moltenhub-add-slight-padding-between-prompt-and-lo" {
-		t.Fatalf("BaseBranch = %q, want preserved branch", cfg.BaseBranch)
+	if cfg.BaseBranch != "main" {
+		t.Fatalf("BaseBranch = %q, want %q", cfg.BaseBranch, "main")
 	}
 	if cfg.TargetSubdir != "." {
 		t.Fatalf("TargetSubdir = %q, want %q", cfg.TargetSubdir, ".")
