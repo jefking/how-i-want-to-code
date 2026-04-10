@@ -487,6 +487,32 @@ func TestParseRunConfigJSONExpandsLibraryTaskPayloadAndPreservesReviewConfig(t *
 	}
 }
 
+func TestParseRunConfigJSONExpandsLibraryTaskPayloadAndPreservesImages(t *testing.T) {
+	cfg, err := ParseRunConfigJSON([]byte(`{
+		"repo": "git@github.com:acme/repo.git",
+		"libraryTaskName": "unit-test-coverage",
+		"images": [
+			{
+				"name": "shot.png",
+				"mediaType": "image/png",
+				"dataBase64": "aGVsbG8="
+			}
+		]
+	}`))
+	if err != nil {
+		t.Fatalf("ParseRunConfigJSON() error = %v", err)
+	}
+	if got, want := len(cfg.Images), 1; got != want {
+		t.Fatalf("len(Images) = %d, want %d", got, want)
+	}
+	if got, want := cfg.Images[0].Name, "shot.png"; got != want {
+		t.Fatalf("Images[0].Name = %q, want %q", got, want)
+	}
+	if got := cfg.Prompt; !strings.Contains(got, "100% unit-test coverage") {
+		t.Fatalf("Prompt = %q", got)
+	}
+}
+
 func TestParseRunConfigJSONRejectsAmbiguousPromptAndLibraryTask(t *testing.T) {
 	t.Parallel()
 

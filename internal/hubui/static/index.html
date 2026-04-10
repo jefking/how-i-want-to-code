@@ -3469,6 +3469,7 @@
         branch,
         targetSubdir: String(libraryTargetSubdir.value || "").trim() || ".",
         libraryTaskName: libraryTaskName,
+        images: normalizePromptImages(state.promptImages),
       };
       const reviewers = reviewerListFromValue(libraryReviewerInput.value);
       if (reviewers.length) {

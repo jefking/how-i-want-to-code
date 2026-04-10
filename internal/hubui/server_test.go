@@ -904,6 +904,10 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `function promptImageSummary(images)`) {
 		t.Fatalf("expected index html to summarize screenshot names inline in the prompt action row")
 	}
+	if !strings.Contains(markup, `libraryTaskName: libraryTaskName,
+        images: normalizePromptImages(state.promptImages),`) {
+		t.Fatalf("expected index html to include pasted screenshots in library mode payloads")
+	}
 	if !strings.Contains(markup, `class="prompt-compose-stack"`) {
 		t.Fatalf("expected index html to wrap prompt panels and actions in a shared compose stack")
 	}
@@ -1899,7 +1903,7 @@ func TestHandlerLibraryRunSubmitAccepted(t *testing.T) {
 	ts := httptest.NewServer(srv.Handler())
 	defer ts.Close()
 
-	payload := `{"repos":["git@github.com:acme/repo.git","git@github.com:acme/repo-two.git"],"branch":"main","targetSubdir":"internal/hub","libraryTaskName":"unit-test-coverage"}`
+	payload := `{"repos":["git@github.com:acme/repo.git","git@github.com:acme/repo-two.git"],"branch":"main","targetSubdir":"internal/hub","libraryTaskName":"unit-test-coverage","images":[{"name":"shot.png","mediaType":"image/png","dataBase64":"aGVsbG8="}]}`
 	resp, err := http.Post(ts.URL+"/api/library/run", "application/json", bytes.NewBufferString(payload))
 	if err != nil {
 		t.Fatalf("POST /api/library/run error = %v", err)
