@@ -44,6 +44,9 @@ var nonRemediableRepoAccessMarkers = []string{
 	"could not read username for 'https://github.com'",
 	"doesn't have the rights to pull the code",
 	"doesn't have the rights to push a pr",
+	"refusing to allow an oauth app to create or update workflow",
+	"without workflow scope",
+	"without `workflow` scope",
 }
 
 var nonRemediableFailureMarkers = []string{
