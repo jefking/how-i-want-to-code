@@ -282,6 +282,15 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `Edit Agent Profile`) {
 		t.Fatalf("expected index html to include connected profile editor copy")
 	}
+	if !strings.Contains(markup, `<span class="prompt-label">Profile</span>`) {
+		t.Fatalf("expected index html to relabel the agent summary field as Profile")
+	}
+	if !strings.Contains(markup, `hubSetupHandle.readOnly = profileEditor;`) {
+		t.Fatalf("expected index html to make the handle field readonly in profile edit mode")
+	}
+	if !strings.Contains(markup, `hubSetupSubmit.textContent = profileEditor ? "Save" : "Done";`) {
+		t.Fatalf("expected index html to relabel the profile editor submit button to Save")
+	}
 	if !strings.Contains(markup, "function syncBrandLogoRotation()") {
 		t.Fatalf("expected index html to include brand logo rotation controller")
 	}
