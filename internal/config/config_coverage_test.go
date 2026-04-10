@@ -147,6 +147,9 @@ func TestDefaultMetadataAndStringHelpers(t *testing.T) {
 	if got := normalizeReviewerList([]string{" @OctoCat ", "octocat", "", "@hubbot"}); len(got) != 2 || got[0] != "OctoCat" || got[1] != "hubbot" {
 		t.Fatalf("normalizeReviewerList() = %#v", got)
 	}
+	if got := normalizeReviewer(" none "); got != "" {
+		t.Fatalf("normalizeReviewer(none) = %q, want empty", got)
+	}
 	if got := mergeReviewers([]string{"reviewer"}, "@octocat"); len(got) != 2 || got[0] != "octocat" {
 		t.Fatalf("mergeReviewers() = %#v", got)
 	}

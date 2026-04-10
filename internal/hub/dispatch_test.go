@@ -567,6 +567,22 @@ func TestParseRunConfigJSONSupportsGitHubHandleReviewer(t *testing.T) {
 	}
 }
 
+func TestParseRunConfigJSONTreatsNoneReviewerAsUnset(t *testing.T) {
+	t.Parallel()
+
+	cfg, err := ParseRunConfigJSON([]byte(`{
+		"repo": "git@github.com:acme/repo.git",
+		"prompt": "make a change",
+		"reviewers": ["none"]
+	}`))
+	if err != nil {
+		t.Fatalf("ParseRunConfigJSON() error = %v", err)
+	}
+	if cfg.Reviewers != nil {
+		t.Fatalf("Reviewers = %#v, want nil", cfg.Reviewers)
+	}
+}
+
 func TestParseRunConfigJSONRejectsInvalidPayload(t *testing.T) {
 	t.Parallel()
 
