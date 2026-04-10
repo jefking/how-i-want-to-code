@@ -3625,8 +3625,9 @@
         select.appendChild(option);
       }
 
+      const keepManualSelection = manualSelected && currentReviewers.length > 0;
       let nextValue = "";
-      if (!(manualSelected && currentReviewers.length !== 1)) {
+      if (!keepManualSelection) {
         if (selectedValue && unique.includes(selectedValue)) {
           nextValue = selectedValue;
         } else if (currentValue && unique.includes(currentValue)) {
