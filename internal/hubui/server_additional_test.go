@@ -844,8 +844,11 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	if !strings.Contains(css, ".submit-status-inline {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  flex: 0 1 280px;\n  min-width: 140px;\n  text-align: center;\n}") {
 		t.Fatalf("expected inline status to sit between the screenshot area and the action buttons")
 	}
-	if !strings.Contains(css, ".prompt-image-chip {\n  border-radius: 14px;\n  border: 1px solid var(--border);\n  background: var(--surface-glass-strong);") {
-		t.Fatalf("expected screenshot chips to use the shared theme-aware panel treatment")
+	if !strings.Contains(css, ".prompt-action-paste[data-empty=\"false\"] {\n  color: var(--text);\n}") {
+		t.Fatalf("expected attached screenshot summaries to switch the paste target to active text styling")
+	}
+	if strings.Contains(css, ".prompt-image-chip {") {
+		t.Fatalf("expected stacked screenshot chip styles to be removed")
 	}
 	if !strings.Contains(css, "@media (max-width: 700px) {\n  .page-bottom-dock {\n    bottom: max(12px, env(safe-area-inset-bottom));\n    max-width: calc(100vw - 24px);\n  }\n\n  .prompt-mode-tabs-dock {\n    max-width: calc(100vw - 24px);\n  }\n\n  .theme-toggle {\n    right: 12px;\n    bottom: 12px;\n    left: auto;\n  }\n\n  :root {\n    --hub-floating-bottom: max(12px, env(safe-area-inset-bottom));\n    --hub-floating-stack-height: 128px;\n    --hub-studio-dock-gap: 12px;\n  }") {
 		t.Fatalf("expected mobile layout to coordinate the bottom dock stack and theme toggle spacing")

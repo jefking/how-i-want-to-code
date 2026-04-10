@@ -754,20 +754,23 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `class="prompt-control prompt-action-paste"`) {
 		t.Fatalf("expected index html to render screenshot paste target in the action row style")
 	}
-	if !strings.Contains(markup, `id="builder-image-field" class="prompt-field grid gap-2 w-full max-w-full"`) {
-		t.Fatalf("expected index html to render screenshot field at full width")
-	}
 	if !strings.Contains(markup, ">Paste screenshots.<") {
 		t.Fatalf("expected index html to render concise screenshot paste copy")
 	}
 	if strings.Contains(markup, ">Paste screenshots here.<") {
 		t.Fatalf("expected index html to remove old screenshot paste copy")
 	}
-	if !strings.Contains(markup, `id="builder-image-list"`) {
-		t.Fatalf("expected index html to include screenshot attachment list")
+	if !strings.Contains(markup, `function promptImageSummary(images)`) {
+		t.Fatalf("expected index html to summarize screenshot names inline in the prompt action row")
 	}
-	if !strings.Contains(markup, `row.className = "prompt-image-chip";`) {
-		t.Fatalf("expected index html to render screenshot attachments with a dedicated light-theme chip class")
+	if !strings.Contains(markup, `return names.join(" | ");`) {
+		t.Fatalf("expected index html to join attached screenshot names with a pipe separator")
+	}
+	if strings.Contains(markup, `id="builder-image-list"`) {
+		t.Fatalf("expected index html to remove the stacked screenshot attachment list")
+	}
+	if strings.Contains(markup, `prompt-image-chip`) {
+		t.Fatalf("expected index html to remove stacked screenshot chip rendering")
 	}
 	if strings.Contains(markup, ">Screenshots<") {
 		t.Fatalf("expected index html to remove the screenshots title label")

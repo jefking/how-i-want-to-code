@@ -202,9 +202,6 @@
                   spellcheck="false"
                   placeholder="Describe the change you want"></textarea>
               </label>
-              <div id="builder-image-field" class="prompt-field grid gap-2 w-full max-w-full">
-                <div id="builder-image-list" class="grid gap-2"></div>
-              </div>
             </div>
 
             <div id="prompt-library-panel" class="prompt-panel hidden grid gap-2.5">
@@ -244,7 +241,6 @@
   "libraryTaskName": "unit-test-coverage"
 }'></textarea>
             </div>
-            <div id="local-prompt-hint" class="prompt-hint text-[0.74rem] leading-[1.3] text-hub-muted"></div>
             <div class="prompt-actions">
               <div class="prompt-actions-start">
                 <div
@@ -927,7 +923,6 @@
     const builderTargetSubdir = document.getElementById("builder-target-subdir");
     const builderPromptInput = document.getElementById("builder-prompt-input");
     const builderImagePasteTarget = document.getElementById("builder-image-paste-target");
-    const builderImageList = document.getElementById("builder-image-list");
     const builderImagesClear = document.getElementById("builder-images-clear");
     const libraryRepoSelect = document.getElementById("library-repo-select");
     const libraryRepoHistoryField = document.getElementById("library-repo-history-field");
@@ -2695,23 +2690,25 @@
       return `screenshot-${index + 1}.png`;
     }
 
-    function renderPromptImages() {
-      if (!builderImageList || !builderImagesClear) return;
-      builderImageList.replaceChildren();
-      const hasImages = state.promptImages.length > 0;
-      builderImageList.classList.toggle("hidden", !hasImages);
-      syncBuilderDraftClearState();
-
-      if (!hasImages) {
-        return;
+    function promptImageSummary(images) {
+      const names = (images || [])
+        .map((image, index) => promptImageName(image, index))
+        .filter((name) => name !== "");
+      if (!names.length) {
+        return "Paste screenshots.";
       }
+      return names.join(" | ");
+    }
 
-      state.promptImages.forEach((image, index) => {
-        const row = document.createElement("div");
-        row.className = "prompt-image-chip";
-        row.textContent = `${promptImageName(image, index)} (${String(image.mediaType || "image/png").trim() || "image/png"})`;
-        builderImageList.appendChild(row);
-      });
+    function renderPromptImages() {
+      if (!builderImagePasteTarget || !builderImagesClear) return;
+      const summary = promptImageSummary(state.promptImages);
+      const hasImages = state.promptImages.length > 0;
+      builderImagePasteTarget.textContent = summary;
+      builderImagePasteTarget.title = hasImages ? summary : "Paste screenshots.";
+      builderImagePasteTarget.setAttribute("aria-label", hasImages ? `Attached screenshots: ${summary}` : "Paste screenshots.");
+      builderImagePasteTarget.dataset.empty = hasImages ? "false" : "true";
+      syncBuilderDraftClearState();
     }
 
     function setPromptImages(images) {
