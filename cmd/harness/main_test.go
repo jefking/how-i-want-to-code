@@ -408,7 +408,7 @@ func TestFailureFollowUpRunConfigUsesRequiredPayloadShapeAndLogContext(t *testin
 	}
 }
 
-func TestFailureFollowUpRunConfigUsesMainBranchAndNormalizesTarget(t *testing.T) {
+func TestFailureFollowUpRunConfigPreservesNonMainBranchAndTarget(t *testing.T) {
 	t.Parallel()
 
 	logRoot := filepath.Join(t.TempDir(), ".log")
@@ -424,11 +424,11 @@ func TestFailureFollowUpRunConfigUsesMainBranchAndNormalizesTarget(t *testing.T)
 	}
 
 	cfg := failureFollowUpRunConfig("local-1712345678-000001", failedResult, failedRunCfg, logRoot)
-	if cfg.BaseBranch != "main" {
-		t.Fatalf("BaseBranch = %q, want %q", cfg.BaseBranch, "main")
+	if cfg.BaseBranch != "moltenhub-add-slight-padding-between-prompt-and-lo" {
+		t.Fatalf("BaseBranch = %q, want %q", cfg.BaseBranch, "moltenhub-add-slight-padding-between-prompt-and-lo")
 	}
-	if cfg.TargetSubdir != "." {
-		t.Fatalf("TargetSubdir = %q, want %q", cfg.TargetSubdir, ".")
+	if cfg.TargetSubdir != "internal/hubui" {
+		t.Fatalf("TargetSubdir = %q, want %q", cfg.TargetSubdir, "internal/hubui")
 	}
 	for _, want := range []string{
 		"- target_subdir=internal/hubui",
