@@ -962,7 +962,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 		t.Fatalf("expected index html Clear button to reset the full builder draft")
 	}
 	if !strings.Contains(markup, "builderPromptInput.addEventListener(\"input\", syncBuilderDraftClearState);") ||
-		!strings.Contains(markup, "builderTargetSubdir.addEventListener(\"input\", syncBuilderDraftClearState);") ||
+		!strings.Contains(markup, "builderTargetSubdir.addEventListener(\"input\", () => {") ||
+		!strings.Contains(markup, "libraryTargetSubdir.addEventListener(\"input\", () => {") ||
 		!strings.Contains(markup, "localPromptInput.addEventListener(\"input\", syncBuilderDraftClearState);") {
 		t.Fatalf("expected index html to update shared Clear availability as prompt fields change")
 	}
