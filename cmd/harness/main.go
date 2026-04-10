@@ -1526,12 +1526,19 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 	activeCfg.ApplyDefaults()
 	activeCfg.BaseURL = hubSetupBaseURL(activeCfg.BaseURL, state.Region)
 
-	activeCfg.BindToken = ""
-	activeCfg.AgentToken = ""
-	if state.AgentMode == "new" {
-		activeCfg.BindToken = token
+	useSavedCredentials := token == ""
+	if useSavedCredentials {
+		if strings.TrimSpace(activeCfg.AgentToken) == "" && strings.TrimSpace(activeCfg.BindToken) == "" {
+			return state, fmt.Errorf("%s token is required", state.TokenType)
+		}
 	} else {
-		activeCfg.AgentToken = token
+		activeCfg.BindToken = ""
+		activeCfg.AgentToken = ""
+		if state.AgentMode == "new" {
+			activeCfg.BindToken = token
+		} else {
+			activeCfg.AgentToken = token
+		}
 	}
 
 	client := hub.NewAPIClient(activeCfg.BaseURL)
@@ -1545,7 +1552,13 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 		finalCfg.BaseURL = baseURL
 	}
 	finalCfg.AgentToken = resolvedToken
-	if state.AgentMode == "new" {
+	profileUpdateRequested := useSavedCredentials ||
+		state.AgentMode == "new" ||
+		strings.TrimSpace(req.Handle) != "" ||
+		strings.TrimSpace(req.Profile.Bio) != "" ||
+		strings.TrimSpace(req.Profile.DisplayName) != "" ||
+		strings.TrimSpace(req.Profile.Emoji) != ""
+	if profileUpdateRequested {
 		finalCfg.Handle = state.Handle
 		finalCfg.Profile.Bio = state.Profile.Bio
 		finalCfg.Profile.DisplayName = state.Profile.DisplayName
@@ -1553,15 +1566,15 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 		if err := client.SyncProfile(ctx, resolvedToken, finalCfg); err != nil {
 			return state, fmt.Errorf("sync hub profile: %w", err)
 		}
-	} else {
-		profile, err := client.AgentProfile(ctx, resolvedToken)
-		if err != nil {
-			return state, fmt.Errorf("load hub profile: %w", err)
-		}
-		_ = client.UpdateAgentStatus(ctx, resolvedToken, "online")
-		finalCfg.Handle = strings.TrimSpace(profile.Handle)
-		finalCfg.Profile = profile.Profile
 	}
+
+	profile, err := client.AgentProfile(ctx, resolvedToken)
+	if err != nil {
+		return state, fmt.Errorf("load hub profile: %w", err)
+	}
+	_ = client.UpdateAgentStatus(ctx, resolvedToken, "online")
+	finalCfg.Handle = strings.TrimSpace(profile.Handle)
+	finalCfg.Profile = profile.Profile
 
 	if state.AgentMode == "new" {
 		if profile, err := client.AgentProfile(ctx, resolvedToken); err == nil {
