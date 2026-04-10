@@ -329,6 +329,9 @@ func TestStaticStyleIncludesSharedDockIconStyles(t *testing.T) {
 	if !strings.Contains(stylesheet, `.hub-setup-profile-grid {`) {
 		t.Fatalf("expected stylesheet to include hub setup profile grid styles")
 	}
+	if !strings.Contains(stylesheet, `grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto;`) {
+		t.Fatalf("expected profile grid to reserve a compact auto-width column for the emoji picker")
+	}
 	if !strings.Contains(stylesheet, `.hub-setup-profile-text {`) {
 		t.Fatalf("expected stylesheet to keep the profile textarea spanning the full profile grid width")
 	}
@@ -349,6 +352,9 @@ func TestStaticStyleIncludesSharedDockIconStyles(t *testing.T) {
 	}
 	if !strings.Contains(stylesheet, `.hub-emoji-picker-toggle {`) || !strings.Contains(stylesheet, `z-index: 2;`) {
 		t.Fatalf("expected stylesheet to keep the emoji picker toggle above the text input hit area")
+	}
+	if !strings.Contains(stylesheet, `.hub-emoji-picker-input {`) || !strings.Contains(stylesheet, `width: 5.75rem;`) {
+		t.Fatalf("expected emoji picker input to stay compact and only show a single emoji selection width")
 	}
 }
 
