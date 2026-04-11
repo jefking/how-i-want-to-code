@@ -32,6 +32,7 @@ const (
 	agentVisibilityValue = "public"
 	gitHubTaskComplete   = "github task complete"
 	maxActivityEntries   = 20
+	maxPullTimeoutMs     = 30000
 )
 
 // PulledOpenClawMessage is one leased inbound message from pull transport.
@@ -389,18 +390,7 @@ func (c APIClient) PublishResult(ctx context.Context, token string, payload map[
 
 // PullOpenClawMessage claims the next OpenClaw envelope using long-poll transport.
 func (c APIClient) PullOpenClawMessage(ctx context.Context, token string, timeoutMs int) (PulledOpenClawMessage, bool, error) {
-	query := ""
-	if timeoutMs < 0 {
-		timeoutMs = 0
-	}
-	if timeoutMs > 30000 {
-		timeoutMs = 30000
-	}
-	if timeoutMs > 0 {
-		query = fmt.Sprintf("?timeout_ms=%d", timeoutMs)
-	}
-
-	status, body, err := c.doJSON(ctx, http.MethodGet, "/openclaw/messages/pull"+query, token, nil)
+	status, body, err := c.doJSON(ctx, http.MethodGet, "/openclaw/messages/pull"+openClawPullQuery(timeoutMs), token, nil)
 	if err != nil {
 		return PulledOpenClawMessage{}, false, err
 	}
@@ -423,32 +413,45 @@ func (c APIClient) PullOpenClawMessage(ctx context.Context, token string, timeou
 
 // AckOpenClawDelivery acknowledges a leased pull delivery.
 func (c APIClient) AckOpenClawDelivery(ctx context.Context, token, deliveryID string) error {
-	deliveryID = strings.TrimSpace(deliveryID)
-	if deliveryID == "" {
-		return fmt.Errorf("delivery id is required")
-	}
-	ok, trace := c.tryAny(ctx, token, []apiAttempt{
-		{Method: http.MethodPost, Path: "/openclaw/messages/ack", Body: map[string]any{"delivery_id": deliveryID}},
-	})
-	if !ok {
-		return fmt.Errorf("ack delivery failed: %s", trace)
-	}
-	return nil
+	return c.updateOpenClawDelivery(ctx, token, deliveryID, "ack", "/openclaw/messages/ack")
 }
 
 // NackOpenClawDelivery releases a leased pull delivery back to the queue.
 func (c APIClient) NackOpenClawDelivery(ctx context.Context, token, deliveryID string) error {
+	return c.updateOpenClawDelivery(ctx, token, deliveryID, "nack", "/openclaw/messages/nack")
+}
+
+func (c APIClient) updateOpenClawDelivery(ctx context.Context, token, deliveryID, action, path string) error {
+	normalizedToken, err := requireHubToken(token, action+" delivery")
+	if err != nil {
+		return err
+	}
+	token = normalizedToken
+
 	deliveryID = strings.TrimSpace(deliveryID)
 	if deliveryID == "" {
 		return fmt.Errorf("delivery id is required")
 	}
 	ok, trace := c.tryAny(ctx, token, []apiAttempt{
-		{Method: http.MethodPost, Path: "/openclaw/messages/nack", Body: map[string]any{"delivery_id": deliveryID}},
+		{Method: http.MethodPost, Path: path, Body: map[string]any{"delivery_id": deliveryID}},
 	})
 	if !ok {
-		return fmt.Errorf("nack delivery failed: %s", trace)
+		return fmt.Errorf("%s delivery failed: %s", action, trace)
 	}
 	return nil
+}
+
+func openClawPullQuery(timeoutMs int) string {
+	switch {
+	case timeoutMs < 0:
+		timeoutMs = 0
+	case timeoutMs > maxPullTimeoutMs:
+		timeoutMs = maxPullTimeoutMs
+	}
+	if timeoutMs == 0 {
+		return ""
+	}
+	return fmt.Sprintf("?timeout_ms=%d", timeoutMs)
 }
 
 // WebsocketURL builds the websocket endpoint from API base URL.

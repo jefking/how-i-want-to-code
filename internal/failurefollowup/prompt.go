@@ -115,8 +115,8 @@ func TaskLogPaths(logRoot, requestID string) []string {
 		return nil
 	}
 
-	paths := make([]string, 0, 6)
-	seen := make(map[string]struct{}, 6)
+	paths := make([]string, 0, 5)
+	seen := make(map[string]struct{}, 5)
 	appendPath := func(path string) {
 		path = strings.TrimSpace(path)
 		if path == "" {
@@ -128,13 +128,16 @@ func TaskLogPaths(logRoot, requestID string) []string {
 		seen[path] = struct{}{}
 		paths = append(paths, path)
 	}
+	appendTaskLogPaths := func(taskDir string, includeDir bool) {
+		if includeDir {
+			appendPath(taskDir)
+		}
+		appendPath(filepath.Join(taskDir, LegacyTaskLogFileName))
+		appendPath(filepath.Join(taskDir, LogFileName))
+	}
 
-	appendPath(logDir)
-	appendPath(filepath.Join(logDir, LegacyTaskLogFileName))
-	appendPath(filepath.Join(logDir, LogFileName))
-	appendPath(filepath.Join(logRoot, LogFileName))
-	appendPath(filepath.Join(logRoot, FallbackLogSubdir, LegacyTaskLogFileName))
-	appendPath(filepath.Join(logRoot, FallbackLogSubdir, LogFileName))
+	appendTaskLogPaths(logDir, true)
+	appendTaskLogPaths(filepath.Join(logRoot, FallbackLogSubdir), false)
 
 	return paths
 }

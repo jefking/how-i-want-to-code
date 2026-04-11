@@ -72,6 +72,19 @@ func TestTaskLogPathsReturnsNilWhenTaskLogDirInvalid(t *testing.T) {
 	}
 }
 
+func TestTaskLogPathsExcludesAggregateLogToAvoidSelfReferentialPrompts(t *testing.T) {
+	t.Parallel()
+
+	root := "/tmp/logs"
+	paths := TaskLogPaths(root, "local-1775613327-000024")
+	aggregate := filepath.Join(root, LogFileName)
+	for _, path := range paths {
+		if path == aggregate {
+			t.Fatalf("TaskLogPaths() should not include aggregate log path %q; got=%v", aggregate, paths)
+		}
+	}
+}
+
 func TestTaskLogDirRejectsBlankInputs(t *testing.T) {
 	t.Parallel()
 
