@@ -12,6 +12,7 @@ import (
 	"reflect"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
 	"github.com/jef/moltenhub-code/internal/config"
@@ -183,6 +184,52 @@ func TestHubPingFailureDetail(t *testing.T) {
 	err := errors.New("GET https://na.hub.molten.bot/ping returned status=503")
 	if got := hubPingFailureDetail("base message", err); !strings.Contains(got, "status=503") {
 		t.Fatalf("hubPingFailureDetail(base,err) missing status detail: %q", got)
+	}
+}
+
+func TestStartHubPingRetryLoopSignalsWhenPingRecovers(t *testing.T) {
+	t.Parallel()
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	var logs []string
+	var attempts int
+	live := startHubPingRetryLoopWithInterval(
+		ctx,
+		"https://na.hub.molten.bot/v1",
+		"https://na.hub.molten.bot/ping",
+		errors.New("GET https://na.hub.molten.bot/ping returned status=503"),
+		5*time.Millisecond,
+		func(format string, args ...any) {
+			logs = append(logs, fmt.Sprintf(format, args...))
+		},
+		func(context.Context, string) (string, error) {
+			attempts++
+			if attempts == 1 {
+				return "", errors.New("GET https://na.hub.molten.bot/ping returned status=503")
+			}
+			return "https://na.hub.molten.bot/ping status=204", nil
+		},
+	)
+
+	select {
+	case <-live:
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for hub ping retry loop to report liveness")
+	}
+
+	if attempts != 2 {
+		t.Fatalf("ping attempts = %d, want 2", attempts)
+	}
+	if len(logs) < 2 {
+		t.Fatalf("expected retry logs, got %v", logs)
+	}
+	if !strings.Contains(logs[0], `hub.connection status=retrying`) {
+		t.Fatalf("first log = %q, want retrying status", logs[0])
+	}
+	if !strings.Contains(strings.Join(logs, "\n"), `hub.connection status=reachable`) {
+		t.Fatalf("logs missing reachable status: %v", logs)
 	}
 }
 
