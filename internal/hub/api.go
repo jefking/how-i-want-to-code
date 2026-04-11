@@ -176,9 +176,11 @@ func (c *APIClient) bindTokenFlow(ctx context.Context, bindToken string) (string
 
 // SyncProfile applies handle/profile updates.
 func (c APIClient) SyncProfile(ctx context.Context, token string, cfg InitConfig) error {
-	if strings.TrimSpace(token) == "" {
-		return fmt.Errorf("profile sync requires token")
+	normalizedToken, err := requireHubToken(token, "profile sync")
+	if err != nil {
+		return err
 	}
+	token = normalizedToken
 
 	cfg.ApplyDefaults()
 	metadata, err := c.AgentMetadata(ctx, token)
@@ -191,16 +193,11 @@ func (c APIClient) SyncProfile(ctx context.Context, token string, cfg InitConfig
 
 	handle := strings.TrimSpace(cfg.Handle)
 	updateProfile := func(includeHandle bool) (bool, string) {
-		body := map[string]any{
-			"metadata": metadata,
-		}
+		handleValue := ""
 		if includeHandle && handle != "" {
-			body["handle"] = handle
+			handleValue = handle
 		}
-		return c.tryAny(ctx, token, []apiAttempt{
-			{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: body},
-			{Method: http.MethodPatch, Path: "/agents/me", Body: body},
-		})
+		return c.tryAny(ctx, token, agentProfilePatchAttempts(metadata, handleValue))
 	}
 
 	if handle == "" {
@@ -220,25 +217,6 @@ func (c APIClient) SyncProfile(ctx context.Context, token string, cfg InitConfig
 		return nil
 	}
 	return fmt.Errorf("set profile failed: %s; retry_without_handle: %s", trace, retryTrace)
-}
-
-func (c APIClient) syncProfileMetadata(ctx context.Context, token string, cfg InitConfig) error {
-	metadata, err := c.AgentMetadata(ctx, token)
-	if err != nil {
-		return fmt.Errorf("load agent metadata: %w", err)
-	}
-
-	metadata = cloneMetadataMap(metadata)
-	mergeProfileMetadata(metadata, cfg)
-
-	ok, trace := c.tryAny(ctx, token, []apiAttempt{
-		{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: map[string]any{"metadata": metadata}},
-		{Method: http.MethodPatch, Path: "/agents/me", Body: map[string]any{"metadata": metadata}},
-	})
-	if !ok {
-		return fmt.Errorf("sync profile metadata failed: %s", trace)
-	}
-	return nil
 }
 
 func mergeProfileMetadata(metadata map[string]any, cfg InitConfig) {
@@ -266,9 +244,11 @@ func mergeProfileMetadata(metadata map[string]any, cfg InitConfig) {
 
 // UpdateAgentStatus updates the hub-visible lifecycle status for this agent.
 func (c APIClient) UpdateAgentStatus(ctx context.Context, token, status string) error {
-	if strings.TrimSpace(token) == "" {
-		return fmt.Errorf("update agent status requires token")
+	normalizedToken, err := requireHubToken(token, "update agent status")
+	if err != nil {
+		return err
 	}
+	token = normalizedToken
 
 	normalizedStatus, err := normalizeAgentStatus(status)
 	if err != nil {
@@ -292,9 +272,11 @@ func (c APIClient) UpdateAgentStatus(ctx context.Context, token, status string) 
 
 // MarkOpenClawOffline marks this runtime offline for OpenClaw websocket transport.
 func (c APIClient) MarkOpenClawOffline(ctx context.Context, token, sessionKey, reason string) error {
-	if strings.TrimSpace(token) == "" {
-		return fmt.Errorf("mark openclaw offline requires token")
+	normalizedToken, err := requireHubToken(token, "mark openclaw offline")
+	if err != nil {
+		return err
 	}
+	token = normalizedToken
 
 	body := map[string]any{}
 	if strings.TrimSpace(sessionKey) != "" {
@@ -318,34 +300,22 @@ func (c APIClient) MarkOpenClawOffline(ctx context.Context, token, sessionKey, r
 
 // RecordGitHubTaskCompleteActivity appends a minimal completion entry to metadata.activities.
 func (c APIClient) RecordGitHubTaskCompleteActivity(ctx context.Context, token string) error {
-	if strings.TrimSpace(token) == "" {
-		return fmt.Errorf("record github task complete activity requires token")
-	}
-
-	metadata, err := c.AgentMetadata(ctx, token)
+	normalizedToken, err := requireHubToken(token, "record github task complete activity")
 	if err != nil {
-		return fmt.Errorf("load agent metadata: %w", err)
+		return err
 	}
-
-	metadata = cloneMetadataMap(metadata)
-	metadata["activities"] = appendActivityEntries(metadata["activities"], gitHubTaskComplete)
-
-	ok, trace := c.tryAny(ctx, token, []apiAttempt{
-		{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: map[string]any{"metadata": metadata}},
-		{Method: http.MethodPatch, Path: "/agents/me", Body: map[string]any{"metadata": metadata}},
+	return c.updateAgentMetadata(ctx, normalizedToken, "record github task complete activity failed", func(metadata map[string]any) {
+		metadata["activities"] = appendActivityEntries(metadata["activities"], gitHubTaskComplete)
 	})
-	if !ok {
-		return fmt.Errorf("record github task complete activity failed: %s", trace)
-	}
-
-	return nil
 }
 
 // AgentMetadata loads the current agent metadata for safe merge-style updates.
 func (c APIClient) AgentMetadata(ctx context.Context, token string) (map[string]any, error) {
-	if strings.TrimSpace(token) == "" {
-		return nil, fmt.Errorf("agent metadata requires token")
+	normalizedToken, err := requireHubToken(token, "agent metadata")
+	if err != nil {
+		return nil, err
 	}
+	token = normalizedToken
 
 	status, body, err := c.doJSON(ctx, http.MethodGet, "/agents/me", token, nil)
 	if err != nil {
@@ -360,9 +330,11 @@ func (c APIClient) AgentMetadata(ctx context.Context, token string) (map[string]
 
 // AgentProfile loads the current agent handle/profile for config persistence.
 func (c APIClient) AgentProfile(ctx context.Context, token string) (AgentProfile, error) {
-	if strings.TrimSpace(token) == "" {
-		return AgentProfile{}, fmt.Errorf("agent profile requires token")
+	normalizedToken, err := requireHubToken(token, "agent profile")
+	if err != nil {
+		return AgentProfile{}, err
 	}
+	token = normalizedToken
 
 	status, body, err := c.doJSON(ctx, http.MethodGet, "/agents/me", token, nil)
 	if err != nil {
@@ -377,25 +349,13 @@ func (c APIClient) AgentProfile(ctx context.Context, token string) (AgentProfile
 
 // RegisterRuntime sends plugin/runtime metadata to hub.
 func (c APIClient) RegisterRuntime(ctx context.Context, token string, cfg InitConfig, libraryTasks []library.TaskSummary) error {
-	if strings.TrimSpace(token) == "" {
-		return fmt.Errorf("register runtime requires token")
-	}
-
-	metadata, err := c.AgentMetadata(ctx, token)
+	normalizedToken, err := requireHubToken(token, "register runtime")
 	if err != nil {
-		return fmt.Errorf("load agent metadata: %w", err)
+		return err
 	}
-	metadata = cloneMetadataMap(metadata)
-	mergeRuntimeRegistrationMetadata(metadata, cfg, libraryTasks)
-
-	ok, trace := c.tryAny(ctx, token, []apiAttempt{
-		{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: map[string]any{"metadata": metadata}},
-		{Method: http.MethodPatch, Path: "/agents/me", Body: map[string]any{"metadata": metadata}},
+	return c.updateAgentMetadata(ctx, normalizedToken, "register runtime failed", func(metadata map[string]any) {
+		mergeRuntimeRegistrationMetadata(metadata, cfg, libraryTasks)
 	})
-	if !ok {
-		return fmt.Errorf("register runtime failed: %s", trace)
-	}
-	return nil
 }
 
 // PublishResult posts a skill result using OpenClaw publish transport.
@@ -592,6 +552,54 @@ func (c APIClient) tryAny(ctx context.Context, token string, attempts []apiAttem
 		traces = append(traces, fmt.Sprintf("%s %s status=%d", attempt.Method, attempt.Path, status))
 	}
 	return false, strings.Join(traces, "; ")
+}
+
+func requireHubToken(token, operation string) (string, error) {
+	normalizedToken := strings.TrimSpace(token)
+	if normalizedToken == "" {
+		return "", fmt.Errorf("%s requires token", strings.TrimSpace(operation))
+	}
+	return normalizedToken, nil
+}
+
+func agentProfilePatchAttempts(metadata map[string]any, handle string) []apiAttempt {
+	body := map[string]any{
+		"metadata": metadata,
+	}
+	if strings.TrimSpace(handle) != "" {
+		body["handle"] = strings.TrimSpace(handle)
+	}
+	return []apiAttempt{
+		{Method: http.MethodPatch, Path: "/agents/me/metadata", Body: body},
+		{Method: http.MethodPatch, Path: "/agents/me", Body: body},
+	}
+}
+
+func metadataPatchAttempts(metadata map[string]any) []apiAttempt {
+	return agentProfilePatchAttempts(metadata, "")
+}
+
+func (c APIClient) updateAgentMetadata(
+	ctx context.Context,
+	token string,
+	applyErrPrefix string,
+	mutate func(map[string]any),
+) error {
+	metadata, err := c.AgentMetadata(ctx, token)
+	if err != nil {
+		return fmt.Errorf("load agent metadata: %w", err)
+	}
+
+	metadata = cloneMetadataMap(metadata)
+	if mutate != nil {
+		mutate(metadata)
+	}
+
+	ok, trace := c.tryAny(ctx, token, metadataPatchAttempts(metadata))
+	if !ok {
+		return fmt.Errorf("%s: %s", applyErrPrefix, trace)
+	}
+	return nil
 }
 
 func (c APIClient) logf(format string, args ...any) {

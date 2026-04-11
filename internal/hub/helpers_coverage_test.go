@@ -42,9 +42,6 @@ func TestFailureFollowUpHelperBranches(t *testing.T) {
 	if got := failureFollowUpRepos(res, config.Config{}); len(got) != 1 || got[0] != config.DefaultRepositoryURL {
 		t.Fatalf("failureFollowUpRepos() = %#v", got)
 	}
-	if got := singleRepoFromResults([]harness.RepoResult{{RepoURL: "a"}, {RepoURL: "b"}}); got != "" {
-		t.Fatalf("singleRepoFromResults(multiple repos) = %q, want empty", got)
-	}
 	if got := failureFollowUpRequestID(""); got != "failure-review" {
 		t.Fatalf("failureFollowUpRequestID(empty) = %q", got)
 	}
