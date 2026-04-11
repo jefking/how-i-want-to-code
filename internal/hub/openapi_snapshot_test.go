@@ -10,6 +10,7 @@ import (
 )
 
 var requiredRuntimeIntegrationRoutes = []string{
+	"/agents/bind:",
 	"/agents/me/metadata:",
 	"/agents/me:",
 	"/messages/publish:",
@@ -40,6 +41,25 @@ func TestOpenAPISnapshotIncludesRuntimeIntegrationRoutes(t *testing.T) {
 
 	if strings.Contains(content, "/openclaw/messages/register-plugin:") {
 		t.Fatalf("%s unexpectedly contains undocumented route /openclaw/messages/register-plugin", source)
+	}
+
+	bindSection := openAPIPathBlock(content, "/v1/agents/bind")
+	if bindSection == "" {
+		t.Fatalf("%s missing expected bind route section", source)
+	}
+	if !strings.Contains(bindSection, "required: [bind_token]") {
+		t.Fatalf("%s bind route missing bind_token requirement", source)
+	}
+	if strings.Contains(bindSection, "humanAuth") {
+		t.Fatalf("%s bind route should not require human auth", source)
+	}
+
+	bindTokensSection := openAPIPathBlock(content, "/v1/agents/bind-tokens")
+	if bindTokensSection == "" {
+		t.Fatalf("%s missing expected bind-tokens route section", source)
+	}
+	if !strings.Contains(bindTokensSection, "humanAuth") {
+		t.Fatalf("%s bind-tokens route missing human auth requirement", source)
 	}
 }
 
@@ -78,4 +98,25 @@ func assertOpenAPIRoutes(t *testing.T, source, content string) {
 			t.Fatalf("%s missing required route %q", source, route)
 		}
 	}
+}
+
+func openAPIPathBlock(content, path string) string {
+	content = strings.TrimSpace(content)
+	path = strings.TrimSpace(path)
+	if content == "" || path == "" {
+		return ""
+	}
+
+	marker := "  " + path + ":"
+	start := strings.Index(content, marker)
+	if start < 0 {
+		return ""
+	}
+
+	rest := content[start+len(marker):]
+	next := strings.Index(rest, "\n  /")
+	if next < 0 {
+		return content[start:]
+	}
+	return content[start : start+len(marker)+next]
 }
