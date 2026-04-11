@@ -2382,6 +2382,37 @@ func TestRunCodexReturnsErrorWhenCodexReportsFailure(t *testing.T) {
 	}
 }
 
+func TestRunCodexReturnsErrorWhenCodexReportsStructuredTaskFailure(t *testing.T) {
+	t.Parallel()
+
+	targetDir := t.TempDir()
+	prompt := "add prompt image to /code page"
+	firstCmd := codexCommand(targetDir, prompt)
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{
+			cmd: firstCmd,
+			res: execx.Result{
+				Stderr: strings.Join([]string{
+					`"summary": "Task failed.",`,
+					`"message": "Task failed. One or more hub snapshot regions failed to refresh.",`,
+					`"error": "One or more hub snapshot regions failed to refresh.",`,
+					`"stack": "Error: One or more hub snapshot regions failed to refresh."`,
+				}, "\n"),
+			},
+		},
+	}}
+
+	h := New(fake)
+	err := h.runCodex(context.Background(), agentruntime.Default(), targetDir, prompt, codexRunOptions{}, "")
+	if err == nil {
+		t.Fatal("runCodex() error = nil, want codex reported failure error")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "codex reported failure") {
+		t.Fatalf("runCodex() error = %v, want codex reported failure marker", err)
+	}
+}
+
 func TestShouldRetryCodexWithoutSandbox(t *testing.T) {
 	t.Parallel()
 
@@ -2446,6 +2477,42 @@ func TestCodexReportedFailure(t *testing.T) {
 		Stdout: "All good. No changes needed.",
 	}); failed || detail != "" {
 		t.Fatalf("codexReportedFailure(success text) = (%v, %q), want (false, \"\")", failed, detail)
+	}
+}
+
+func TestCodexReportedFailureDetectsStructuredTaskFailurePayload(t *testing.T) {
+	t.Parallel()
+
+	res := execx.Result{
+		Stderr: strings.Join([]string{
+			`"summary": "Task failed.",`,
+			`"message": "Task failed. One or more hub snapshot regions failed to refresh.",`,
+			`"error": "One or more hub snapshot regions failed to refresh.",`,
+			`"stack": "Error: One or more hub snapshot regions failed to refresh."`,
+		}, "\n"),
+	}
+
+	failed, detail := codexReportedFailure(res)
+	if !failed {
+		t.Fatal("codexReportedFailure(structured task failure payload) = false, want true")
+	}
+	if !strings.Contains(detail, `"summary": "Task failed."`) {
+		t.Fatalf("codexReportedFailure(...) detail = %q, want task-failure summary line", detail)
+	}
+}
+
+func TestCodexReportedFailureIgnoresQuotedDispatchLogEcho(t *testing.T) {
+	t.Parallel()
+
+	res := execx.Result{
+		Stderr: strings.Join([]string{
+			`dispatch request_id=local-1775867707-000003 cmd phase=codex name=codex stream=stderr text="\"summary\": \"Task failed.\","`,
+			`dispatch request_id=local-1775867707-000003 cmd phase=codex name=codex stream=stderr text="\"error\": \"One or more hub snapshot regions failed to refresh.\","`,
+		}, "\n"),
+	}
+
+	if failed, detail := codexReportedFailure(res); failed || detail != "" {
+		t.Fatalf("codexReportedFailure(dispatch log echo) = (%v, %q), want (false, \"\")", failed, detail)
 	}
 }
 
