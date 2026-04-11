@@ -1676,11 +1676,30 @@ func shouldRetryCodexWithoutSandbox(res execx.Result, err error) bool {
 }
 
 func codexReportedFailure(res execx.Result) (bool, string) {
-	combined := strings.TrimSpace(strings.Join([]string{res.Stdout, res.Stderr}, "\n"))
-	if combined == "" {
+	if failed, detail := codexReportedFailureInOutput(res.Stdout, true); failed {
+		return true, detail
+	}
+	if failed, detail := codexReportedFailureInOutput(res.Stderr, false); failed {
+		return true, detail
+	}
+
+	// Codex occasionally emits rich diagnostics and code snippets on stderr that
+	// contain task-failure-like JSON keys. Avoid treating those noisy traces as
+	// fatal unless stderr is a compact, failure-shaped payload.
+	if strings.TrimSpace(res.Stdout) == "" {
+		if failed, detail := codexReportedCompactStructuredFailure(res.Stderr); failed {
+			return true, detail
+		}
+	}
+	return false, ""
+}
+
+func codexReportedFailureInOutput(output string, allowStructured bool) (bool, string) {
+	output = strings.TrimSpace(output)
+	if output == "" {
 		return false, ""
 	}
-	lines := splitOutputLines(combined)
+	lines := splitOutputLines(output)
 	var structuredTaskFailureLine string
 	var structuredErrorLine string
 	for _, line := range lines {
@@ -1695,17 +1714,53 @@ func codexReportedFailure(res execx.Result) (bool, string) {
 		if strings.HasPrefix(lower, "task failed") {
 			return true, trimmed
 		}
-		if structuredTaskFailureLine == "" && isStructuredTaskFailureLine(lower) {
+		if allowStructured && structuredTaskFailureLine == "" && isStructuredTaskFailureLine(lower) {
 			structuredTaskFailureLine = trimmed
 			continue
 		}
-		if structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(lower) {
+		if allowStructured && structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(lower) {
 			structuredErrorLine = trimmed
 		}
 	}
 
 	// Treat structured JSON-style failure output as fatal only when both a
 	// task-failure marker and an accompanying error/stack line are present.
+	if structuredTaskFailureLine != "" && structuredErrorLine != "" {
+		return true, structuredTaskFailureLine + " " + structuredErrorLine
+	}
+	return false, ""
+}
+
+func codexReportedCompactStructuredFailure(output string) (bool, string) {
+	output = strings.TrimSpace(output)
+	if output == "" {
+		return false, ""
+	}
+	lines := splitOutputLines(output)
+	nonEmpty := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		nonEmpty = append(nonEmpty, trimmed)
+	}
+	if len(nonEmpty) == 0 || len(nonEmpty) > 8 {
+		return false, ""
+	}
+
+	var structuredTaskFailureLine string
+	var structuredErrorLine string
+	for _, line := range nonEmpty {
+		lower := strings.ToLower(line)
+		if structuredTaskFailureLine == "" && isStructuredTaskFailureLine(lower) {
+			structuredTaskFailureLine = line
+			continue
+		}
+		if structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(lower) {
+			structuredErrorLine = line
+		}
+	}
 	if structuredTaskFailureLine != "" && structuredErrorLine != "" {
 		return true, structuredTaskFailureLine + " " + structuredErrorLine
 	}

@@ -2501,6 +2501,46 @@ func TestCodexReportedFailureDetectsStructuredTaskFailurePayload(t *testing.T) {
 	}
 }
 
+func TestCodexReportedFailureIgnoresStructuredTaskFailureInNoisyStderr(t *testing.T) {
+	t.Parallel()
+
+	res := execx.Result{
+		Stdout: "- Deferred home hero JS init to load + idle callback.",
+		Stderr: strings.Join([]string{
+			"setTimeout(loadGA, 2000);",
+			`"summary": "Task failed.",`,
+			`"message": "Task failed. One or more hub snapshot regions failed to refresh.",`,
+			`"error": "One or more hub snapshot regions failed to refresh.",`,
+			`"stack": "Error: One or more hub snapshot regions failed to refresh."`,
+			"</script> </body> </html>",
+			"window.setTimeout(() => {",
+			"setTimeout(() => {",
+			"const summary = 'Task failed.';",
+		}, "\n"),
+	}
+
+	if failed, detail := codexReportedFailure(res); failed || detail != "" {
+		t.Fatalf("codexReportedFailure(noisy stderr snippet) = (%v, %q), want (false, \"\")", failed, detail)
+	}
+}
+
+func TestCodexReportedFailureIgnoresCompactStructuredStderrWhenStdoutHasSuccess(t *testing.T) {
+	t.Parallel()
+
+	res := execx.Result{
+		Stdout: "Implemented requested changes.",
+		Stderr: strings.Join([]string{
+			`"summary": "Task failed.",`,
+			`"message": "Task failed. One or more hub snapshot regions failed to refresh.",`,
+			`"error": "One or more hub snapshot regions failed to refresh.",`,
+		}, "\n"),
+	}
+
+	if failed, detail := codexReportedFailure(res); failed || detail != "" {
+		t.Fatalf("codexReportedFailure(compact stderr + success stdout) = (%v, %q), want (false, \"\")", failed, detail)
+	}
+}
+
 func TestCodexReportedFailureIgnoresQuotedDispatchLogEcho(t *testing.T) {
 	t.Parallel()
 
