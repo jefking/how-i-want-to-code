@@ -981,24 +981,6 @@ func failureFollowUpRepos(_ harness.Result, _ config.Config) []string {
 	return nil
 }
 
-func singleRepoFromResults(results []harness.RepoResult) string {
-	var repo string
-	for _, result := range results {
-		candidate := strings.TrimSpace(result.RepoURL)
-		if candidate == "" {
-			continue
-		}
-		if repo == "" {
-			repo = candidate
-			continue
-		}
-		if repo != candidate {
-			return ""
-		}
-	}
-	return repo
-}
-
 func unexpectedNoChangesFollowUpPrompt(logPaths []string, requestID string, result harness.Result, runCfg config.Config) string {
 	const requiredPrompt = "Review the previous local task logs first. The prior run completed with no file changes and no pull request, which is unexpected for this task. Identify why the task produced no repository changes, fix the underlying issue, complete the requested work, validate locally where possible, and summarize the verified results. If the request is already satisfied, return a clear no-op result with concrete evidence."
 

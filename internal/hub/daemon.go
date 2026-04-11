@@ -781,24 +781,6 @@ func failureFollowUpRepos(_ harness.Result, _ config.Config) []string {
 	return nil
 }
 
-func singleRepoFromResults(results []harness.RepoResult) string {
-	var repo string
-	for _, result := range results {
-		candidate := strings.TrimSpace(result.RepoURL)
-		if candidate == "" {
-			continue
-		}
-		if repo == "" {
-			repo = candidate
-			continue
-		}
-		if repo != candidate {
-			return ""
-		}
-	}
-	return repo
-}
-
 func failureFollowUpPrompt(logRoot string, dispatch SkillDispatch, res harness.Result) string {
 	paths := failureLogPaths(logRoot, dispatch.RequestID, dispatch.Config, res)
 	return failurefollowup.ComposePrompt(
