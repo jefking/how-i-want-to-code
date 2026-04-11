@@ -490,11 +490,13 @@ func TestConfigureHubSetupMarksFailingOnboardingStep(t *testing.T) {
 			_, _ = w.Write([]byte(`{"agent_token":"agent_bound"}`))
 		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
 			agentProfileReads++
-			if agentProfileReads <= 2 {
+			if agentProfileReads <= 1 {
 				_, _ = w.Write([]byte(`{"metadata":{"visibility":"public"}}`))
 				return
 			}
 			http.Error(w, `{"error":"profile unavailable"}`, http.StatusBadGateway)
+		case (r.Method == http.MethodPatch || r.Method == http.MethodPost) && r.URL.Path == "/v1/agents/me/status":
+			_, _ = w.Write([]byte(`{"ok":true}`))
 		case (r.Method == http.MethodPatch || r.Method == http.MethodPost) &&
 			(r.URL.Path == "/v1/agents/me" || r.URL.Path == "/v1/agents/me/metadata"):
 			_, _ = w.Write([]byte(`{"ok":true}`))

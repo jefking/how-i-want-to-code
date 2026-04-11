@@ -616,8 +616,8 @@ func runHub(args []string) int {
 				uiServer.ConfigureAgentAuth = authGate.Configure
 			}
 		}
-		uiServer.HubSetupStatus = func(_ context.Context) (hubui.HubSetupState, error) {
-			return currentHubSetupState(cfg), nil
+		uiServer.HubSetupStatus = func(reqCtx context.Context) (hubui.HubSetupState, error) {
+			return currentHubSetupStateWithRemoteProfile(reqCtx, cfg), nil
 		}
 		uiServer.ConfigureHubSetup = func(reqCtx context.Context, req hubui.HubSetupRequest) (hubui.HubSetupState, error) {
 			return configureHubSetup(reqCtx, cfg, req, hubController.Update)
@@ -1558,6 +1558,56 @@ func currentHubSetupState(cfg hub.InitConfig) hubui.HubSetupState {
 	return state
 }
 
+func currentHubSetupStateWithRemoteProfile(ctx context.Context, cfg hub.InitConfig) hubui.HubSetupState {
+	state := currentHubSetupState(cfg)
+	if !hubSetupProfileNeedsRemoteHydration(state) {
+		return state
+	}
+
+	activeCfg, err := effectiveHubSetupConfig(cfg)
+	if err != nil {
+		return state
+	}
+	token := strings.TrimSpace(activeCfg.AgentToken)
+	if token == "" {
+		return state
+	}
+
+	client := hub.NewAPIClient(activeCfg.BaseURL)
+	remoteProfile, err := client.AgentProfile(ctx, token)
+	if err != nil {
+		return state
+	}
+
+	if strings.TrimSpace(remoteProfile.Handle) != "" {
+		state.Handle = strings.TrimSpace(remoteProfile.Handle)
+	}
+	mergedProfile := mergeProfileConfig(
+		remoteProfile.Profile,
+		hub.ProfileConfig{
+			DisplayName: strings.TrimSpace(state.Profile.DisplayName),
+			Emoji:       strings.TrimSpace(state.Profile.Emoji),
+			ProfileText: strings.TrimSpace(state.Profile.ProfileText),
+		},
+	)
+	state.Profile.DisplayName = strings.TrimSpace(mergedProfile.DisplayName)
+	state.Profile.Emoji = strings.TrimSpace(mergedProfile.Emoji)
+	state.Profile.ProfileText = strings.TrimSpace(mergedProfile.ProfileText)
+	return state
+}
+
+func hubSetupProfileNeedsRemoteHydration(state hubui.HubSetupState) bool {
+	if !state.Configured {
+		return false
+	}
+	if strings.TrimSpace(state.Handle) == "" {
+		return true
+	}
+	return strings.TrimSpace(state.Profile.DisplayName) == "" &&
+		strings.TrimSpace(state.Profile.Emoji) == "" &&
+		strings.TrimSpace(state.Profile.ProfileText) == ""
+}
+
 func effectiveHubSetupConfig(cfg hub.InitConfig) (hub.InitConfig, error) {
 	activeCfg := cfg
 	activeCfg.ApplyDefaults()
@@ -1654,12 +1704,10 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 		finalCfg.BaseURL = baseURL
 	}
 	finalCfg.AgentToken = resolvedToken
-	profileUpdateRequested := useSavedCredentials ||
-		state.AgentMode == "new" ||
-		strings.TrimSpace(req.Handle) != "" ||
-		strings.TrimSpace(req.Profile.ProfileText) != "" ||
-		strings.TrimSpace(req.Profile.DisplayName) != "" ||
-		strings.TrimSpace(req.Profile.Emoji) != ""
+	profileUpdateRequested := strings.TrimSpace(state.Handle) != strings.TrimSpace(activeCfg.Handle) ||
+		strings.TrimSpace(state.Profile.ProfileText) != strings.TrimSpace(activeCfg.Profile.ProfileText) ||
+		strings.TrimSpace(state.Profile.DisplayName) != strings.TrimSpace(activeCfg.Profile.DisplayName) ||
+		strings.TrimSpace(state.Profile.Emoji) != strings.TrimSpace(activeCfg.Profile.Emoji)
 	if profileUpdateRequested {
 		finalCfg.Handle = state.Handle
 		finalCfg.Profile.ProfileText = state.Profile.ProfileText
@@ -1684,16 +1732,16 @@ func configureHubSetup(ctx context.Context, cfg hub.InitConfig, req hubui.HubSet
 		hubSetupMarkStep(&state, "work_activate", "error", err.Error())
 		return state, fmt.Errorf("load hub profile: %w", err)
 	}
-	if normalizeHubSetupMode(state.AgentMode) == "existing" {
-		if strings.TrimSpace(profile.Handle) != "" {
-			finalCfg.Handle = strings.TrimSpace(profile.Handle)
-		}
-		finalCfg.Profile = mergeProfileConfig(profile.Profile, finalCfg.Profile)
-	} else {
+	if profileUpdateRequested {
 		if strings.TrimSpace(finalCfg.Handle) == "" {
 			finalCfg.Handle = strings.TrimSpace(profile.Handle)
 		}
 		finalCfg.Profile = mergeProfileConfig(finalCfg.Profile, profile.Profile)
+	} else {
+		if strings.TrimSpace(profile.Handle) != "" {
+			finalCfg.Handle = strings.TrimSpace(profile.Handle)
+		}
+		finalCfg.Profile = mergeProfileConfig(profile.Profile, finalCfg.Profile)
 	}
 	finalCfg.ApplyDefaults()
 

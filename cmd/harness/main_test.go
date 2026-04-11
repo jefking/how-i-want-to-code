@@ -753,6 +753,62 @@ func TestCurrentHubSetupStateUsesStoredBindTokenAsNewAgentMode(t *testing.T) {
 	}
 }
 
+func TestCurrentHubSetupStateWithRemoteProfileHydratesMissingProfileFromHub(t *testing.T) {
+	t.Parallel()
+
+	const savedToken = "z9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/agents/me" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer")); got != savedToken {
+			t.Fatalf("GET /agents/me token = %q, want %q", got, savedToken)
+		}
+		_, _ = w.Write([]byte(`{
+			"ok": true,
+			"result": {
+				"agent": {
+					"handle": "remote-agent",
+					"metadata": {
+						"profile_markdown": "# 🌊 Remote Agent\n\nOwns remote profile hydration."
+					}
+				}
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{
+		"version": "v1",
+		"base_url": %q,
+		"agent_token": %q
+	}`, server.URL+"/v1", savedToken)), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	state := currentHubSetupStateWithRemoteProfile(context.Background(), hub.InitConfig{
+		RuntimeConfigPath: configPath,
+	})
+	if got, want := state.Handle, "remote-agent"; got != want {
+		t.Fatalf("Handle = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.DisplayName, "Remote Agent"; got != want {
+		t.Fatalf("DisplayName = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.Emoji, "🌊"; got != want {
+		t.Fatalf("Emoji = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.ProfileText, "Owns remote profile hydration."; got != want {
+		t.Fatalf("ProfileText = %q, want %q", got, want)
+	}
+}
+
 func TestConfigureHubSetupNewAgentUsesBindTokenFlow(t *testing.T) {
 	t.Parallel()
 
@@ -1175,6 +1231,159 @@ func TestConfigureHubSetupExistingAgentProfileEditUsesSavedCredentials(t *testin
 	}
 	if profileGets == 0 {
 		t.Fatal("expected profile lookup after sync")
+	}
+	if got, want := state.Profile.DisplayName, "Molten Bot"; got != want {
+		t.Fatalf("DisplayName = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.Emoji, "⚙️"; got != want {
+		t.Fatalf("Emoji = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.ProfileText, "Owns hub edits"; got != want {
+		t.Fatalf("ProfileText = %q, want %q", got, want)
+	}
+}
+
+func TestConfigureHubSetupSavedCredentialsWithoutProfileChangesSkipsProfileSync(t *testing.T) {
+	t.Parallel()
+
+	const savedToken = "h9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+
+	var (
+		getCalls    int
+		syncCalls   int
+		statusCalls int
+	)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer")); got != savedToken {
+			t.Fatalf("%s %s token = %q, want %q", r.Method, r.URL.Path, got, savedToken)
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
+			getCalls++
+			_, _ = w.Write([]byte(`{"handle":"existing-agent","profile":{"display_name":"Remote Agent","emoji":"🚀","profile":"Loaded from hub"}}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/agents/me/status":
+			statusCalls++
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case (r.Method == http.MethodPost || r.Method == http.MethodPatch) &&
+			(r.URL.Path == "/v1/agents/me/metadata" || r.URL.Path == "/v1/agents/me"):
+			syncCalls++
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{"base_url":%q,"agent_token":%q}`, server.URL+"/v1", savedToken)), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	state, err := configureHubSetup(context.Background(), hub.InitConfig{
+		BaseURL:           server.URL + "/v1",
+		AgentHarness:      "codex",
+		RuntimeConfigPath: configPath,
+	}, hubui.HubSetupRequest{
+		AgentMode: "existing",
+	}, nil)
+	if err != nil {
+		t.Fatalf("configureHubSetup() error = %v", err)
+	}
+	if syncCalls != 0 {
+		t.Fatalf("profile sync calls = %d, want 0 when no profile changes were requested", syncCalls)
+	}
+	if statusCalls == 0 {
+		t.Fatal("expected online status verification call")
+	}
+	if getCalls < 2 {
+		t.Fatalf("GET /agents/me calls = %d, want at least 2", getCalls)
+	}
+	if got, want := state.Handle, "existing-agent"; got != want {
+		t.Fatalf("Handle = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.DisplayName, "Remote Agent"; got != want {
+		t.Fatalf("DisplayName = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.Emoji, "🚀"; got != want {
+		t.Fatalf("Emoji = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.ProfileText, "Loaded from hub"; got != want {
+		t.Fatalf("ProfileText = %q, want %q", got, want)
+	}
+}
+
+func TestConfigureHubSetupExistingAgentProfileEditKeepsRequestedValuesWhenReadbackStale(t *testing.T) {
+	t.Parallel()
+
+	const savedToken = "i9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+
+	var syncCalls int
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer")); got != savedToken {
+			t.Fatalf("%s %s token = %q, want %q", r.Method, r.URL.Path, got, savedToken)
+		}
+		switch {
+		case r.Method == http.MethodGet && r.URL.Path == "/v1/agents/me":
+			// Simulate eventual consistency: readback remains stale immediately after PATCH.
+			_, _ = w.Write([]byte(`{"handle":"existing-agent","profile":{"display_name":"Old Name","emoji":"🤖","profile":"Old bio"}}`))
+		case (r.Method == http.MethodPost || r.Method == http.MethodPatch) &&
+			(r.URL.Path == "/v1/agents/me/metadata" || r.URL.Path == "/v1/agents/me"):
+			bodyBytes, _ := io.ReadAll(r.Body)
+			body := string(bodyBytes)
+			if !strings.Contains(body, `"display_name":"Molten Bot"`) {
+				t.Fatalf("profile sync missing updated display_name: %s", body)
+			}
+			if !strings.Contains(body, `"emoji":"⚙️"`) {
+				t.Fatalf("profile sync missing updated emoji: %s", body)
+			}
+			if !strings.Contains(body, `"profile":"Owns hub edits"`) {
+				t.Fatalf("profile sync missing updated profile text: %s", body)
+			}
+			syncCalls++
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		case r.Method == http.MethodPatch && r.URL.Path == "/v1/agents/me/status":
+			_, _ = w.Write([]byte(`{"ok":true}`))
+		default:
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{"base_url":%q,"agent_token":%q,"handle":"existing-agent","profile":{"display_name":"Old Name","emoji":"🤖","profile":"Old bio"}}`, server.URL+"/v1", savedToken)), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	state, err := configureHubSetup(context.Background(), hub.InitConfig{
+		BaseURL:           server.URL + "/v1",
+		AgentHarness:      "codex",
+		RuntimeConfigPath: configPath,
+	}, hubui.HubSetupRequest{
+		AgentMode: "existing",
+		Handle:    "existing-agent",
+		Profile: struct {
+			ProfileText string `json:"profile"`
+			DisplayName string `json:"display_name"`
+			Emoji       string `json:"emoji"`
+		}{
+			ProfileText: "Owns hub edits",
+			DisplayName: "Molten Bot",
+			Emoji:       "⚙️",
+		},
+	}, nil)
+	if err != nil {
+		t.Fatalf("configureHubSetup() error = %v", err)
+	}
+	if syncCalls == 0 {
+		t.Fatal("expected profile sync request")
 	}
 	if got, want := state.Profile.DisplayName, "Molten Bot"; got != want {
 		t.Fatalf("DisplayName = %q, want %q", got, want)
