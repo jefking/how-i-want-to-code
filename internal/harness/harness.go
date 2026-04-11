@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"net/url"
 	"os"
 	"path/filepath"
 	"regexp"
@@ -754,12 +755,17 @@ func (h Harness) cloneRepositories(ctx context.Context, repos []repoWorkspace, b
 	if len(repos) == 0 {
 		return baseBranch, nil
 	}
+	repoURLs := make([]string, 0, len(repos))
+	for _, repo := range repos {
+		repoURLs = append(repoURLs, repo.URL)
+	}
+	repoOwnerHints := repoOwnerFallbackCandidates(repoURLs)
 
 	usedFallback := make([]bool, len(repos))
 	cloneErrors := make([]error, len(repos))
 
 	cloneOne := func(index int) {
-		fellBack, err := h.cloneRepository(ctx, repos[index], baseBranch)
+		fellBack, err := h.cloneRepository(ctx, &repos[index], baseBranch, repoOwnerHints)
 		usedFallback[index] = fellBack
 		cloneErrors[index] = err
 	}
@@ -806,23 +812,77 @@ func (h Harness) cloneRepositories(ctx context.Context, repos []repoWorkspace, b
 	return effectiveBaseBranch, nil
 }
 
-func (h Harness) cloneRepository(ctx context.Context, repo repoWorkspace, branch string) (bool, error) {
+func (h Harness) cloneRepository(ctx context.Context, repo *repoWorkspace, branch string, repoOwnerHints []string) (bool, error) {
+	if repo == nil {
+		return false, fmt.Errorf("repo workspace is required")
+	}
+
 	branch = strings.TrimSpace(branch)
 	if branch == "" {
 		branch = "main"
 	}
 
-	h.logf("stage=clone status=start repo=%s branch=%s repo_dir=%s", repo.URL, branch, repo.RelDir)
+	repoURL := repo.URL
+	requestedRepoURL := repoURL
+	h.logf("stage=clone status=start repo=%s branch=%s repo_dir=%s", repoURL, branch, repo.RelDir)
 	cloneRes, cloneErr := h.runCloneWithRetry(
 		ctx,
-		repo.URL,
+		repoURL,
 		branch,
 		repo.Dir,
 		repo.RelDir,
-		cloneRepoCommand(repo.URL, branch, repo.Dir),
+		cloneRepoCommand(repoURL, branch, repo.Dir),
 	)
+	if cloneErr != nil && isRepoNotFoundCloneError(cloneErr, cloneRes) {
+		if fallbackRepoURL, ok := repoOwnerFallbackURL(repoURL, repoOwnerHints); ok {
+			h.logf(
+				"stage=clone status=warn action=fallback_repo_owner reason=repository_not_found repo=%s fallback_repo=%s branch=%s repo_dir=%s",
+				repoURL,
+				fallbackRepoURL,
+				branch,
+				repo.RelDir,
+			)
+			if err := os.RemoveAll(repo.Dir); err != nil {
+				return false, fmt.Errorf("cleanup failed clone dir %s: %w", repo.Dir, err)
+			}
+			fallbackRes, fallbackErr := h.runCloneWithRetry(
+				ctx,
+				fallbackRepoURL,
+				branch,
+				repo.Dir,
+				repo.RelDir,
+				cloneRepoCommand(fallbackRepoURL, branch, repo.Dir),
+			)
+			if fallbackErr == nil {
+				repo.URL = fallbackRepoURL
+				repoURL = fallbackRepoURL
+				cloneRes = fallbackRes
+				cloneErr = nil
+				h.logf(
+					"stage=clone status=ok action=fallback_repo_owner repo=%s fallback_repo=%s branch=%s repo_dir=%s",
+					requestedRepoURL,
+					fallbackRepoURL,
+					branch,
+					repo.RelDir,
+				)
+			} else {
+				repo.URL = fallbackRepoURL
+				repoURL = fallbackRepoURL
+				cloneRes = fallbackRes
+				cloneErr = fallbackErr
+				h.logf(
+					"stage=clone status=warn action=fallback_repo_owner reason=fallback_failed repo=%s fallback_repo=%s branch=%s repo_dir=%s err=%q",
+					requestedRepoURL,
+					fallbackRepoURL,
+					branch,
+					repo.RelDir,
+					fallbackErr,
+				)
+			}
+		}
+	}
 	if cloneErr == nil {
-		h.logf("stage=clone status=ok repo=%s repo_dir=%s", repo.URL, repo.RelDir)
+		h.logf("stage=clone status=ok repo=%s repo_dir=%s", repoURL, repo.RelDir)
 		return false, nil
 	}
 	if !shouldFallbackCloneToDefaultBranch(branch, cloneRes, cloneErr) {
@@ -831,7 +891,7 @@ func (h Harness) cloneRepository(ctx context.Context, repo repoWorkspace, branch
 
 	h.logf(
 		"stage=clone status=warn action=fallback_default_branch reason=missing_remote_branch repo=%s branch=%s repo_dir=%s",
-		repo.URL,
+		repoURL,
 		branch,
 		repo.RelDir,
 	)
@@ -840,18 +900,18 @@ func (h Harness) cloneRepository(ctx context.Context, repo repoWorkspace, branch
 	}
 	if _, err := h.runCloneWithRetry(
 		ctx,
-		repo.URL,
+		repoURL,
 		"",
 		repo.Dir,
 		repo.RelDir,
-		cloneRepoDefaultBranchCommand(repo.URL, repo.Dir),
+		cloneRepoDefaultBranchCommand(repoURL, repo.Dir),
 	); err != nil {
 		return false, err
 	}
 
 	h.logf(
 		"stage=clone status=ok action=fallback_default_branch repo=%s repo_dir=%s resolved_branch=%s",
-		repo.URL,
+		repoURL,
 		repo.RelDir,
 		"main",
 	)
@@ -1453,6 +1513,165 @@ func isRepoNotFoundCloneError(err error, res execx.Result) bool {
 		strings.Contains(text, "repository not found") ||
 		strings.Contains(text, "does not appear to be a git repository") ||
 		strings.Contains(text, "repository does not exist")
+}
+
+var gitHubSCPLikeRepoPattern = regexp.MustCompile(`(?i)^((?:[^@:\s/]+@)?github\.com:)([^/\s]+)/([^/\s]+?)(\.git)?$`)
+
+type gitHubRepoRef struct {
+	owner        string
+	name         string
+	hasGitSuffix bool
+	scpPrefix    string
+	urlStyle     bool
+	urlValue     url.URL
+}
+
+func parseGitHubRepoRef(repoURL string) (gitHubRepoRef, bool) {
+	repoURL = strings.TrimSpace(repoURL)
+	if repoURL == "" {
+		return gitHubRepoRef{}, false
+	}
+
+	if matches := gitHubSCPLikeRepoPattern.FindStringSubmatch(repoURL); len(matches) == 5 {
+		owner := strings.TrimSpace(matches[2])
+		name := strings.TrimSpace(matches[3])
+		if owner == "" || name == "" {
+			return gitHubRepoRef{}, false
+		}
+		return gitHubRepoRef{
+			owner:        owner,
+			name:         name,
+			hasGitSuffix: strings.TrimSpace(matches[4]) != "",
+			scpPrefix:    matches[1],
+		}, true
+	}
+
+	parsed, err := url.Parse(repoURL)
+	if err != nil {
+		return gitHubRepoRef{}, false
+	}
+	if !strings.EqualFold(strings.TrimSpace(parsed.Hostname()), "github.com") {
+		return gitHubRepoRef{}, false
+	}
+	path := strings.Trim(parsed.Path, "/")
+	if path == "" {
+		return gitHubRepoRef{}, false
+	}
+	parts := strings.Split(path, "/")
+	if len(parts) < 2 {
+		return gitHubRepoRef{}, false
+	}
+	owner := strings.TrimSpace(parts[0])
+	name := strings.TrimSpace(parts[1])
+	if owner == "" || name == "" {
+		return gitHubRepoRef{}, false
+	}
+	hasGitSuffix := strings.HasSuffix(strings.ToLower(name), ".git")
+	name = strings.TrimSuffix(name, ".git")
+	if name == "" {
+		return gitHubRepoRef{}, false
+	}
+	return gitHubRepoRef{
+		owner:        owner,
+		name:         name,
+		hasGitSuffix: hasGitSuffix,
+		urlStyle:     true,
+		urlValue:     *parsed,
+	}, true
+}
+
+func (r gitHubRepoRef) withOwner(owner string) (string, bool) {
+	owner = strings.TrimSpace(owner)
+	if owner == "" || strings.EqualFold(owner, r.owner) {
+		return "", false
+	}
+	if strings.ContainsAny(owner, " \t\r\n") || strings.Contains(owner, "/") {
+		return "", false
+	}
+
+	repoName := r.name
+	if r.hasGitSuffix {
+		repoName += ".git"
+	}
+	if r.urlStyle {
+		updated := r.urlValue
+		updated.Path = "/" + owner + "/" + repoName
+		updated.RawPath = ""
+		return updated.String(), true
+	}
+	if strings.TrimSpace(r.scpPrefix) == "" {
+		return "", false
+	}
+	return r.scpPrefix + owner + "/" + repoName, true
+}
+
+func repoOwnerFallbackCandidates(repoURLs []string) []string {
+	if len(repoURLs) == 0 {
+		return nil
+	}
+
+	owners := make([]string, 0, len(repoURLs))
+	seen := make(map[string]struct{}, len(repoURLs))
+	appendOwner := func(owner string) {
+		owner = strings.TrimSpace(owner)
+		if owner == "" {
+			return
+		}
+		key := strings.ToLower(owner)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		owners = append(owners, owner)
+	}
+
+	for _, repoURL := range repoURLs {
+		ref, ok := parseGitHubRepoRef(repoURL)
+		if !ok {
+			continue
+		}
+		appendOwner(ref.owner)
+	}
+	return owners
+}
+
+func repoOwnerFallbackURL(repoURL string, ownerHints []string) (string, bool) {
+	ref, ok := parseGitHubRepoRef(repoURL)
+	if !ok {
+		return "", false
+	}
+
+	candidates := make([]string, 0, len(ownerHints)+1)
+	seen := make(map[string]struct{}, len(ownerHints)+2)
+	seen[strings.ToLower(strings.TrimSpace(ref.owner))] = struct{}{}
+	appendCandidate := func(owner string) {
+		owner = strings.TrimSpace(owner)
+		if owner == "" {
+			return
+		}
+		key := strings.ToLower(owner)
+		if _, exists := seen[key]; exists {
+			return
+		}
+		seen[key] = struct{}{}
+		candidates = append(candidates, owner)
+	}
+
+	for _, owner := range ownerHints {
+		appendCandidate(owner)
+	}
+	if defaultRef, ok := parseGitHubRepoRef(config.DefaultRepositoryURL); ok && strings.EqualFold(defaultRef.name, ref.name) {
+		appendCandidate(defaultRef.owner)
+	}
+
+	for _, owner := range candidates {
+		candidateURL, ok := ref.withOwner(owner)
+		if !ok {
+			continue
+		}
+		return candidateURL, true
+	}
+	return "", false
 }
 
 func shouldFallbackCloneToDefaultBranch(baseBranch string, res execx.Result, err error) bool {
