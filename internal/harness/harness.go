@@ -1681,17 +1681,78 @@ func codexReportedFailure(res execx.Result) (bool, string) {
 		return false, ""
 	}
 	lines := splitOutputLines(combined)
+	var structuredTaskFailureLine string
+	var structuredErrorLine string
 	for _, line := range lines {
 		trimmed := strings.TrimSpace(line)
 		if trimmed == "" {
 			continue
 		}
-		if strings.HasPrefix(strings.ToLower(trimmed), "failure:") {
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "failure:") {
 			return true, trimmed
 		}
+		if strings.HasPrefix(lower, "task failed") {
+			return true, trimmed
+		}
+		if structuredTaskFailureLine == "" && isStructuredTaskFailureLine(lower) {
+			structuredTaskFailureLine = trimmed
+			continue
+		}
+		if structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(lower) {
+			structuredErrorLine = trimmed
+		}
+	}
+
+	// Treat structured JSON-style failure output as fatal only when both a
+	// task-failure marker and an accompanying error/stack line are present.
+	if structuredTaskFailureLine != "" && structuredErrorLine != "" {
+		return true, structuredTaskFailureLine + " " + structuredErrorLine
 	}
 	return false, ""
 }
+
+func isStructuredTaskFailureLine(lower string) bool {
+	line := strings.TrimSpace(lower)
+	taskFailedMarker := "task failed"
+	if !strings.Contains(line, taskFailedMarker) {
+		return false
+	}
+
+	prefixes := []string{
+		`"summary":`,
+		`\"summary\":`,
+		`summary:`,
+		`"message":`,
+		`\"message\":`,
+		`message:`,
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
+func isStructuredFailureErrorLine(lower string) bool {
+	line := strings.TrimSpace(lower)
+	prefixes := []string{
+		`"error":`,
+		`\"error\":`,
+		`error:`,
+		`"stack":`,
+		`\"stack\":`,
+		`stack:`,
+	}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(line, prefix) {
+			return true
+		}
+	}
+	return false
+}
+
 func resolveTargetDir(repoDir, targetSubdir string) (string, error) {
 	targetDir := filepath.Join(repoDir, filepath.Clean(targetSubdir))
 	rel, err := filepath.Rel(repoDir, targetDir)
