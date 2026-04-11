@@ -21,7 +21,7 @@ func TestResolveAgentToken_UsesConfiguredAgentTokenWhenVerified(t *testing.T) {
 				return
 			}
 			w.WriteHeader(http.StatusUnauthorized)
-		case "/v1/agents/bind", "/v1/agents/bind-tokens":
+		case "/v1/agents/bind":
 			bindCalls++
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
@@ -52,9 +52,12 @@ func TestResolveAgentToken_AgentTokenUnverifiedFallsBackToConfiguredBindToken(t 
 	var bindBodies []string
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/agents/bind-tokens":
+		case "/v1/agents/bind":
 			data, _ := io.ReadAll(r.Body)
 			bindBodies = append(bindBodies, string(data))
+			if got := r.Header.Get("Authorization"); got != "" {
+				t.Fatalf("bind Authorization = %q, want empty", got)
+			}
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"agent_token":"agent_bound"}`))
@@ -84,8 +87,8 @@ func TestResolveAgentToken_AgentTokenUnverifiedFallsBackToConfiguredBindToken(t 
 	if len(bindBodies) == 0 {
 		t.Fatal("expected bind fallback attempt")
 	}
-	if !strings.Contains(bindBodies[0], "bind_valid") {
-		t.Fatalf("first bind attempt body = %q, want bind token", bindBodies[0])
+	if got := strings.TrimSpace(bindBodies[0]); got != `{"bind_token":"bind_valid"}` {
+		t.Fatalf("first bind attempt body = %q, want canonical bind_token payload", got)
 	}
 }
 
@@ -95,7 +98,7 @@ func TestResolveAgentToken_AgentTokenUnverifiedAttemptsAgentTokenAsBindCandidate
 	var bindCalls int
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/agents/bind-tokens":
+		case "/v1/agents/bind":
 			bindCalls++
 			data, _ := io.ReadAll(r.Body)
 			if strings.Contains(string(data), "agent_saved") {
@@ -140,7 +143,7 @@ func TestResolveAgentToken_AgentTokenUnverifiedReturnsOriginalTokenWhenFallbackF
 		switch r.URL.Path {
 		case "/v1/agents/me":
 			w.WriteHeader(http.StatusUnauthorized)
-		case "/v1/agents/bind", "/v1/agents/bind-tokens":
+		case "/v1/agents/bind":
 			bindCalls++
 			w.WriteHeader(http.StatusInternalServerError)
 		default:
@@ -170,7 +173,7 @@ func TestResolveAgentToken_BindFallbackAllowsUnverifiedToken(t *testing.T) {
 
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
-		case "/v1/agents/bind-tokens":
+		case "/v1/agents/bind":
 			w.Header().Set("Content-Type", "application/json")
 			w.WriteHeader(http.StatusOK)
 			_, _ = w.Write([]byte(`{"agent_token":"agent_bound"}`))
@@ -204,5 +207,35 @@ func TestResolveAgentToken_RequiresSomeCredential(t *testing.T) {
 	}
 	if !strings.Contains(err.Error(), "missing bind_token and agent_token") {
 		t.Fatalf("ResolveAgentToken() err = %q", err)
+	}
+}
+
+func TestResolveAgentToken_BindTokenFailureIncludesHubErrorDetails(t *testing.T) {
+	t.Parallel()
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path != "/v1/agents/bind" {
+			t.Fatalf("unexpected path: %s", r.URL.Path)
+		}
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusBadRequest)
+		_, _ = w.Write([]byte(`{"error":"invalid_request","message":"invalid JSON request"}`))
+	}))
+	t.Cleanup(server.Close)
+
+	client := NewAPIClient(server.URL + "/v1")
+	_, err := client.ResolveAgentToken(context.Background(), InitConfig{
+		BindToken: "bind_invalid",
+	})
+	if err == nil {
+		t.Fatal("ResolveAgentToken() error = nil, want non-nil")
+	}
+	for _, want := range []string{
+		"bind flow failed for provided bind_token",
+		"/agents/bind: hub API 400 invalid_request: invalid JSON request",
+	} {
+		if !strings.Contains(err.Error(), want) {
+			t.Fatalf("ResolveAgentToken() err = %q, want containing %q", err, want)
+		}
 	}
 }
