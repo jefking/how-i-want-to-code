@@ -47,6 +47,34 @@ func TestPullOpenClawMessageParsesResult(t *testing.T) {
 	}
 }
 
+func TestPullOpenClawMessageTimeoutRespectsOpenAPIBounds(t *testing.T) {
+	t.Parallel()
+
+	var observedQueries []string
+	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		observedQueries = append(observedQueries, r.URL.RawQuery)
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer ts.Close()
+
+	client := NewAPIClient(ts.URL + "/v1")
+	for _, timeoutMs := range []int{-1, 0, 5, 35000} {
+		if _, _, err := client.PullOpenClawMessage(context.Background(), "token", timeoutMs); err != nil {
+			t.Fatalf("PullOpenClawMessage(timeoutMs=%d) error = %v", timeoutMs, err)
+		}
+	}
+
+	want := []string{
+		"",
+		"",
+		"timeout_ms=5",
+		"timeout_ms=30000",
+	}
+	if !reflect.DeepEqual(observedQueries, want) {
+		t.Fatalf("pull timeout queries = %#v, want %#v", observedQueries, want)
+	}
+}
+
 func TestPullOpenClawMessageParsesNestedDeliveryAndPrefersOpenClawEnvelope(t *testing.T) {
 	t.Parallel()
 

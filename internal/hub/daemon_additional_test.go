@@ -432,13 +432,15 @@ func TestHandleDispatchQueuesFailureFollowUpWithTaskLogPaths(t *testing.T) {
 		expectedLogDir,
 		filepath.Join(expectedLogDir, "term"),
 		filepath.Join(expectedLogDir, "terminal.log"),
-		filepath.Join(logRoot, "terminal.log"),
 		filepath.Join(logRoot, "main", "term"),
 		filepath.Join(logRoot, "main", "terminal.log"),
 	} {
 		if !strings.Contains(prompt, path) {
 			t.Fatalf("follow-up prompt missing task log path %q: %q", path, prompt)
 		}
+	}
+	if strings.Contains(prompt, filepath.Join(logRoot, "terminal.log")) {
+		t.Fatalf("follow-up prompt should exclude aggregate terminal log path to avoid recursive reads: %q", prompt)
 	}
 	if strings.Contains(prompt, failureFollowUpNoPathGuidance) {
 		t.Fatalf("follow-up prompt should prefer concrete task log paths when available: %q", prompt)

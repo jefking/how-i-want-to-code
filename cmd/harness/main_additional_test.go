@@ -613,7 +613,6 @@ func TestUnexpectedNoChangesFollowUpRunConfigPreservesTaskTargetingAndAddsContex
 	for _, want := range []string{
 		"Review the previous local task logs first.",
 		filepath.Join(logRoot, "local", "1712345678", "000001"),
-		filepath.Join(logRoot, logFileName),
 		filepath.Join(logRoot, fallbackLogSubdir, logFileName),
 		"Observed no-change context:",
 		"- request_id=local-1712345678-000001",
@@ -627,6 +626,9 @@ func TestUnexpectedNoChangesFollowUpRunConfigPreservesTaskTargetingAndAddsContex
 		if !strings.Contains(cfg.Prompt, want) {
 			t.Fatalf("Prompt missing %q: %q", want, cfg.Prompt)
 		}
+	}
+	if strings.Contains(cfg.Prompt, filepath.Join(logRoot, logFileName)) {
+		t.Fatalf("Prompt should exclude aggregate terminal log path to avoid recursive follow-up reads: %q", cfg.Prompt)
 	}
 }
 
@@ -682,7 +684,6 @@ func TestTaskLogDirAndTaskLogPathsValidateInputs(t *testing.T) {
 		filepath.Join("/tmp/.log", "local", "1712345678", "000001"),
 		filepath.Join("/tmp/.log", "local", "1712345678", "000001", legacyTaskLogFileName),
 		filepath.Join("/tmp/.log", "local", "1712345678", "000001", logFileName),
-		filepath.Join("/tmp/.log", logFileName),
 		filepath.Join("/tmp/.log", fallbackLogSubdir, legacyTaskLogFileName),
 		filepath.Join("/tmp/.log", fallbackLogSubdir, logFileName),
 	}
