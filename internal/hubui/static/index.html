@@ -708,7 +708,7 @@
       const label = configuredAgentLabel().toLowerCase();
       if (label.includes("claude")) return AGENT_LOGO_URLS.claude;
       if (label.includes("auggie") || label.includes("augment")) return AGENT_LOGO_URLS.auggie;
-      if (label.includes("pi")) return AGENT_LOGO_URLS.pi;
+      if (/\bpi\b/.test(label)) return AGENT_LOGO_URLS.pi;
       if (label.includes("codex")) return AGENT_LOGO_URLS.codex;
       return "";
     }
@@ -720,7 +720,7 @@
       }
       if (label.includes("claude")) return AGENT_LOGO_URLS.claude;
       if (label.includes("auggie") || label.includes("augment")) return AGENT_LOGO_URLS.auggie;
-      if (label.includes("pi")) return AGENT_LOGO_URLS.pi;
+      if (/\bpi\b/.test(label)) return AGENT_LOGO_URLS.pi;
       if (label.includes("codex")) return AGENT_LOGO_URLS.codex;
       return "";
     }
