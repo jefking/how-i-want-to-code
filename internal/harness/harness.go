@@ -1714,11 +1714,11 @@ func codexReportedFailureInOutput(output string, allowStructured bool) (bool, st
 		if strings.HasPrefix(lower, "task failed") {
 			return true, trimmed
 		}
-		if allowStructured && structuredTaskFailureLine == "" && isStructuredTaskFailureLine(lower) {
+		if allowStructured && structuredTaskFailureLine == "" && isStructuredTaskFailureLine(trimmed) {
 			structuredTaskFailureLine = trimmed
 			continue
 		}
-		if allowStructured && structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(lower) {
+		if allowStructured && structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(trimmed) {
 			structuredErrorLine = trimmed
 		}
 	}
@@ -1752,12 +1752,11 @@ func codexReportedCompactStructuredFailure(output string) (bool, string) {
 	var structuredTaskFailureLine string
 	var structuredErrorLine string
 	for _, line := range nonEmpty {
-		lower := strings.ToLower(line)
-		if structuredTaskFailureLine == "" && isStructuredTaskFailureLine(lower) {
+		if structuredTaskFailureLine == "" && isStructuredTaskFailureLine(line) {
 			structuredTaskFailureLine = line
 			continue
 		}
-		if structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(lower) {
+		if structuredTaskFailureLine != "" && structuredErrorLine == "" && isStructuredFailureErrorLine(line) {
 			structuredErrorLine = line
 		}
 	}
@@ -1767,43 +1766,54 @@ func codexReportedCompactStructuredFailure(output string) (bool, string) {
 	return false, ""
 }
 
-func isStructuredTaskFailureLine(lower string) bool {
-	line := strings.TrimSpace(lower)
+func isStructuredTaskFailureLine(raw string) bool {
+	line := strings.TrimSpace(raw)
+	lower := strings.ToLower(line)
 	taskFailedMarker := "task failed"
-	if !strings.Contains(line, taskFailedMarker) {
+	if !strings.Contains(lower, taskFailedMarker) {
 		return false
 	}
 
-	// Structured task-failure payloads arrive as JSON-style key/value lines.
-	// Restrict detection to quoted keys so regular source snippets like:
-	// Message: "Task failed ...", Error: strings.TrimSpace(...)
-	// do not trigger false-positive run failures.
-	prefixes := []string{
+	// Structured task-failure payloads arrive as JSON-style/escaped key/value
+	// lines. Keep matching case-insensitive for quoted keys.
+	caseInsensitivePrefixes := []string{
 		`"summary":`,
 		`\"summary\":`,
 		`"message":`,
 		`\"message\":`,
 	}
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(line, prefix) {
+	for _, prefix := range caseInsensitivePrefixes {
+		if strings.HasPrefix(lower, prefix) {
 			return true
 		}
+	}
+
+	// For unquoted keys, require lowercase prefixes so Go struct fields
+	// like `Message: "Task failed..."` do not trigger false positives.
+	if strings.HasPrefix(line, "summary:") || strings.HasPrefix(line, "message:") {
+		return true
 	}
 	return false
 }
 
-func isStructuredFailureErrorLine(lower string) bool {
-	line := strings.TrimSpace(lower)
-	prefixes := []string{
+func isStructuredFailureErrorLine(raw string) bool {
+	line := strings.TrimSpace(raw)
+	lower := strings.ToLower(line)
+	caseInsensitivePrefixes := []string{
 		`"error":`,
 		`\"error\":`,
 		`"stack":`,
 		`\"stack\":`,
 	}
-	for _, prefix := range prefixes {
-		if strings.HasPrefix(line, prefix) {
+	for _, prefix := range caseInsensitivePrefixes {
+		if strings.HasPrefix(lower, prefix) {
 			return true
 		}
+	}
+	// For unquoted keys, require lowercase prefixes so Go struct fields
+	// like `Error: err.Error()` do not trigger false positives.
+	if strings.HasPrefix(line, "error:") || strings.HasPrefix(line, "stack:") {
+		return true
 	}
 	return false
 }
