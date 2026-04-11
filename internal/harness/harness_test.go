@@ -1742,6 +1742,91 @@ func TestRunRepoNotFoundCloneFailsWithoutRetry(t *testing.T) {
 	}
 }
 
+func TestRunRepoNotFoundCloneFallsBackToKnownOwner(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	cfg.RepoURL = ""
+	cfg.Repo = ""
+	cfg.Repos = []string{
+		"git@github.com:Molten-Bot/user-portal.git",
+		"git@github.com:moltenbot000/moltenhub-code.git",
+	}
+	cfg.TargetSubdir = "."
+
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := testRunDir(guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
+	branch := "moltenhub-build-api"
+
+	repoRelA := repoWorkspaceDirName(cfg.Repos[0], 0, len(cfg.Repos))
+	repoRelB := repoWorkspaceDirName(cfg.Repos[1], 1, len(cfg.Repos))
+	repoDirA := filepath.Join(runDir, repoRelA)
+	repoDirB := filepath.Join(runDir, repoRelB)
+	fallbackRepoB := "git@github.com:Molten-Bot/moltenhub-code.git"
+
+	codexPrompt := workspaceCodexPrompt(cfg.Prompt, cfg.TargetSubdir, []repoWorkspace{
+		{URL: cfg.Repos[0], RelDir: repoRelA},
+		{URL: fallbackRepoB, RelDir: repoRelB},
+	})
+	codexPrompt = withAgentsPrompt(codexPrompt, agentsPath)
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneRepoCommand(cfg.Repos[0], cfg.BaseBranch, repoDirA)},
+		{
+			cmd: cloneRepoCommand(cfg.Repos[1], cfg.BaseBranch, repoDirB),
+			res: execx.Result{Stderr: "remote: Repository not found.\nfatal: repository not found\n"},
+			err: errors.New("clone failed"),
+		},
+		{cmd: cloneRepoCommand(fallbackRepoB, cfg.BaseBranch, repoDirB)},
+		{cmd: branchCommand(repoDirA, branch)},
+		{cmd: branchCommand(repoDirB, branch)},
+		{cmd: pushDryRunCommand(repoDirA, branch)},
+		{cmd: pushDryRunCommand(repoDirB, branch)},
+		{cmd: codexCommandWithOptions(runDir, codexPrompt, codexRunOptions{SkipGitRepoCheck: true})},
+		{cmd: statusCommand(repoDirA), res: execx.Result{Stdout: " M file-a.go\n"}},
+		{cmd: statusCommand(repoDirB), res: execx.Result{Stdout: " M file-b.go\n"}},
+		{cmd: addCommand(repoDirA)},
+		{cmd: commitCommand(repoDirA, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDirA, branch)},
+		{cmd: prCreateCommand(repoDirA, cfg, branch), res: execx.Result{Stdout: "https://github.com/Molten-Bot/user-portal/pull/10\n"}},
+		{cmd: prChecksCommand(repoDirA, "https://github.com/Molten-Bot/user-portal/pull/10")},
+		{cmd: addCommand(repoDirB)},
+		{cmd: commitCommand(repoDirB, cfg.CommitMessage)},
+		{cmd: pushCommand(repoDirB, branch)},
+		{cmd: prCreateCommand(repoDirB, cfg, branch), res: execx.Result{Stdout: "https://github.com/Molten-Bot/moltenhub-code/pull/20\n"}},
+		{cmd: prChecksCommand(repoDirB, "https://github.com/Molten-Bot/moltenhub-code/pull/20")},
+	}}
+
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = testWorkspaceManager(guid)
+	h.TargetDirOK = func(path string) bool { return path == repoDirA }
+	h.Sleep = func(context.Context, time.Duration) error { return nil }
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.ExitCode != ExitSuccess {
+		t.Fatalf("ExitCode = %d, want %d", res.ExitCode, ExitSuccess)
+	}
+	if got, want := len(res.RepoResults), 2; got != want {
+		t.Fatalf("len(RepoResults) = %d, want %d", got, want)
+	}
+	if got, want := res.RepoResults[1].RepoURL, fallbackRepoB; got != want {
+		t.Fatalf("RepoResults[1].RepoURL = %q, want %q", got, want)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
+	}
+}
+
 func TestRunMissingNonMoltenhubBaseBranchFailsClone(t *testing.T) {
 	t.Parallel()
 
