@@ -327,6 +327,31 @@ func TestJoinPRURLsAndCountChangedRepos(t *testing.T) {
 	}
 }
 
+func TestSingleRepoFromResults(t *testing.T) {
+	t.Parallel()
+
+	if got := singleRepoFromResults(nil); got != "" {
+		t.Fatalf("singleRepoFromResults(nil) = %q, want empty", got)
+	}
+
+	sameRepo := []harness.RepoResult{
+		{RepoURL: "  git@github.com:acme/repo.git  "},
+		{RepoURL: ""},
+		{RepoURL: "git@github.com:acme/repo.git"},
+	}
+	if got, want := singleRepoFromResults(sameRepo), "git@github.com:acme/repo.git"; got != want {
+		t.Fatalf("singleRepoFromResults(same) = %q, want %q", got, want)
+	}
+
+	differentRepos := []harness.RepoResult{
+		{RepoURL: "git@github.com:acme/repo-a.git"},
+		{RepoURL: "git@github.com:acme/repo-b.git"},
+	}
+	if got := singleRepoFromResults(differentRepos); got != "" {
+		t.Fatalf("singleRepoFromResults(different) = %q, want empty", got)
+	}
+}
+
 func TestMarshalRunConfigJSONReturnsJSONPayload(t *testing.T) {
 	t.Parallel()
 
