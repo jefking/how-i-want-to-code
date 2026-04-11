@@ -11,6 +11,7 @@ import (
 	"net/url"
 	"strings"
 	"time"
+	"unicode"
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
 	"github.com/jef/moltenhub-code/internal/library"
@@ -1013,16 +1014,31 @@ func mergeAgentProfiles(primary, secondary AgentProfile) AgentProfile {
 
 func extractProfileConfig(raw map[string]any) ProfileConfig {
 	skills := parseProfileSkills(raw["skills"])
+	displayName := firstNonEmpty(
+		stringAt(raw, "display_name"),
+		stringAt(raw, "displayName"),
+		stringAt(raw, "name"),
+	)
+	emoji := firstNonEmpty(
+		stringAt(raw, "emoji"),
+		stringAt(raw, "icon"),
+	)
+	markdown := firstNonEmpty(
+		stringAt(raw, "profile_markdown"),
+		stringAt(raw, "profileMarkdown"),
+		stringAt(raw, "markdown"),
+	)
+	headerEmoji, headerDisplayName := profileHeaderFromMarkdown(markdown)
+	if strings.TrimSpace(emoji) == "" {
+		emoji = strings.TrimSpace(headerEmoji)
+	}
+	if strings.TrimSpace(displayName) == "" {
+		displayName = strings.TrimSpace(headerDisplayName)
+	}
+
 	return ProfileConfig{
-		DisplayName: firstNonEmpty(
-			stringAt(raw, "display_name"),
-			stringAt(raw, "displayName"),
-			stringAt(raw, "name"),
-		),
-		Emoji: firstNonEmpty(
-			stringAt(raw, "emoji"),
-			stringAt(raw, "icon"),
-		),
+		DisplayName: displayName,
+		Emoji:       emoji,
 		ProfileText: extractProfileText(raw),
 		LLM: firstNonEmpty(
 			stringAt(raw, "llm"),
@@ -1077,6 +1093,54 @@ func profileTextFromMarkdown(markdown string) string {
 	}
 
 	return markdown
+}
+
+func profileHeaderFromMarkdown(markdown string) (string, string) {
+	markdown = strings.TrimSpace(markdown)
+	if markdown == "" {
+		return "", ""
+	}
+
+	lines := strings.Split(markdown, "\n")
+	if len(lines) == 0 {
+		return "", ""
+	}
+	header := strings.TrimSpace(lines[0])
+	if !strings.HasPrefix(header, "#") {
+		return "", ""
+	}
+	header = strings.TrimSpace(strings.TrimLeft(header, "#"))
+	if header == "" {
+		return "", ""
+	}
+
+	parts := strings.Fields(header)
+	if len(parts) == 0 {
+		return "", ""
+	}
+	first := strings.TrimSpace(parts[0])
+	if !looksLikeEmojiToken(first) {
+		return "", header
+	}
+
+	displayName := strings.TrimSpace(strings.TrimPrefix(header, first))
+	return first, displayName
+}
+
+func looksLikeEmojiToken(value string) bool {
+	value = strings.TrimSpace(value)
+	if value == "" {
+		return false
+	}
+
+	hasRune := false
+	for _, r := range value {
+		hasRune = true
+		if unicode.IsLetter(r) || unicode.IsDigit(r) {
+			return false
+		}
+	}
+	return hasRune
 }
 
 func agentProfileEmpty(profile AgentProfile) bool {
