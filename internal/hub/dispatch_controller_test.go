@@ -187,6 +187,60 @@ func TestAdaptiveDispatchControllerScalesDownOnPressure(t *testing.T) {
 	close(releaseReq2)
 }
 
+func TestAdaptiveDispatchControllerQueuedRequestResamplesAndAutoResumes(t *testing.T) {
+	t.Parallel()
+
+	controller := NewAdaptiveDispatchController(DispatcherConfig{
+		MaxParallel:            2,
+		MinParallel:            1,
+		SampleWindow:           1,
+		SampleIntervalMS:       1000,
+		CPUHighWatermark:       85,
+		MemoryHighWatermark:    85,
+		DiskIOHighWatermarkMBs: 100,
+	}, nil)
+	controller.sample = &sequenceSample{
+		values: []resourceSample{
+			{CPUPercent: 92, MemoryPercent: 70},
+			{CPUPercent: 20, MemoryPercent: 35},
+		},
+	}
+
+	ctx, cancel := context.WithCancel(context.Background())
+	defer cancel()
+
+	releaseFirst, err := controller.Acquire(ctx, "req-1")
+	if err != nil {
+		t.Fatalf("Acquire(req-1) error = %v", err)
+	}
+	controller.sampleAndUpdate()
+
+	acquiredReq2 := make(chan struct{}, 1)
+	errCh := make(chan error, 1)
+	releaseReq2 := make(chan struct{})
+	go func() {
+		release, acquireErr := controller.Acquire(ctx, "req-2")
+		if acquireErr != nil {
+			errCh <- acquireErr
+			return
+		}
+		acquiredReq2 <- struct{}{}
+		<-releaseReq2
+		release()
+	}()
+
+	select {
+	case <-acquiredReq2:
+	case err := <-errCh:
+		t.Fatalf("unexpected acquire error: %v", err)
+	case <-time.After(2 * time.Second):
+		t.Fatal("timed out waiting for queued request to auto-resume after healthy sample")
+	}
+
+	releaseFirst()
+	close(releaseReq2)
+}
+
 func TestAdaptiveDispatchControllerLogsWindowSamplesEvenWhenCapacityIsSteady(t *testing.T) {
 	t.Parallel()
 

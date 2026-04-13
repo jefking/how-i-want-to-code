@@ -157,6 +157,10 @@ func (c *AdaptiveDispatchController) Acquire(ctx context.Context, requestID stri
 			running,
 			allowed,
 		)
+		// Re-sample immediately after queueing so work does not sit idle until the
+		// next background tick when pressure has already dropped back below the
+		// resume threshold.
+		c.sampleAndUpdate()
 	}
 
 	if granted {
