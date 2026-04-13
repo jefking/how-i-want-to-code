@@ -95,15 +95,13 @@ Key fields:
 - `bind_token` or `agent_token` (first-time activation)
 - `session_key` (default `main`)
 - `handle`
-- `profile.display_name`, `profile.emoji`, `profile.profile` (used for Hub sync/UI, not persisted in runtime `config.json`)
+- `profile.display_name`, `profile.emoji`, `profile.profile`
 - `agent_harness`, `agent_command`
 - `log_level` (`error`, `warn`, `info`, `debug`; default `info`)
 - `dispatcher.*`
 - Optional bootstrap secrets: `github_token`, `openai_api_key`, `augment_session_auth`
 
-Runtime persists Hub connectivity to `./.moltenhub/config.json` using a minimal shape:
-- `base_url`
-- `agent_token` (or `bind_token` when no resolved agent token is available)
+Runtime persists auth/config to `./.moltenhub/config.json` (default layout).
 
 Example: [`init.example.json`](init.example.json)
 
