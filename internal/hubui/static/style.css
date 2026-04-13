@@ -1729,8 +1729,7 @@ select.prompt-control {
   background: var(--surface-badge-idle);
 }
 
-.badge.completed,
-.badge.ok {
+.badge.completed {
   background: var(--good);
 }
 
@@ -1948,8 +1947,7 @@ select.prompt-control {
   display: flex;
 }
 
-.task-result.completed,
-.task-result.ok {
+.task-result.completed {
   color: var(--surface-success);
   background: rgba(43, 182, 115, 0.1);
 }
@@ -1973,7 +1971,7 @@ select.prompt-control {
   letter-spacing: 0.06em;
 }
 
-.task-result.ok .task-result-detail {
+.task-result.completed .task-result-detail {
   color: var(--surface-success);
 }
 

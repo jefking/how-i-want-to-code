@@ -57,6 +57,22 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	}
 }
 
+func TestBrokerNormalizesLegacyOKTerminalStatusToCompleted(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("dispatch status=start request_id=req-legacy")
+	b.IngestLog("dispatch status=ok request_id=req-legacy workspace=/tmp/run branch=moltenhub-legacy")
+
+	snap := b.Snapshot()
+	if got, want := len(snap.Tasks), 1; got != want {
+		t.Fatalf("len(tasks) = %d, want %d", got, want)
+	}
+	if got, want := snap.Tasks[0].Status, "completed"; got != want {
+		t.Fatalf("task.Status = %q, want %q", got, want)
+	}
+}
+
 func TestBrokerDropsEmptyCommandPayloadMarkers(t *testing.T) {
 	t.Parallel()
 
@@ -700,7 +716,7 @@ func TestBrokerHidesCompletedOKTasksAfterFiveMinutes(t *testing.T) {
 		t.Fatalf("len(tasks) after ttl expiry = %d, want 0", got)
 	}
 	if _, ok := b.TaskRunConfig("req-ok"); ok {
-		t.Fatal("TaskRunConfig() found = true for pruned ok task, want false")
+		t.Fatal("TaskRunConfig() found = true for pruned completed task, want false")
 	}
 }
 

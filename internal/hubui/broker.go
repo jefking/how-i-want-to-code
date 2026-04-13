@@ -245,7 +245,7 @@ func (b *Broker) Snapshot() Snapshot {
 			Repo:         t.Repo,
 			Repos:        append([]string(nil), t.Repos...),
 			BaseBranch:   t.BaseBranch,
-			Status:       t.Status,
+			Status:       normalizeTaskTerminalStatus(t.Status),
 			Stage:        t.Stage,
 			StageStatus:  t.StageStatus,
 			ExitCode:     t.ExitCode,
@@ -462,7 +462,7 @@ func (b *Broker) isClosedTaskLocked(requestID string, now time.Time) bool {
 }
 
 func (b *Broker) shouldHideTaskLocked(task *taskState, now time.Time) bool {
-	if task == nil || task.Status != "ok" || b.okTaskTTL <= 0 {
+	if task == nil || normalizeTaskTerminalStatus(task.Status) != "completed" || b.okTaskTTL <= 0 {
 		return false
 	}
 	return !task.UpdatedAt.IsZero() && now.Sub(task.UpdatedAt) >= b.okTaskTTL
@@ -1084,8 +1084,8 @@ func errorText(err error) string {
 }
 
 func isCompletedTaskStatus(status string) bool {
-	switch strings.TrimSpace(status) {
-	case "completed", "ok", "no_changes", "error", "invalid", "duplicate", "stopped":
+	switch normalizeTaskTerminalStatus(status) {
+	case "completed", "no_changes", "error", "invalid", "duplicate", "stopped":
 		return true
 	default:
 		return false
@@ -1094,4 +1094,13 @@ func isCompletedTaskStatus(status string) bool {
 
 func isFinalTaskDispatchLine(fields map[string]string) bool {
 	return strings.TrimSpace(fields["action"]) == ""
+}
+
+func normalizeTaskTerminalStatus(status string) string {
+	switch strings.TrimSpace(status) {
+	case "ok":
+		return "completed"
+	default:
+		return strings.TrimSpace(status)
+	}
 }
