@@ -724,16 +724,19 @@ func TestHandleDispatchInvokesOnDispatchFailed(t *testing.T) {
 		t.Fatal("timed out waiting for OnDispatchFailed callback")
 	}
 
-	if publishRequests != 2 {
-		t.Fatalf("publish requests = %d, want 2", publishRequests)
+	if publishRequests != 3 {
+		t.Fatalf("publish requests = %d, want 3", publishRequests)
 	}
 	if got := fmt.Sprint(publishedMsgs[0]["status"]); got != "error" {
 		t.Fatalf("first publish status = %q, want error", got)
 	}
-	if got := fmt.Sprint(publishedMsgs[1]["type"]); got != "skill_request" {
+	if got := fmt.Sprint(publishedMsgs[1]["request_id"]); got != "req-fail-rerun" {
+		t.Fatalf("rerun request_id = %q, want req-fail-rerun", got)
+	}
+	if got := fmt.Sprint(publishedMsgs[2]["type"]); got != "skill_request" {
 		t.Fatalf("follow-up type = %q, want skill_request", got)
 	}
-	if got := fmt.Sprint(publishedMsgs[1]["request_id"]); got != "req-fail-failure-review" {
+	if got := fmt.Sprint(publishedMsgs[2]["request_id"]); got != "req-fail-failure-review" {
 		t.Fatalf("follow-up request_id = %q, want req-fail-failure-review", got)
 	}
 }
@@ -829,8 +832,8 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 
 	mu.Lock()
 	defer mu.Unlock()
-	if publishRequest != 2 {
-		t.Fatalf("publish requests = %d, want 2", publishRequest)
+	if publishRequest != 3 {
+		t.Fatalf("publish requests = %d, want 3", publishRequest)
 	}
 	if got := fmt.Sprint(publishedMsgs[0]["status"]); got != "error" {
 		t.Fatalf("message.status = %v, want error", publishedMsgs[0]["status"])
@@ -841,7 +844,10 @@ func TestProcessInboundMessagePublishesAcquireFailurePayload(t *testing.T) {
 	if got := fmt.Sprint(publishedMsgs[0]["error"]); !strings.Contains(got, "dispatch acquire: dispatch controller is closed") {
 		t.Fatalf("message.error = %q", got)
 	}
-	if got := fmt.Sprint(publishedMsgs[1]["request_id"]); got != "req-closed-controller-failure-review" {
+	if got := fmt.Sprint(publishedMsgs[1]["request_id"]); got != "req-closed-controller-rerun" {
+		t.Fatalf("rerun request_id = %q, want req-closed-controller-rerun", got)
+	}
+	if got := fmt.Sprint(publishedMsgs[2]["request_id"]); got != "req-closed-controller-failure-review" {
 		t.Fatalf("follow-up request_id = %q, want req-closed-controller-failure-review", got)
 	}
 }
