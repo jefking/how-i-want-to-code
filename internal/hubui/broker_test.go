@@ -19,7 +19,7 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	b.IngestLog("dispatch status=start request_id=req-42 skill=moltenhub_code_run repo=git@github.com:acme/repo.git repos=git@github.com:acme/repo.git,git@github.com:acme/repo-two.git")
 	b.IngestLog("dispatch request_id=req-42 stage=codex status=start")
 	b.IngestLog("dispatch request_id=req-42 cmd phase=codex name=codex stream=stdout b64=" + base64.StdEncoding.EncodeToString([]byte("thinking...")))
-	b.IngestLog("dispatch status=ok request_id=req-42 workspace=/tmp/run branch=moltenhub-feature pr_url=https://github.com/acme/repo/pull/99")
+	b.IngestLog("dispatch status=completed request_id=req-42 workspace=/tmp/run branch=moltenhub-feature pr_url=https://github.com/acme/repo/pull/99")
 
 	snap := b.Snapshot()
 	if len(snap.Tasks) != 1 {
@@ -29,8 +29,8 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	if task.RequestID != requestID {
 		t.Fatalf("task.RequestID = %q", task.RequestID)
 	}
-	if task.Status != "ok" {
-		t.Fatalf("task.Status = %q, want ok", task.Status)
+	if task.Status != "completed" {
+		t.Fatalf("task.Status = %q, want completed", task.Status)
 	}
 	if task.Stage != "codex" {
 		t.Fatalf("task.Stage = %q, want codex", task.Stage)
@@ -54,6 +54,22 @@ func TestBrokerTracksTaskLifecycleAndCommandOutput(t *testing.T) {
 	}
 	if !foundOutput {
 		t.Fatalf("task logs missing decoded stdout line: %#v", task.Logs)
+	}
+}
+
+func TestBrokerNormalizesLegacyOKTerminalStatusToCompleted(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+	b.IngestLog("dispatch status=start request_id=req-legacy")
+	b.IngestLog("dispatch status=ok request_id=req-legacy workspace=/tmp/run branch=moltenhub-legacy")
+
+	snap := b.Snapshot()
+	if got, want := len(snap.Tasks), 1; got != want {
+		t.Fatalf("len(tasks) = %d, want %d", got, want)
+	}
+	if got, want := snap.Tasks[0].Status, "completed"; got != want {
+		t.Fatalf("task.Status = %q, want %q", got, want)
 	}
 }
 
@@ -515,7 +531,7 @@ func TestBrokerCloseTaskRemovesCompletedTaskAndRunConfig(t *testing.T) {
 	requestID := "req-close"
 	b.RecordTaskRunConfig(requestID, []byte(`{"repo":"git@github.com:acme/repo.git","prompt":"close me"}`))
 	b.IngestLog("dispatch status=start request_id=req-close")
-	b.IngestLog("dispatch status=ok request_id=req-close workspace=/tmp/run branch=moltenhub-close")
+	b.IngestLog("dispatch status=completed request_id=req-close workspace=/tmp/run branch=moltenhub-close")
 
 	if err := b.CloseTask(requestID); err != nil {
 		t.Fatalf("CloseTask() error = %v", err)
@@ -538,7 +554,7 @@ func TestBrokerCloseTaskIgnoresLateCleanupLogs(t *testing.T) {
 	requestID := "req-close-cleanup"
 	b.RecordTaskRunConfig(requestID, []byte(`{"repo":"git@github.com:acme/repo.git","prompt":"close me"}`))
 	b.IngestLog("dispatch status=start request_id=req-close-cleanup")
-	b.IngestLog("dispatch status=ok request_id=req-close-cleanup workspace=/tmp/run branch=moltenhub-close-cleanup")
+	b.IngestLog("dispatch status=completed request_id=req-close-cleanup workspace=/tmp/run branch=moltenhub-close-cleanup")
 
 	if err := b.CloseTask(requestID); err != nil {
 		t.Fatalf("CloseTask() error = %v", err)
@@ -549,6 +565,24 @@ func TestBrokerCloseTaskIgnoresLateCleanupLogs(t *testing.T) {
 	snap := b.Snapshot()
 	if len(snap.Tasks) != 0 {
 		t.Fatalf("len(tasks) after cleanup log = %d, want 0", len(snap.Tasks))
+	}
+}
+
+func TestBrokerIgnoresActionOnlyDispatchStatusForTerminalState(t *testing.T) {
+	t.Parallel()
+
+	b := NewBroker()
+
+	b.IngestLog("dispatch status=start request_id=req-follow-up")
+	b.IngestLog(`dispatch status=error request_id=req-follow-up exit_code=50 err="codex failed"`)
+	b.IngestLog("dispatch status=ok action=queue_failure_followup request_id=req-follow-up follow_up_request_id=req-fix")
+
+	snap := b.Snapshot()
+	if len(snap.Tasks) != 1 {
+		t.Fatalf("len(tasks) = %d, want 1", len(snap.Tasks))
+	}
+	if got := snap.Tasks[0].Status; got != "error" {
+		t.Fatalf("task.Status = %q, want error", got)
 	}
 }
 
@@ -664,7 +698,7 @@ func TestBrokerHidesCompletedOKTasksAfterFiveMinutes(t *testing.T) {
 	b.now = func() time.Time { return now }
 
 	b.IngestLog("dispatch status=start request_id=req-ok")
-	b.IngestLog("dispatch status=ok request_id=req-ok workspace=/tmp/run branch=moltenhub-cleanup")
+	b.IngestLog("dispatch status=completed request_id=req-ok workspace=/tmp/run branch=moltenhub-cleanup")
 
 	if got := len(b.Snapshot().Tasks); got != 1 {
 		t.Fatalf("len(tasks) before retention = %d, want 1", got)
@@ -681,7 +715,7 @@ func TestBrokerHidesCompletedOKTasksAfterFiveMinutes(t *testing.T) {
 		t.Fatalf("len(tasks) after ttl expiry = %d, want 0", got)
 	}
 	if _, ok := b.TaskRunConfig("req-ok"); ok {
-		t.Fatal("TaskRunConfig() found = true for pruned ok task, want false")
+		t.Fatal("TaskRunConfig() found = true for pruned completed task, want false")
 	}
 }
 

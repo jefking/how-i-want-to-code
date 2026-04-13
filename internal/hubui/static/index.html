@@ -615,7 +615,7 @@
     const HUB_LOGIN_URL = "https://app.molten.bot/signin?target=hub";
     const HUB_DASHBOARD_URL = "https://app.molten.bot/hub";
     const GOOGLE_ANALYTICS_MEASUREMENT_ID = "G-BY33RFG2WB";
-    const COMPLETED_STATUSES = new Set(["ok", "no_changes", "error", "invalid", "duplicate", "stopped"]);
+    const COMPLETED_STATUSES = new Set(["completed", "no_changes", "error", "invalid", "duplicate", "stopped"]);
     const TASK_PROGRESS_STEPS = [
       { id: "received", label: "Task Received", detail: "Dispatch accepted by hub.", icon: "moltenhub" },
       { id: "run", label: "Run Started", detail: "Harness run initialized.", icon: "moltenhub" },
@@ -4168,9 +4168,18 @@
       return prompt;
     }
 
+    function normalizedTaskStatus(status) {
+      const normalized = String(status || "").trim().toLowerCase();
+      if (normalized === "ok") {
+        return "completed";
+      }
+      return normalized;
+    }
+
     function statusClass(status) {
-      if (!status) return "";
-      return status.replace(/[^a-z_]/g, "");
+      const normalized = normalizedTaskStatus(status);
+      if (!normalized) return "";
+      return normalized.replace(/[^a-z_]/g, "");
     }
 
     function setLocalPromptStatus(kind, text) {
@@ -4213,7 +4222,7 @@
       if (!task) {
         return false;
       }
-      return COMPLETED_STATUSES.has(task.status || "");
+      return COMPLETED_STATUSES.has(normalizedTaskStatus(task.status));
     }
 
     function isTaskClosing(requestID) {
@@ -4275,7 +4284,7 @@
     function syncTaskCompletionSparkles(previousSnapshot, nextSnapshot) {
       const previousStatuses = new Map();
       for (const task of previousSnapshot?.tasks || []) {
-        previousStatuses.set(String(task.request_id || ""), task.status || "");
+        previousStatuses.set(String(task.request_id || ""), normalizedTaskStatus(task.status));
       }
 
       for (const task of nextSnapshot?.tasks || []) {
@@ -4500,12 +4509,12 @@
     }
 
     function taskActivityRank(task) {
-      const status = String(task?.status || "").toLowerCase();
+      const status = normalizedTaskStatus(task?.status);
       if (status === "running") return 0;
       if (status === "pending" || status === "active" || status === "paused") return 1;
       if (status === "error" || status === "invalid" || status === "stopped") return 2;
       if (status === "duplicate") return 3;
-      if (status === "ok" || status === "no_changes") return 4;
+      if (status === "completed" || status === "no_changes") return 4;
       return 5;
     }
 
@@ -4796,8 +4805,8 @@
         return;
       }
 
-      const status = task.status || "";
-      if (status !== "ok" && status !== "no_changes" && status !== "error" && status !== "invalid" && status !== "duplicate" && status !== "stopped") {
+      const status = normalizedTaskStatus(task.status);
+      if (status !== "completed" && status !== "no_changes" && status !== "error" && status !== "invalid" && status !== "duplicate" && status !== "stopped") {
         return;
       }
 
@@ -4810,7 +4819,7 @@
       const detail = document.createElement("span");
       detail.className = "task-result-detail";
 
-      if (status === "ok") {
+      if (status === "completed") {
         title.textContent = "Task Success";
         detail.textContent = task.pr_url ? "Pull request created." : "Completed.";
       } else if (status === "no_changes") {
@@ -5028,7 +5037,7 @@
 
         const badge = document.createElement("span");
         badge.className = `badge ${statusClass(task.status)}`;
-        badge.textContent = task.status || "pending";
+        badge.textContent = normalizedTaskStatus(task.status) || "pending";
 
         const topActions = document.createElement("div");
         topActions.className = "task-top-actions";

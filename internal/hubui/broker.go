@@ -245,7 +245,7 @@ func (b *Broker) Snapshot() Snapshot {
 			Repo:         t.Repo,
 			Repos:        append([]string(nil), t.Repos...),
 			BaseBranch:   t.BaseBranch,
-			Status:       t.Status,
+			Status:       normalizeTaskTerminalStatus(t.Status),
 			Stage:        t.Stage,
 			StageStatus:  t.StageStatus,
 			ExitCode:     t.ExitCode,
@@ -462,7 +462,7 @@ func (b *Broker) isClosedTaskLocked(requestID string, now time.Time) bool {
 }
 
 func (b *Broker) shouldHideTaskLocked(task *taskState, now time.Time) bool {
-	if task == nil || task.Status != "ok" || b.okTaskTTL <= 0 {
+	if task == nil || normalizeTaskTerminalStatus(task.Status) != "completed" || b.okTaskTTL <= 0 {
 		return false
 	}
 	return !task.UpdatedAt.IsZero() && now.Sub(task.UpdatedAt) >= b.okTaskTTL
@@ -535,17 +535,25 @@ func (b *Broker) updateTaskFromLineLocked(t *taskState, line string, fields map[
 		}
 	}
 
-	if strings.HasPrefix(line, "dispatch status=ok") {
-		t.Status = "ok"
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=completed") {
+		t.Status = "completed"
 		t.WorkspaceDir = firstNonEmpty(fields["workspace"], fields["workspace_dir"], t.WorkspaceDir)
 		t.Branch = firstNonEmpty(fields["branch"], t.Branch)
 		t.PRURL = firstNonEmpty(fields["pr_url"], t.PRURL)
 	}
 
-	if strings.HasPrefix(line, "dispatch status=no_changes") {
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=ok") {
+		t.Status = "completed"
+		t.WorkspaceDir = firstNonEmpty(fields["workspace"], fields["workspace_dir"], t.WorkspaceDir)
+		t.Branch = firstNonEmpty(fields["branch"], t.Branch)
+		t.PRURL = firstNonEmpty(fields["pr_url"], t.PRURL)
+	}
+
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=no_changes") {
 		t.Status = "no_changes"
 		t.WorkspaceDir = firstNonEmpty(fields["workspace"], fields["workspace_dir"], t.WorkspaceDir)
 		t.Branch = firstNonEmpty(fields["branch"], t.Branch)
+		t.PRURL = firstNonEmpty(fields["pr_url"], t.PRURL)
 	}
 
 	if strings.HasPrefix(line, "dispatch status=paused") {
@@ -562,7 +570,7 @@ func (b *Broker) updateTaskFromLineLocked(t *taskState, line string, fields map[
 		t.StageStatus = firstNonEmpty(fields["status"], "resumed")
 	}
 
-	if strings.HasPrefix(line, "dispatch status=stopped") {
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=stopped") {
 		t.Status = "stopped"
 		if code, ok := parseIntField(fields["exit_code"]); ok {
 			t.ExitCode = code
@@ -576,7 +584,7 @@ func (b *Broker) updateTaskFromLineLocked(t *taskState, line string, fields map[
 		}
 	}
 
-	if strings.HasPrefix(line, "dispatch status=error") {
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=error") {
 		t.Status = "error"
 		if code, ok := parseIntField(fields["exit_code"]); ok {
 			t.ExitCode = code
@@ -587,12 +595,12 @@ func (b *Broker) updateTaskFromLineLocked(t *taskState, line string, fields map[
 		t.Error = firstNonEmpty(fields["err"], fields["error"], t.Error)
 	}
 
-	if strings.HasPrefix(line, "dispatch status=invalid") {
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=invalid") {
 		t.Status = "invalid"
 		t.Error = firstNonEmpty(fields["err"], fields["error"], t.Error)
 	}
 
-	if strings.HasPrefix(line, "dispatch status=duplicate") {
+	if isFinalTaskDispatchLine(fields) && strings.HasPrefix(line, "dispatch status=duplicate") {
 		if t.Status == "" || t.Status == "pending" || t.Status == "duplicate" {
 			t.Status = "duplicate"
 			t.Stage = firstNonEmpty(t.Stage, "dispatch")
@@ -1076,10 +1084,23 @@ func errorText(err error) string {
 }
 
 func isCompletedTaskStatus(status string) bool {
-	switch strings.TrimSpace(status) {
-	case "ok", "no_changes", "error", "invalid", "duplicate", "stopped":
+	switch normalizeTaskTerminalStatus(status) {
+	case "completed", "no_changes", "error", "invalid", "duplicate", "stopped":
 		return true
 	default:
 		return false
+	}
+}
+
+func isFinalTaskDispatchLine(fields map[string]string) bool {
+	return strings.TrimSpace(fields["action"]) == ""
+}
+
+func normalizeTaskTerminalStatus(status string) string {
+	switch strings.TrimSpace(status) {
+	case "ok":
+		return "completed"
+	default:
+		return strings.TrimSpace(status)
 	}
 }
