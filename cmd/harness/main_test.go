@@ -885,6 +885,120 @@ func TestCurrentHubSetupStateWithRemoteProfileHydratesMissingProfileFromHub(t *t
 	}
 }
 
+func TestCurrentHubSetupStateWithRemoteProfileMergesSplitProfileFields(t *testing.T) {
+	t.Parallel()
+
+	const savedToken = "p9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/agents/me" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer")); got != savedToken {
+			t.Fatalf("GET /agents/me token = %q, want %q", got, savedToken)
+		}
+		_, _ = w.Write([]byte(`{
+			"ok": true,
+			"result": {
+				"agent": {
+					"handle": "codex-beast",
+					"profile": {
+						"display_name": "Jef's Codex"
+					},
+					"metadata": {
+						"profile_markdown": "# 🦍 Jef's Codex\n\nRunning code updates quickly."
+					}
+				}
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{
+		"version": "v1",
+		"base_url": %q,
+		"agent_token": %q
+	}`, server.URL+"/v1", savedToken)), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	state := currentHubSetupStateWithRemoteProfile(context.Background(), hub.InitConfig{
+		RuntimeConfigPath: configPath,
+	})
+	if got, want := state.Handle, "codex-beast"; got != want {
+		t.Fatalf("Handle = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.DisplayName, "Jef's Codex"; got != want {
+		t.Fatalf("DisplayName = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.Emoji, "🦍"; got != want {
+		t.Fatalf("Emoji = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.ProfileText, "Running code updates quickly."; got != want {
+		t.Fatalf("ProfileText = %q, want %q", got, want)
+	}
+}
+
+func TestCurrentHubSetupStateWithRemoteProfileMergesDirectProfileAndMetadata(t *testing.T) {
+	t.Parallel()
+
+	const savedToken = "q9mju6sL6Qns5WX1H09ghY5X4HJHHRTlcc6nzfiOdxs"
+
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		if r.Method != http.MethodGet || r.URL.Path != "/v1/agents/me" {
+			t.Fatalf("unexpected request: %s %s", r.Method, r.URL.Path)
+		}
+		if got := strings.TrimSpace(strings.TrimPrefix(r.Header.Get("Authorization"), "Bearer")); got != savedToken {
+			t.Fatalf("GET /agents/me token = %q, want %q", got, savedToken)
+		}
+		_, _ = w.Write([]byte(`{
+			"handle": "codex-beast",
+			"profile": {
+				"display_name": "Jef's Codex",
+				"emoji": "🦍"
+			},
+			"metadata": {
+				"profile": "Running code updates quickly."
+			}
+		}`))
+	}))
+	defer server.Close()
+
+	configPath := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	if err := os.MkdirAll(filepath.Dir(configPath), 0o755); err != nil {
+		t.Fatalf("MkdirAll() error = %v", err)
+	}
+	if err := os.WriteFile(configPath, []byte(fmt.Sprintf(`{
+		"version": "v1",
+		"base_url": %q,
+		"agent_token": %q
+	}`, server.URL+"/v1", savedToken)), 0o600); err != nil {
+		t.Fatalf("WriteFile() error = %v", err)
+	}
+
+	state := currentHubSetupStateWithRemoteProfile(context.Background(), hub.InitConfig{
+		RuntimeConfigPath: configPath,
+	})
+	if got, want := state.Handle, "codex-beast"; got != want {
+		t.Fatalf("Handle = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.DisplayName, "Jef's Codex"; got != want {
+		t.Fatalf("DisplayName = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.Emoji, "🦍"; got != want {
+		t.Fatalf("Emoji = %q, want %q", got, want)
+	}
+	if got, want := state.Profile.ProfileText, "Running code updates quickly."; got != want {
+		t.Fatalf("ProfileText = %q, want %q", got, want)
+	}
+}
+
 func TestConfigureHubSetupNewAgentUsesBindTokenFlow(t *testing.T) {
 	t.Parallel()
 
