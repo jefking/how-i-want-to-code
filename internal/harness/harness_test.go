@@ -328,6 +328,7 @@ func TestRunCommitNoOpReturnsNoChanges(t *testing.T) {
 			err: errors.New("exit status 1"),
 		},
 		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: "## moltenhub-build-api\n"}},
+		{cmd: commitsAheadOfBaseCommand(repoDir, cfg.BaseBranch), res: execx.Result{Stdout: "0\n"}},
 		{cmd: remoteBranchExistsOnOriginCommand(repoDir, branch)},
 		{cmd: prLookupAnyByHeadCommand(repoDir, branch)},
 	}}
@@ -349,6 +350,63 @@ func TestRunCommitNoOpReturnsNoChanges(t *testing.T) {
 	}
 	if got, want := res.Branch, branch; got != want {
 		t.Fatalf("Branch = %q, want %q", got, want)
+	}
+}
+
+func TestRunCommitNoOpWithExistingLocalCommitPushesAndCreatesPR(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := testRunDir(guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
+	repoDir := filepath.Join(runDir, "repo")
+	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
+	branch := "moltenhub-build-api"
+	prURL := "https://github.com/acme/repo/pull/4242"
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: branchCommand(repoDir, branch)},
+		{cmd: pushDryRunCommand(repoDir, branch)},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: "## moltenhub-build-api\n"}},
+		{cmd: commitsAheadOfBaseCommand(repoDir, cfg.BaseBranch), res: execx.Result{Stdout: "1\n"}},
+		{cmd: addCommand(repoDir)},
+		{
+			cmd: commitCommand(repoDir, cfg.CommitMessage),
+			res: execx.Result{Stdout: "On branch moltenhub-build-api\nnothing to commit, working tree clean\n"},
+			err: errors.New("exit status 1"),
+		},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: "## moltenhub-build-api\n"}},
+		{cmd: commitsAheadOfBaseCommand(repoDir, cfg.BaseBranch), res: execx.Result{Stdout: "1\n"}},
+		{cmd: pushCommand(repoDir, branch)},
+		{cmd: prCreateCommand(repoDir, cfg, branch), res: execx.Result{Stdout: prURL + "\n"}},
+		{cmd: prChecksCommand(repoDir, prURL)},
+	}}
+
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = testWorkspaceManager(guid)
+	h.TargetDirOK = func(path string) bool { return path == targetDir }
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.NoChanges {
+		t.Fatal("NoChanges = true, want false")
+	}
+	if got, want := res.PRURL, prURL; got != want {
+		t.Fatalf("PRURL = %q, want %q", got, want)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
 	}
 }
 
@@ -2321,6 +2379,12 @@ func TestCommandBuilders(t *testing.T) {
 		t.Fatalf("remote head command unexpected: %+v", remoteHead)
 	}
 
+	commitsAhead := commitsAheadOfBaseCommand(repoDir, "refs/heads/main")
+	wantCommitsAhead := []string{"rev-list", "--count", "main..HEAD"}
+	if commitsAhead.Name != "git" || commitsAhead.Dir != repoDir || !reflect.DeepEqual(commitsAhead.Args, wantCommitsAhead) {
+		t.Fatalf("commits ahead command unexpected: %+v", commitsAhead)
+	}
+
 	if !shouldCreateWorkBranch("main") {
 		t.Fatal("shouldCreateWorkBranch(main) = false, want true")
 	}
@@ -3229,6 +3293,20 @@ func TestHasTrackedWorktreeChanges(t *testing.T) {
 	}
 	if hasTrackedWorktreeChanges("\n") {
 		t.Fatal("hasTrackedWorktreeChanges(empty) = true, want false")
+	}
+}
+
+func TestHasAheadCommitsInStatus(t *testing.T) {
+	t.Parallel()
+
+	if !hasAheadCommitsInStatus("## moltenhub-branch...origin/moltenhub-branch [ahead 1]\n") {
+		t.Fatal("hasAheadCommitsInStatus(ahead) = false, want true")
+	}
+	if hasAheadCommitsInStatus("## moltenhub-branch...origin/moltenhub-branch [behind 2]\n") {
+		t.Fatal("hasAheadCommitsInStatus(behind) = true, want false")
+	}
+	if hasAheadCommitsInStatus(" M file.go\n") {
+		t.Fatal("hasAheadCommitsInStatus(no-header) = true, want false")
 	}
 }
 
