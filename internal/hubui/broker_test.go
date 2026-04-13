@@ -572,7 +572,6 @@ func TestBrokerIgnoresActionOnlyDispatchStatusForTerminalState(t *testing.T) {
 	t.Parallel()
 
 	b := NewBroker()
-	requestID := "req-follow-up"
 
 	b.IngestLog("dispatch status=start request_id=req-follow-up")
 	b.IngestLog(`dispatch status=error request_id=req-follow-up exit_code=50 err="codex failed"`)
