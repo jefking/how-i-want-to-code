@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"regexp"
 	"sort"
+	"strconv"
 	"strings"
 	"sync"
 	"time"
@@ -295,7 +296,11 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 			return h.fail(ExitGit, "git", err, runDir)
 		}
 		repos[i].Branch = pickFirstNonEmpty(localBranchFromStatus(statusRes.Stdout), repos[i].Branch)
-		repos[i].Changed = hasTrackedWorktreeChanges(statusRes.Stdout)
+		changed, detectErr := h.repoHasPendingChanges(ctx, repos[i], statusRes.Stdout, runCfg.BaseBranch)
+		if detectErr != nil {
+			return h.fail(ExitGit, "git", detectErr, runDir)
+		}
+		repos[i].Changed = changed
 		h.logf("stage=git status=scan repo=%s repo_dir=%s changed=%t", repos[i].URL, repos[i].RelDir, repos[i].Changed)
 	}
 
@@ -390,7 +395,7 @@ func (h Harness) processChangedRepo(
 	}
 	commitRes, commitErr := h.runCommand(ctx, "git", commitCommand(repo.Dir, cfg.CommitMessage))
 	if commitErr != nil {
-		noChanges, statusErr := h.refreshRepoChangeStateAfterNoOpCommit(ctx, repo, commitRes, commitErr)
+		noChanges, statusErr := h.refreshRepoChangeStateAfterNoOpCommit(ctx, repo, cfg.BaseBranch, commitRes, commitErr)
 		if statusErr != nil {
 			return ExitGit, "git", statusErr
 		}
@@ -398,7 +403,10 @@ func (h Harness) processChangedRepo(
 			h.logf("stage=git status=ok action=commit repo=%s repo_dir=%s reason=no_changes_after_add", repo.URL, repo.RelDir)
 			return ExitSuccess, "git", nil
 		}
-		return ExitGit, "git", commitErr
+		if !isNothingToCommitResult(commitRes, commitErr) {
+			return ExitGit, "git", commitErr
+		}
+		h.logf("stage=git status=ok action=commit repo=%s repo_dir=%s reason=already_committed", repo.URL, repo.RelDir)
 	}
 	if err := h.pushWithSync(ctx, *repo, 0); err != nil {
 		return ExitGit, "git", err
@@ -614,7 +622,7 @@ func (h Harness) processChangedRepo(
 		}
 		commitRes, commitErr := h.runCommand(ctx, "git", commitCommand(repo.Dir, remediationCommitMessage(cfg.CommitMessage, attempt+1)))
 		if commitErr != nil {
-			noChanges, statusErr := h.refreshRepoChangeStateAfterNoOpCommit(ctx, repo, commitRes, commitErr)
+			noChanges, statusErr := h.refreshRepoChangeStateAfterNoOpCommit(ctx, repo, cfg.BaseBranch, commitRes, commitErr)
 			if statusErr != nil {
 				return ExitGit, "git", statusErr
 			}
@@ -627,7 +635,15 @@ func (h Harness) processChangedRepo(
 				)
 				continue
 			}
-			return ExitGit, "git", commitErr
+			if !isNothingToCommitResult(commitRes, commitErr) {
+				return ExitGit, "git", commitErr
+			}
+			h.logf(
+				"stage=git status=ok action=repair_commit attempt=%d repo=%s repo_dir=%s reason=already_committed",
+				attempt+1,
+				repo.URL,
+				repo.RelDir,
+			)
 		}
 		if err := h.pushWithSync(ctx, *repo, attempt+1); err != nil {
 			return ExitGit, "git", err
@@ -1037,7 +1053,13 @@ func commandErrorWithDetails(prefix string, err error, res execx.Result, maxChar
 	return fmt.Errorf("%s: %w: %s", prefix, err, detail)
 }
 
-func (h Harness) refreshRepoChangeStateAfterNoOpCommit(ctx context.Context, repo *repoWorkspace, commitRes execx.Result, commitErr error) (bool, error) {
+func (h Harness) refreshRepoChangeStateAfterNoOpCommit(
+	ctx context.Context,
+	repo *repoWorkspace,
+	baseBranch string,
+	commitRes execx.Result,
+	commitErr error,
+) (bool, error) {
 	if repo == nil || !isNothingToCommitResult(commitRes, commitErr) {
 		return false, nil
 	}
@@ -1047,8 +1069,66 @@ func (h Harness) refreshRepoChangeStateAfterNoOpCommit(ctx context.Context, repo
 		return false, err
 	}
 	repo.Branch = pickFirstNonEmpty(localBranchFromStatus(statusRes.Stdout), repo.Branch)
-	repo.Changed = hasTrackedWorktreeChanges(statusRes.Stdout)
+	changed, detectErr := h.repoHasPendingChanges(ctx, *repo, statusRes.Stdout, baseBranch)
+	if detectErr != nil {
+		return false, detectErr
+	}
+	repo.Changed = changed
 	return !repo.Changed, nil
+}
+
+func (h Harness) repoHasPendingChanges(
+	ctx context.Context,
+	repo repoWorkspace,
+	statusStdout string,
+	baseBranch string,
+) (bool, error) {
+	if hasTrackedWorktreeChanges(statusStdout) || hasAheadCommitsInStatus(statusStdout) {
+		return true, nil
+	}
+	// `git status --porcelain --branch` should include a branch header.
+	// If it does not, keep legacy behavior and treat this as no changes.
+	if strings.TrimSpace(localBranchFromStatus(statusStdout)) == "" {
+		return false, nil
+	}
+	if !shouldCreateWorkBranch(baseBranch) {
+		return false, nil
+	}
+	commitsAhead, err := h.countCommitsAheadOfBase(ctx, repo, normalizeBranchRef(baseBranch))
+	if err != nil {
+		return false, err
+	}
+	return commitsAhead > 0, nil
+}
+
+func (h Harness) countCommitsAheadOfBase(ctx context.Context, repo repoWorkspace, baseBranch string) (int, error) {
+	baseBranch = normalizeBranchRef(baseBranch)
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
+	res, err := h.runCommand(ctx, "git", commitsAheadOfBaseCommand(repo.Dir, baseBranch))
+	if err != nil {
+		return 0, commandErrorWithDetails(
+			fmt.Sprintf("count commits ahead of base branch %q for repo %s", baseBranch, repo.URL),
+			err,
+			res,
+			maxGitErrorDetailChars,
+		)
+	}
+	countText := strings.TrimSpace(res.Stdout)
+	if countText == "" {
+		return 0, nil
+	}
+	count, parseErr := strconv.Atoi(countText)
+	if parseErr != nil {
+		return 0, fmt.Errorf(
+			"parse commits-ahead count for repo %s branch %q: %w",
+			repo.URL,
+			repo.Branch,
+			parseErr,
+		)
+	}
+	return count, nil
 }
 
 func isNothingToCommitResult(res execx.Result, err error) bool {
@@ -2525,6 +2605,17 @@ func hasTrackedWorktreeChanges(stdout string) bool {
 	return false
 }
 
+func hasAheadCommitsInStatus(stdout string) bool {
+	for _, line := range strings.Split(stdout, "\n") {
+		line = strings.TrimSpace(line)
+		if !strings.HasPrefix(line, "## ") {
+			continue
+		}
+		return strings.Contains(line, "[ahead ")
+	}
+	return false
+}
+
 func addCommand(repoDir string) execx.Command {
 	return execx.Command{Dir: repoDir, Name: "git", Args: []string{"add", "-A"}}
 }
@@ -2542,6 +2633,18 @@ func pushDryRunCommand(repoDir, branch string) execx.Command {
 		Dir:  repoDir,
 		Name: "git",
 		Args: []string{"push", "--dry-run", "origin", fmt.Sprintf("HEAD:refs/heads/%s", normalizeBranchRef(branch))},
+	}
+}
+
+func commitsAheadOfBaseCommand(repoDir, baseBranch string) execx.Command {
+	baseBranch = normalizeBranchRef(baseBranch)
+	if baseBranch == "" {
+		baseBranch = "main"
+	}
+	return execx.Command{
+		Dir:  repoDir,
+		Name: "git",
+		Args: []string{"rev-list", "--count", fmt.Sprintf("%s..HEAD", baseBranch)},
 	}
 }
 
