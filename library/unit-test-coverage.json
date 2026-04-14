@@ -3,6 +3,6 @@
     "displayName": "100% Unit Test Coverage",
     "description": "Drive the repository to full unit-test coverage and keep CI green.",
     "targetSubdir": ".",
-    "prompt": "You are a senior tester and need to reach 100% unit-test coverage for this repository. Improve coverage, test locally, and only finish when the PR exists and required CI/CD checks are green. If checks fail, keep iterating with focused fixes until they pass."
+    "prompt": "You are a senior tester and need to reach 100% unit-test coverage for this repository. Improve coverage, validate locally, and keep iterating on focused repository changes until the coverage target is met or you can prove a concrete blocker."
   }
 }

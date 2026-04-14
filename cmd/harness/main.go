@@ -533,7 +533,7 @@ func runHub(args []string) int {
 			return
 		}
 
-		rerunRequestID, rerunErr := enqueueLocalRun(ctx, failedRunCfg, false, "rerun", false)
+		rerunRequestID, rerunErr := enqueueFailureRerun(ctx, enqueueLocalRun, failedRunCfg)
 		if rerunErr != nil {
 			daemonLogger(
 				"dispatch status=warn action=queue_failure_rerun request_id=%s err=%q",
@@ -1201,6 +1201,17 @@ func shouldQueueFailureRerun(source string, failedResult harness.Result) (bool, 
 		return false, "run is already a failure rerun"
 	}
 	return true, ""
+}
+
+type localRunEnqueueFunc func(context.Context, config.Config, bool, string, bool) (string, error)
+
+func enqueueFailureRerun(ctx context.Context, enqueue localRunEnqueueFunc, failedRunCfg config.Config) (string, error) {
+	if enqueue == nil {
+		return "", fmt.Errorf("local run enqueuer is required")
+	}
+	// The failed run still owns the dedupe key until its goroutine unwinds, so
+	// the required one-time rerun must bypass duplicate suppression.
+	return enqueue(ctx, failedRunCfg, false, "rerun", true)
 }
 
 func shouldQueueUnexpectedNoChangesFollowUp(result harness.Result) (bool, string) {

@@ -418,6 +418,9 @@ func TestFailureFollowUpPromptDefaultWhenNoPaths(t *testing.T) {
 	if !strings.Contains(got, `When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.`) {
 		t.Fatalf("prompt missing failure response instruction: %q", got)
 	}
+	if !strings.Contains(got, "Do not stop work just because you cannot create a pull request or watch remote CI/CD from inside this agent runtime.") {
+		t.Fatalf("prompt missing remote operations handoff: %q", got)
+	}
 	if !strings.Contains(got, `"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."`) {
 		t.Fatalf("prompt missing follow-up payload shape: %q", got)
 	}
@@ -675,6 +678,48 @@ func TestShouldQueueFailureRerunSkipsNestedFailureRerunSource(t *testing.T) {
 	}
 	if reason != "failed task did not include an error" {
 		t.Fatalf("reason = %q, want %q", reason, "failed task did not include an error")
+	}
+}
+
+func TestEnqueueFailureRerunBypassesDuplicateSuppression(t *testing.T) {
+	t.Parallel()
+
+	runCfg := config.Config{
+		Repo:   "git@github.com:acme/repo.git",
+		Prompt: "fix failing checks",
+	}
+
+	var (
+		gotCfg                  config.Config
+		gotAllowFailureFollowUp bool
+		gotSource               string
+		gotForce                bool
+	)
+
+	requestID, err := enqueueFailureRerun(context.Background(), func(_ context.Context, cfg config.Config, allowFailureFollowUp bool, source string, force bool) (string, error) {
+		gotCfg = cfg
+		gotAllowFailureFollowUp = allowFailureFollowUp
+		gotSource = source
+		gotForce = force
+		return "local-rerun-1", nil
+	}, runCfg)
+	if err != nil {
+		t.Fatalf("enqueueFailureRerun() error = %v", err)
+	}
+	if requestID != "local-rerun-1" {
+		t.Fatalf("requestID = %q, want %q", requestID, "local-rerun-1")
+	}
+	if !reflect.DeepEqual(gotCfg, runCfg) {
+		t.Fatalf("runCfg = %#v, want %#v", gotCfg, runCfg)
+	}
+	if gotAllowFailureFollowUp {
+		t.Fatal("allowFailureFollowUp = true, want false")
+	}
+	if gotSource != "rerun" {
+		t.Fatalf("source = %q, want %q", gotSource, "rerun")
+	}
+	if !gotForce {
+		t.Fatal("force = false, want true")
 	}
 }
 

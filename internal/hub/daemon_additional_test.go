@@ -27,7 +27,7 @@ type stubMoltenHubAPI struct {
 	mu           sync.Mutex
 	acked        []string
 	nacked       []string
-	published     []map[string]any
+	published    []map[string]any
 	offlineCalls []struct {
 		SessionKey string
 		Reason     string
@@ -405,7 +405,10 @@ func TestHandleDispatchQueuesFailureFollowUpAfterPublishingFailureResult(t *test
 		t.Fatalf("follow-up prompt missing original prompt: %q", prompt)
 	}
 	if !strings.Contains(prompt, `Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.`) {
-		t.Fatalf("follow-up prompt missing execution contract: %q", prompt)
+		t.Fatalf("follow-up prompt missing offline review instruction: %q", prompt)
+	}
+	if !strings.Contains(prompt, "Do not stop work just because you cannot create a pull request or watch remote CI/CD from inside this agent runtime.") {
+		t.Fatalf("follow-up prompt missing remote operations handoff: %q", prompt)
 	}
 	if !strings.Contains(prompt, "If no file changes are required, return a clear no-op result with concrete evidence instead of forcing an empty PR.") {
 		t.Fatalf("follow-up prompt missing no-op completion carve-out: %q", prompt)
