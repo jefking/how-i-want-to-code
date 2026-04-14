@@ -36,6 +36,9 @@ func TestComposePromptUsesExplicitNoPathGuidance(t *testing.T) {
 	if !strings.Contains(got, "\n- use fallback log directory") {
 		t.Fatalf("ComposePrompt() = %q, want no-path guidance bullet", got)
 	}
+	if !strings.Contains(got, OfflineReviewInstruction) {
+		t.Fatalf("ComposePrompt() missing offline review instruction")
+	}
 	if !strings.Contains(got, ExecutionContract) {
 		t.Fatalf("ComposePrompt() missing execution contract")
 	}

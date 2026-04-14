@@ -3120,19 +3120,13 @@ func TestCodexReportedFailureIgnoresGoStructSnippet(t *testing.T) {
 	}
 }
 
-func TestWithCompletionGatePromptIncludesFailureQueueContract(t *testing.T) {
+func TestWithCompletionGatePromptIncludesAgentRuntimeGuidance(t *testing.T) {
 	t.Parallel()
 
 	got := withCompletionGatePrompt("Build API")
 	wantSnippets := []string{
-		"Issue an offline to moltenbot hub -> review na.hub.molten.bot.openapi.yaml for integration behaviours.",
-		`When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.`,
-		"When a task fails (execution failure):",
-		"- Re-run the original task once.",
-		"Queue a follow-up task dedicated to reviewing the logs and fixing all underlying issues in this codebase.",
-		"Pass the relevant failing file/folder log path(s) into that follow-up task context.",
-		`{"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."}`,
-		"Completion requirements:",
+		"When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.",
+		"Do not stop work just because you cannot create a pull request or watch remote CI/CD from inside this agent runtime.",
 		"If no file changes are required, return a clear no-op result with concrete evidence instead of forcing an empty PR.",
 	}
 	for _, snippet := range wantSnippets {
