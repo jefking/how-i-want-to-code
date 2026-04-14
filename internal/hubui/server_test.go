@@ -210,7 +210,6 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if strings.Contains(markup, `Run Studio`) || strings.Contains(markup, `Queue repository work with the same repo, branch, reviewer, and prompt contract the hub executes.`) {
 		t.Fatalf("expected index html to remove the Studio overview hero panel")
 	}
-	}
 	if !strings.Contains(markup, `>Queue Task</button>`) {
 		t.Fatalf("expected index html to rename the primary prompt submit action to Queue Task")
 	}
