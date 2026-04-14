@@ -208,8 +208,8 @@ func TestHarnessAdditionalHelperBranches(t *testing.T) {
 	if got := withCompletionGatePrompt(""); !strings.Contains(got, "Improve this repository in a minimal, production-ready way.") {
 		t.Fatalf("withCompletionGatePrompt(empty) missing default prompt: %q", got)
 	}
-	if got := withCompletionGatePrompt("ship fix"); !strings.Contains(got, failurefollowup.ExecutionContract) {
-		t.Fatalf("withCompletionGatePrompt() missing execution contract: %q", got)
+	if got := withCompletionGatePrompt("ship fix"); !strings.Contains(got, failurefollowup.RemoteOperationsInstruction) {
+		t.Fatalf("withCompletionGatePrompt() missing remote-operations guidance: %q", got)
 	}
 
 	cmd := codexCommandWithOptions("/tmp/repo", "ship fix", codexRunOptions{SkipGitRepoCheck: true})
