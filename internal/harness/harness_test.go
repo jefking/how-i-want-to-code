@@ -856,13 +856,14 @@ func TestRunCodexFailureStopsBeforeCommitAndPR(t *testing.T) {
 	}
 }
 
-func TestRunRemoteWriteAccessFailureStopsBeforeCodex(t *testing.T) {
+func TestRunSingleRepoReadOnlyChangedFailsAfterAgent(t *testing.T) {
 	t.Parallel()
 
 	cfg := sampleConfig()
 	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
 	guid := "abcdef123456"
 	runDir := testRunDir(guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
 	repoDir := filepath.Join(runDir, "repo")
 	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
 	branch := "moltenhub-build-api"
@@ -878,6 +879,8 @@ func TestRunRemoteWriteAccessFailureStopsBeforeCodex(t *testing.T) {
 		{cmd: cloneCommand(cfg, repoDir)},
 		{cmd: branchCommand(repoDir, branch)},
 		{cmd: pushDryRunCommand(repoDir, branch), res: push403, err: errors.New("exit status 128")},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: " M file.go\n"}},
 	}}
 
 	h := New(fake)
@@ -892,11 +895,63 @@ func TestRunRemoteWriteAccessFailureStopsBeforeCodex(t *testing.T) {
 	if res.ExitCode != ExitGit {
 		t.Fatalf("ExitCode = %d, want %d", res.ExitCode, ExitGit)
 	}
+	if !strings.Contains(res.Err.Error(), "cannot publish changes for repo") {
+		t.Fatalf("error = %v, want publish failure context", res.Err)
+	}
 	if !strings.Contains(res.Err.Error(), "verify remote write access") {
 		t.Fatalf("error = %v, want write-access context", res.Err)
 	}
 	if !strings.Contains(res.Err.Error(), "Write access to repository not granted") {
 		t.Fatalf("error = %v, want remote error detail", res.Err)
+	}
+	if len(fake.exps) != 0 {
+		t.Fatalf("unconsumed expectations: %d", len(fake.exps))
+	}
+}
+
+func TestRunSingleRepoReadOnlyNoChangesStillSucceeds(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	now := time.Date(2026, 4, 2, 15, 4, 5, 0, time.UTC)
+	guid := "abcdef123456"
+	runDir := testRunDir(guid)
+	agentsPath := filepath.Join(runDir, "AGENTS.md")
+	repoDir := filepath.Join(runDir, "repo")
+	targetDir := filepath.Join(repoDir, cfg.TargetSubdir)
+	branch := "moltenhub-build-api"
+	push403 := execx.Result{
+		Stderr: "remote: Write access to repository not granted.\nfatal: unable to access 'https://github.com/acme/repo.git/': The requested URL returned error: 403\n",
+	}
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{cmd: execx.Command{Name: "git", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"--version"}}},
+		{cmd: execx.Command{Name: "codex", Args: []string{"--help"}}},
+		{cmd: execx.Command{Name: "gh", Args: []string{"auth", "status"}}},
+		{cmd: cloneCommand(cfg, repoDir)},
+		{cmd: branchCommand(repoDir, branch)},
+		{cmd: pushDryRunCommand(repoDir, branch), res: push403, err: errors.New("exit status 128")},
+		{cmd: codexCommand(targetDir, withAgentsPrompt(cfg.Prompt, agentsPath))},
+		{cmd: statusCommand(repoDir), res: execx.Result{Stdout: "\n"}},
+		{cmd: remoteBranchExistsOnOriginCommand(repoDir, branch)},
+		{cmd: prLookupAnyByHeadCommand(repoDir, branch)},
+	}}
+
+	h := New(fake)
+	h.Now = func() time.Time { return now }
+	h.Workspace = testWorkspaceManager(guid)
+	h.TargetDirOK = func(path string) bool { return path == targetDir }
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err != nil {
+		t.Fatalf("Run() err = %v", res.Err)
+	}
+	if res.ExitCode != ExitSuccess {
+		t.Fatalf("ExitCode = %d", res.ExitCode)
+	}
+	if !res.NoChanges {
+		t.Fatal("NoChanges = false, want true")
 	}
 	if len(fake.exps) != 0 {
 		t.Fatalf("unconsumed expectations: %d", len(fake.exps))

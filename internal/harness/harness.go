@@ -237,7 +237,7 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	}
 	for i := range repos {
 		if err := h.verifyRemoteWriteAccess(ctx, repos[i]); err != nil {
-			if len(repos) > 1 && failurefollowup.NonRemediableRepoAccessReason(err) != "" {
+			if failurefollowup.NonRemediableRepoAccessReason(err) != "" {
 				repos[i].WriteAccessChecked = true
 				repos[i].WriteAccessAllowed = false
 				repos[i].WriteAccessErr = err
