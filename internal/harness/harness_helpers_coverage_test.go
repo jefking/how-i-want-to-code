@@ -116,6 +116,9 @@ func TestHarnessFilesystemAndPromptHelpers(t *testing.T) {
 	if got, err := withResponseModePrompt("ship fix", "off"); err != nil || got != "ship fix" {
 		t.Fatalf("withResponseModePrompt(off) = (%q, %v), want original prompt", got, err)
 	}
+	if _, err := withResponseModePrompt("ship fix", "LOUD"); err == nil || !strings.Contains(err.Error(), "unsupported responseMode") {
+		t.Fatalf("withResponseModePrompt(invalid) error = %v, want unsupported responseMode", err)
+	}
 }
 
 func TestHarnessRuntimeAndCheckSnapshotHelpers(t *testing.T) {

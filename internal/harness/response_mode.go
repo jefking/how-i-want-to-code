@@ -18,7 +18,15 @@ const (
 
 func withResponseModePrompt(prompt, responseMode string) (string, error) {
 	prompt = strings.TrimSpace(prompt)
+	rawResponseMode := strings.TrimSpace(responseMode)
 	responseMode = config.NormalizeResponseMode(responseMode)
+	if rawResponseMode != "" && responseMode == "" {
+		return "", fmt.Errorf(
+			"unsupported responseMode %q; supported values: %s",
+			rawResponseMode,
+			strings.Join(config.SupportedResponseModesWithDefault(), ", "),
+		)
+	}
 	if responseMode == config.DisabledResponseMode {
 		return prompt, nil
 	}
