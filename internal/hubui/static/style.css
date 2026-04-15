@@ -16,28 +16,28 @@
   --hub-good-rgb: 43 182 115;
   --hub-warn-rgb: 245 158 11;
   --hub-bad-rgb: 239 68 68;
-  --hub-running-rgb: 10 132 255;
+  --hub-running-rgb: 236 72 153;
   --hub-meta-rgb: 113 136 177;
-  --hub-accent-rgb: 123 97 255;
-  --bg: #f4f8ff;
+  --hub-accent-rgb: 217 70 239;
+  --bg: #fff1f8;
   --bg-soft: rgba(255, 255, 255, 0.84);
   --bg-elevated: #ffffff;
   --bg-panel: rgba(255, 255, 255, 0.76);
   --bg-panel-strong: rgba(255, 255, 255, 0.92);
   --bg-panel-muted: rgba(232, 239, 255, 0.82);
   --border: rgba(17, 34, 68, 0.14);
-  --border-strong: rgba(10, 132, 255, 0.22);
-  --text: #0f1b33;
-  --text-soft: #35507a;
-  --muted: #5a6f95;
-  --meta: #7188b1;
+  --border-strong: rgba(236, 72, 153, 0.22);
+  --text: #4a1232;
+  --text-soft: #7a3656;
+  --muted: #9b5c7d;
+  --meta: #b17a98;
   --good: #2bb673;
   --warn: #f59e0b;
   --bad: #ef4444;
-  --running: #0a84ff;
-  --accent: #7b61ff;
-  --accent-soft: rgba(123, 97, 255, 0.12);
-  --brand-gradient: linear-gradient(135deg, #3ecbff 0%, #0a84ff 48%, #7b61ff 100%);
+  --running: #ec4899;
+  --accent: #d946ef;
+  --accent-soft: rgba(217, 70, 239, 0.12);
+  --brand-gradient: linear-gradient(135deg, #f9a8d4 0%, #ec4899 48%, #d946ef 100%);
   --surface-glass: linear-gradient(160deg, rgba(255, 255, 255, 0.88), rgba(240, 245, 255, 0.74));
   --surface-glass-strong: linear-gradient(160deg, rgba(255, 255, 255, 0.94), rgba(240, 246, 255, 0.9));
   --surface-glass-solid: rgba(255, 255, 255, 0.92);
@@ -86,16 +86,16 @@
   --surface-warning: #8a5a00;
   --surface-danger: #b42318;
   --surface-terminal-bg:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(243, 247, 255, 0.92)),
-    radial-gradient(circle at top left, rgba(62, 203, 255, 0.07), transparent 40%);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.88), rgba(255, 244, 250, 0.92)),
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.08), transparent 40%);
   --surface-scroll-track: rgba(232, 239, 255, 0.5);
   --surface-scroll-thumb: rgba(113, 136, 177, 0.55);
   --surface-scroll-thumb-border: rgba(232, 239, 255, 0.8);
   --surface-scroll-thumb-hover: rgba(90, 111, 149, 0.72);
   --surface-fullscreen-bg:
-    linear-gradient(180deg, rgba(244, 248, 255, 0.76), rgba(236, 243, 255, 0.9)),
-    radial-gradient(circle at top left, rgba(62, 203, 255, 0.14), transparent 38%),
-    radial-gradient(circle at bottom right, rgba(123, 97, 255, 0.16), transparent 42%);
+    linear-gradient(180deg, rgba(255, 241, 248, 0.8), rgba(255, 232, 243, 0.92)),
+    radial-gradient(circle at top left, rgba(244, 114, 182, 0.16), transparent 38%),
+    radial-gradient(circle at bottom right, rgba(217, 70, 239, 0.16), transparent 42%);
   --surface-fullscreen-close-bg: rgba(15, 27, 51, 0.92);
   --surface-fullscreen-close-border: rgba(15, 27, 51, 0.2);
   --surface-fullscreen-close-hover-bg: rgba(15, 27, 51, 0.98);
@@ -111,11 +111,11 @@
   --surface-auth-button-bg: rgba(255, 255, 255, 0.05);
   --surface-auth-button-hover-bg: rgba(255, 255, 255, 0.1);
   --surface-auth-link: #8dc6ff;
-  --surface-auth-verify-bg: linear-gradient(180deg, #0a84ff, #0057d8);
-  --surface-auth-verify-hover-bg: linear-gradient(180deg, #2191ff, #0a6ae6);
-  --surface-auth-verify-border: rgba(10, 132, 255, 0.24);
-  --surface-auth-verify-shadow: 0 12px 24px rgba(10, 132, 255, 0.22);
-  --surface-auth-verify-hover-shadow: 0 16px 28px rgba(10, 132, 255, 0.28);
+  --surface-auth-verify-bg: linear-gradient(180deg, #ec4899, #db2777);
+  --surface-auth-verify-hover-bg: linear-gradient(180deg, #f472b6, #ec4899);
+  --surface-auth-verify-border: rgba(236, 72, 153, 0.24);
+  --surface-auth-verify-shadow: 0 12px 24px rgba(236, 72, 153, 0.22);
+  --surface-auth-verify-hover-shadow: 0 16px 28px rgba(236, 72, 153, 0.28);
   --surface-auth-verify-text: #ffffff;
   --radius: 6px;
   --radius-card: 15px;
@@ -155,11 +155,11 @@
     inset 0 1px 0 rgba(255, 255, 255, 0.82),
     0 0 0 3px rgba(76, 133, 233, 0.18);
   --agent-logo-filter: brightness(0) saturate(100%);
-  --body-radial-left: radial-gradient(1300px 600px at -10% -15%, rgba(10, 132, 255, 0.16), transparent 60%);
-  --body-radial-right: radial-gradient(980px 560px at 110% 8%, rgba(123, 97, 255, 0.12), transparent 62%);
-  --body-linear: linear-gradient(180deg, #f8fbff, #f2f7ff 55%, #ecf3ff);
-  --body-orb-a: radial-gradient(circle, rgba(62, 203, 255, 0.24) 0%, rgba(62, 203, 255, 0) 66%);
-  --body-orb-b: radial-gradient(circle, rgba(123, 97, 255, 0.2) 0%, rgba(123, 97, 255, 0) 70%);
+  --body-radial-left: radial-gradient(1300px 600px at -10% -15%, rgba(244, 114, 182, 0.18), transparent 60%);
+  --body-radial-right: radial-gradient(980px 560px at 110% 8%, rgba(217, 70, 239, 0.14), transparent 62%);
+  --body-linear: linear-gradient(180deg, #fff7fb, #fff0f7 55%, #ffe7f2);
+  --body-orb-a: radial-gradient(circle, rgba(244, 114, 182, 0.24) 0%, rgba(244, 114, 182, 0) 66%);
+  --body-orb-b: radial-gradient(circle, rgba(217, 70, 239, 0.2) 0%, rgba(217, 70, 239, 0) 70%);
   --shadow-sm: 0 10px 28px rgba(10, 44, 102, 0.08);
   --shadow-md: 0 18px 44px rgba(10, 44, 102, 0.14);
   --shadow-lg: 0 28px 72px rgba(10, 44, 102, 0.18);
@@ -3256,11 +3256,11 @@ html.dark {
   --hub-text-rgb: 232 240 255;
   --hub-muted-rgb: 159 178 214;
   --hub-meta-rgb: 140 162 204;
-  --body-radial-left: radial-gradient(1200px 620px at -12% -12%, rgba(10, 132, 255, 0.28), transparent 58%);
-  --body-radial-right: radial-gradient(880px 540px at 108% 4%, rgba(123, 97, 255, 0.22), transparent 60%);
+  --body-radial-left: radial-gradient(1200px 620px at -12% -12%, rgba(236, 72, 153, 0.28), transparent 58%);
+  --body-radial-right: radial-gradient(880px 540px at 108% 4%, rgba(217, 70, 239, 0.22), transparent 60%);
   --body-linear: linear-gradient(180deg, #0d1424, #0a1120 58%, #09101d);
-  --body-orb-a: radial-gradient(circle, rgba(10, 132, 255, 0.22) 0%, rgba(10, 132, 255, 0) 68%);
-  --body-orb-b: radial-gradient(circle, rgba(123, 97, 255, 0.18) 0%, rgba(123, 97, 255, 0) 72%);
+  --body-orb-a: radial-gradient(circle, rgba(236, 72, 153, 0.22) 0%, rgba(236, 72, 153, 0) 68%);
+  --body-orb-b: radial-gradient(circle, rgba(217, 70, 239, 0.18) 0%, rgba(217, 70, 239, 0) 72%);
   --bg: #0f1627;
   --bg-soft: rgba(20, 29, 49, 0.88);
   --bg-elevated: #18233a;
@@ -3273,7 +3273,7 @@ html.dark {
   --text-soft: #b8caea;
   --muted: #9fb2d6;
   --meta: #8ca2cc;
-  --accent-soft: rgba(123, 97, 255, 0.24);
+  --accent-soft: rgba(217, 70, 239, 0.24);
   --surface-glass: linear-gradient(160deg, rgba(25, 35, 57, 0.9), rgba(18, 27, 44, 0.82));
   --surface-glass-strong: linear-gradient(160deg, rgba(31, 43, 69, 0.94), rgba(20, 29, 47, 0.9));
   --surface-glass-solid: rgba(20, 30, 52, 0.94);
@@ -3396,11 +3396,11 @@ html.night {
   --hub-text-rgb: 237 243 255;
   --hub-muted-rgb: 155 173 207;
   --hub-meta-rgb: 140 161 201;
-  --body-radial-left: radial-gradient(1100px 560px at -12% -16%, rgba(48, 124, 255, 0.2), transparent 56%);
-  --body-radial-right: radial-gradient(920px 520px at 112% 2%, rgba(86, 112, 255, 0.16), transparent 60%);
+  --body-radial-left: radial-gradient(1100px 560px at -12% -16%, rgba(236, 72, 153, 0.22), transparent 56%);
+  --body-radial-right: radial-gradient(920px 520px at 112% 2%, rgba(217, 70, 239, 0.18), transparent 60%);
   --body-linear: linear-gradient(180deg, #05070d, #070b14 55%, #090f1a);
-  --body-orb-a: radial-gradient(circle, rgba(55, 120, 255, 0.16) 0%, rgba(55, 120, 255, 0) 70%);
-  --body-orb-b: radial-gradient(circle, rgba(99, 117, 255, 0.14) 0%, rgba(99, 117, 255, 0) 74%);
+  --body-orb-a: radial-gradient(circle, rgba(236, 72, 153, 0.16) 0%, rgba(236, 72, 153, 0) 70%);
+  --body-orb-b: radial-gradient(circle, rgba(217, 70, 239, 0.14) 0%, rgba(217, 70, 239, 0) 74%);
   --bg: #080b14;
   --bg-soft: rgba(9, 14, 24, 0.92);
   --bg-elevated: #0f1626;
@@ -3413,7 +3413,7 @@ html.night {
   --text-soft: #bed0ef;
   --muted: #9badcf;
   --meta: #8ca1c9;
-  --accent-soft: rgba(123, 97, 255, 0.28);
+  --accent-soft: rgba(217, 70, 239, 0.28);
   --surface-glass: linear-gradient(160deg, rgba(16, 24, 41, 0.92), rgba(9, 14, 25, 0.88));
   --surface-glass-strong: linear-gradient(160deg, rgba(20, 29, 49, 0.96), rgba(11, 18, 31, 0.92));
   --surface-glass-solid: rgba(12, 18, 31, 0.95);
