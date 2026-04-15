@@ -141,11 +141,11 @@
 
   function pickerTheme() {
     const root = global.document && global.document.documentElement ? global.document.documentElement : null;
-    const explicitScheme = root ? String(root.style.colorScheme || "").trim().toLowerCase() : "";
-    if (explicitScheme === "dark") {
+    const explicitTheme = root ? String(root.getAttribute("data-theme") || "").trim().toLowerCase() : "";
+    if (explicitTheme && explicitTheme !== "light") {
       return "dark";
     }
-    if (typeof global.matchMedia === "function" && global.matchMedia("(prefers-color-scheme: dark)").matches) {
+    if (root && (root.classList.contains("dark") || root.classList.contains("night"))) {
       return "dark";
     }
     return "light";
@@ -166,14 +166,12 @@
     }
 
     panel.innerHTML = [
-      '<div class="hub-emoji-picker-panel-shell">',
-      '  <div class="hub-emoji-picker-panel-header">',
-      '    <p class="hub-emoji-picker-panel-title">Pick one emoji</p>',
-      '    <button class="hub-emoji-picker-clear" type="button">Clear</button>',
-      "  </div>",
-      '  <div class="hub-emoji-picker-body">',
-      '    <div class="hub-emoji-picker-state">Loading emoji picker...</div>',
-      "  </div>",
+      '<div class="hub-emoji-picker-panel-header">',
+      '  <p class="hub-emoji-picker-panel-title">Pick one emoji</p>',
+      '  <button class="hub-emoji-picker-clear" type="button">Clear</button>',
+      "</div>",
+      '<div class="hub-emoji-picker-body">',
+      '  <div class="hub-emoji-picker-state">Loading emoji picker...</div>',
       "</div>",
     ].join("");
 

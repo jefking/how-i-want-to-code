@@ -120,6 +120,8 @@
   --radius: 6px;
   --radius-card: 15px;
   --radius-sm: calc(var(--radius) - 2px);
+  --popover: rgba(255, 255, 255, 0.9);
+  --input-background: linear-gradient(180deg, rgba(251, 254, 255, 0.98), rgba(234, 245, 255, 0.88));
   --foreground: rgba(26, 26, 26, 1);
   --glass-bg: rgba(255, 255, 255, 0.45);
   --glass-border: rgba(255, 255, 255, 0.5);
@@ -2729,18 +2731,15 @@ select.prompt-control {
   justify-content: space-between;
   gap: 10px;
   width: 100%;
-  min-height: 44px;
+  min-height: 42px;
   padding: 7px 10px;
-  border: 1px solid var(--surface-control-border);
-  border-radius: 16px;
-  background: var(--surface-control-bg);
-  box-shadow: var(--surface-control-shadow);
-  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--input-background);
+  color: var(--foreground);
   transition:
-    transform 180ms ease,
     border-color 180ms ease,
     background 180ms ease,
-    box-shadow 180ms ease,
     color 180ms ease;
 }
 
@@ -2765,10 +2764,9 @@ select.prompt-control {
 
 .hub-emoji-picker-toggle:hover,
 .hub-emoji-picker-toggle:focus-visible {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--running) 34%, var(--surface-control-border));
+  border-color: color-mix(in srgb, var(--running) 34%, var(--border));
   background: var(--surface-control-bg-strong);
-  color: var(--surface-tab-active-text);
+  color: var(--foreground);
 }
 
 .hub-emoji-picker-toggle:focus-visible,
@@ -2782,11 +2780,10 @@ select.prompt-control {
 
 .hub-emoji-picker-toggle:disabled {
   opacity: 0.55;
-  transform: none;
 }
 
 .hub-emoji-picker-toggle-preview {
-  font-size: 0.95rem;
+  font-size: 15px;
   line-height: 1;
 }
 
@@ -2795,9 +2792,9 @@ select.prompt-control {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
-  color: var(--text);
+  color: var(--foreground);
   font-size: 0.83rem;
-  font-weight: 600;
+  font-weight: 500;
 }
 
 .hub-emoji-picker-toggle-text.is-empty {
@@ -2807,7 +2804,7 @@ select.prompt-control {
 .hub-emoji-picker-toggle-chevron {
   flex: 0 0 auto;
   font-size: 0.82rem;
-  color: var(--surface-label);
+  color: var(--muted-foreground);
   line-height: 1;
   transition: transform 180ms ease;
 }
@@ -2824,17 +2821,10 @@ select.prompt-control {
   padding: 8px;
   border: 1px solid var(--glass-border);
   border-radius: var(--radius-card);
-  background: var(--glass-bg);
+  background: var(--popover);
   box-shadow: var(--glass-shadow);
   backdrop-filter: blur(40px) saturate(160%);
   -webkit-backdrop-filter: blur(40px) saturate(160%);
-}
-
-.hub-emoji-picker-panel-shell {
-  border: 1px solid color-mix(in srgb, var(--surface-control-border) 86%, transparent);
-  border-radius: 14px;
-  background: color-mix(in srgb, var(--surface-control-bg) 97%, transparent);
-  padding: 10px;
 }
 
 .hub-emoji-picker-panel-header {
@@ -2842,16 +2832,16 @@ select.prompt-control {
   align-items: center;
   justify-content: space-between;
   gap: 10px;
-  margin-bottom: 10px;
-  padding: 0 2px;
+  margin-bottom: 8px;
+  padding: 0 4px;
 }
 
 .hub-emoji-picker-panel-title {
   margin: 0;
-  color: var(--surface-label);
-  font-size: 0.72rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
   text-transform: none;
 }
 
@@ -2861,41 +2851,34 @@ select.prompt-control {
 }
 
 .hub-emoji-picker-clear {
-  transition: transform 180ms ease, border-color 180ms ease, color 180ms ease, background 180ms ease, box-shadow 180ms ease;
-}
-
-.hub-emoji-picker-clear {
   flex: 0 0 auto;
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid color-mix(in srgb, var(--surface-control-border) 84%, transparent);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--surface-control-bg-strong) 94%, transparent);
-  box-shadow: var(--surface-control-shadow);
-  color: var(--surface-label);
-  font-size: 0.7rem;
-  font-weight: 700;
-  letter-spacing: 0.04em;
+  min-height: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: transparent;
+  box-shadow: none;
+  color: var(--muted-foreground);
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0;
+  transition: color 180ms ease;
 }
 
 .hub-emoji-picker-clear:disabled {
   opacity: 0.48;
-  transform: none;
 }
 
 .hub-emoji-picker-clear:hover,
 .hub-emoji-picker-clear:focus-visible {
-  transform: translateY(-1px);
-  border-color: color-mix(in srgb, var(--running) 32%, var(--surface-control-border));
-  background: color-mix(in srgb, var(--running) 14%, var(--surface-control-bg));
-  color: var(--surface-tab-active-text);
+  color: var(--foreground);
 }
 
 .hub-emoji-picker-body {
   overflow: hidden;
   border: 1px solid var(--glass-border);
-  border-radius: 12px;
-  background: color-mix(in srgb, var(--surface-control-bg-strong) 98%, transparent);
+  border-radius: var(--radius);
+  background: var(--input-background);
 }
 
 .hub-emoji-picker-state {
@@ -2917,7 +2900,7 @@ select.prompt-control {
   --em-rgb-input: 255, 255, 255;
   --em-color-border: rgba(112, 163, 221, 0.24);
   --em-color-border-over: rgba(112, 163, 221, 0.38);
-  border-radius: 12px;
+  border-radius: var(--radius);
 }
 
 html.night .hub-emoji-mart {
@@ -3269,6 +3252,8 @@ html.dark {
   --surface-auth-verify-hover-shadow: 0 18px 34px rgba(10, 132, 255, 0.3);
   --foreground: rgba(245, 245, 247, 1);
   --muted-foreground: rgba(152, 152, 157, 1);
+  --popover: rgba(18, 25, 42, 0.92);
+  --input-background: linear-gradient(180deg, rgba(27, 38, 60, 0.98), rgba(19, 28, 45, 0.92));
   --glass-bg: rgba(50, 50, 52, 0.55);
   --glass-border: rgba(255, 255, 255, 0.08);
   --glass-shadow:
@@ -3409,6 +3394,8 @@ html.night {
   --surface-auth-verify-hover-shadow: 0 18px 34px rgba(10, 132, 255, 0.3);
   --foreground: rgba(220, 220, 225, 1);
   --muted-foreground: rgba(118, 118, 128, 1);
+  --popover: rgba(12, 18, 31, 0.94);
+  --input-background: linear-gradient(180deg, rgba(18, 25, 42, 0.98), rgba(11, 17, 29, 0.94));
   --elevation-sm: 0px 1px 3px 0px rgba(0, 0, 0, 0.7);
   --glass-bg: rgba(22, 22, 26, 0.6);
   --glass-border: rgba(255, 255, 255, 0.05);
