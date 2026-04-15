@@ -216,7 +216,7 @@ func (g *piAuthGate) refreshAndSnapshot(ctx context.Context) (hubui.AgentAuthSta
 
 	if shouldSkipPiProviderProbe(envVar) {
 		g.mu.Lock()
-		g.validatedAuth = canonical
+		g.validatedAuth = validatedPiAuthStateKey("provider", canonical)
 		g.refreshLocked()
 		snap := g.snapshotLocked()
 		g.mu.Unlock()
@@ -232,7 +232,7 @@ func (g *piAuthGate) refreshAndSnapshot(ctx context.Context) (hubui.AgentAuthSta
 	}
 
 	g.mu.Lock()
-	g.validatedAuth = canonical
+	g.validatedAuth = validatedPiAuthStateKey("provider", canonical)
 	g.refreshLocked()
 	snap := g.snapshotLocked()
 	g.mu.Unlock()

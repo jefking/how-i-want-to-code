@@ -14,7 +14,7 @@ import (
 	"github.com/jef/moltenhub-code/internal/hub"
 )
 
-func TestNewPiAuthGateRequiresConfigureWhenMissingProviderAuthAndExistingPiProbeFails(t *testing.T) {
+func TestNewPiAuthGateRequiresConfigureWhenExistingPiProbeFails(t *testing.T) {
 	t.Setenv("OPENAI_API_KEY", "")
 	runner := &authGateRunnerStub{
 		run: func(context.Context, execx.Command) (execx.Result, error) {
@@ -33,13 +33,16 @@ func TestNewPiAuthGateRequiresConfigureWhenMissingProviderAuthAndExistingPiProbe
 	if status.Ready || status.State != "needs_configure" {
 		t.Fatalf("status = %+v", status)
 	}
-	if len(status.ConfigureOptions) == 0 {
-		t.Fatalf("ConfigureOptions = %v, want non-empty", status.ConfigureOptions)
+	if len(status.ConfigureOptions) != 0 {
+		t.Fatalf("ConfigureOptions = %v, want empty", status.ConfigureOptions)
 	}
 	if got, want := status.Message, piExistingLocalAuthValidationStatusMessage(); got != want {
 		t.Fatalf("Message = %q, want %q", got, want)
 	}
-	if got, want := status.ConfigurePlaceholder, "Paste provider token..."; got != want {
+	if got, want := status.ConfigureCommand, piAuthConfigureCommand; got != want {
+		t.Fatalf("ConfigureCommand = %q, want %q", got, want)
+	}
+	if got, want := status.ConfigurePlaceholder, piAuthConfigurePlaceholder; got != want {
 		t.Fatalf("ConfigurePlaceholder = %q, want %q", got, want)
 	}
 	if got := len(runner.calls); got != 1 {
@@ -122,6 +125,54 @@ func TestPiAuthGateConfigurePersistsRuntimeConfigAndEnvironment(t *testing.T) {
 	}
 	if got, want := doc["pi_provider_auth"], expected; got != want {
 		t.Fatalf("pi_provider_auth = %#v, want %q", got, want)
+	}
+	if got := len(runner.calls); got != 1 {
+		t.Fatalf("probe calls = %d, want 1", got)
+	}
+}
+
+func TestPiAuthGateConfigurePersistsPiAuthJSONAndWritesAuthFile(t *testing.T) {
+	t.Setenv("OPENAI_API_KEY", "")
+	homeDir := t.TempDir()
+	t.Setenv("HOME", homeDir)
+
+	path := filepath.Join(t.TempDir(), ".moltenhub", "config.json")
+	runner := &authGateRunnerStub{}
+	g := newPiAuthGateWithRuntime(runner, "pi", path, hub.InitConfig{}, nil)
+
+	input := `{"provider":"demo","token":"saved"}`
+	expected, err := normalizePiAuthJSON(input)
+	if err != nil {
+		t.Fatalf("normalizePiAuthJSON() error = %v", err)
+	}
+
+	status, err := g.Configure(context.Background(), input)
+	if err != nil {
+		t.Fatalf("Configure() error = %v", err)
+	}
+	if !status.Ready || status.State != "ready" {
+		t.Fatalf("status = %+v", status)
+	}
+
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatalf("ReadFile() error = %v", err)
+	}
+	var doc map[string]any
+	if err := json.Unmarshal(data, &doc); err != nil {
+		t.Fatalf("Unmarshal() error = %v", err)
+	}
+	if got, want := doc["pi_auth_json"], expected; got != want {
+		t.Fatalf("pi_auth_json = %#v, want %q", got, want)
+	}
+
+	authPath := filepath.Join(homeDir, ".pi", "agent", "auth.json")
+	written, err := os.ReadFile(authPath)
+	if err != nil {
+		t.Fatalf("ReadFile(auth.json) error = %v", err)
+	}
+	if got, want := string(written), expected; got != want {
+		t.Fatalf("auth.json = %q, want %q", got, want)
 	}
 	if got := len(runner.calls); got != 1 {
 		t.Fatalf("probe calls = %d, want 1", got)
