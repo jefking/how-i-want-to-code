@@ -13,7 +13,7 @@
     window.gtag("config", "G-BY33RFG2WB");
   </script>
   <script>
-    window.__HUB_UI_CONFIG__ = {"automaticMode":false,"configuredHarness":"codex","configuredAgentLabel":"Codex","defaultRepository":"git@github.com:Molten-Bot/moltenhub-code.git"};
+    window.__HUB_UI_CONFIG__ = {"automaticMode":false,"configuredHarness":"codex","configuredAgentLabel":"Codex","defaultRepository":"git@github.com:Molten-Bot/moltenhub-code.git","promptImageHarnesses":["codex","pi"]};
   </script>
   <script>
     (function configureTailwindRuntime() {
@@ -218,7 +218,7 @@
                     spellcheck="false"
                     placeholder="Describe the change you want"></textarea>
                 </label>
-                <p class="prompt-field-copy">Prompt with plain language, paste screenshots directly into the prompt when visual context matters.</p>
+                <p id="builder-prompt-copy" class="prompt-field-copy">Prompt with plain language, paste screenshots directly into the prompt when visual context matters.</p>
               </div>
 
               <div id="prompt-library-panel" class="prompt-panel hidden grid gap-2.5">
