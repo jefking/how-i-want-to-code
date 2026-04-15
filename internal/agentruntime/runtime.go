@@ -1,6 +1,7 @@
 package agentruntime
 
 import (
+	"errors"
 	"fmt"
 	"sort"
 	"strings"
@@ -17,11 +18,18 @@ const (
 
 const defaultHarness = HarnessCodex
 
+var ErrPromptImagesUnsupported = errors.New("prompt images are unsupported for this agent harness")
+
 var harnessDisplayNames = map[string]string{
 	HarnessAuggie: "Auggie",
 	HarnessClaude: "Claude",
 	HarnessCodex:  "Codex",
 	HarnessPi:     "Pi",
+}
+
+var promptImageHarnesses = map[string]struct{}{
+	HarnessCodex: {},
+	HarnessPi:    {},
 }
 
 // RunOptions controls provider-specific execution behavior.
@@ -119,6 +127,40 @@ func DisplayName(harness string) string {
 	return harnessDisplayNames[defaultHarness]
 }
 
+// SupportsPromptImages reports whether the selected harness accepts prompt image attachments.
+func SupportsPromptImages(harness string) bool {
+	_, ok := promptImageHarnesses[normalizeHarness(harness)]
+	return ok
+}
+
+// SupportedPromptImageHarnesses returns the harnesses that accept prompt images.
+func SupportedPromptImageHarnesses() []string {
+	out := make([]string, 0, len(promptImageHarnesses))
+	for harness := range promptImageHarnesses {
+		out = append(out, harness)
+	}
+	sort.Strings(out)
+	return out
+}
+
+// UnsupportedPromptImagesError returns a stable error for unsupported image attachments.
+func UnsupportedPromptImagesError(harness string) error {
+	label := strings.TrimSpace(DisplayName(harness))
+	if label == "" {
+		label = DisplayName(defaultHarness)
+	}
+	supported := supportedPromptImageHarnessLabels()
+	if supported == "" {
+		return fmt.Errorf("%s does not support prompt images: %w", label, ErrPromptImagesUnsupported)
+	}
+	return fmt.Errorf(
+		"%s does not support prompt images. Remove screenshots or switch to %s: %w",
+		label,
+		supported,
+		ErrPromptImagesUnsupported,
+	)
+}
+
 // RequirementName returns the boot diagnostic requirement key for this runtime.
 func (r Runtime) RequirementName() string {
 	return normalizeHarness(r.Harness) + "_cli"
@@ -179,8 +221,8 @@ func buildCodexCommand(targetDir, prompt string, opts RunOptions) (execx.Command
 }
 
 func buildClaudeCommand(targetDir, prompt string, opts RunOptions) (execx.Command, error) {
-	if imageCount := countNonEmptyStrings(opts.ImagePaths); imageCount > 0 {
-		return execx.Command{}, fmt.Errorf("agent harness %q does not support prompt images", HarnessClaude)
+	if err := validatePromptImageSupport(HarnessClaude, opts.ImagePaths); err != nil {
+		return execx.Command{}, err
 	}
 
 	args := []string{
@@ -193,8 +235,8 @@ func buildClaudeCommand(targetDir, prompt string, opts RunOptions) (execx.Comman
 }
 
 func buildAuggieCommand(targetDir, prompt string, opts RunOptions) (execx.Command, error) {
-	if imageCount := countNonEmptyStrings(opts.ImagePaths); imageCount > 0 {
-		return execx.Command{}, fmt.Errorf("agent harness %q does not support prompt images", HarnessAuggie)
+	if err := validatePromptImageSupport(HarnessAuggie, opts.ImagePaths); err != nil {
+		return execx.Command{}, err
 	}
 
 	args := []string{"--print", "--quiet", prompt}
@@ -202,11 +244,15 @@ func buildAuggieCommand(targetDir, prompt string, opts RunOptions) (execx.Comman
 }
 
 func buildPiCommand(targetDir, prompt string, opts RunOptions) (execx.Command, error) {
-	if imageCount := countNonEmptyStrings(opts.ImagePaths); imageCount > 0 {
-		return execx.Command{}, fmt.Errorf("agent harness %q does not support prompt images", HarnessPi)
+	args := []string{"--print", "--mode", "text", "--no-session"}
+	for _, imagePath := range opts.ImagePaths {
+		imagePath = strings.TrimSpace(imagePath)
+		if imagePath == "" {
+			continue
+		}
+		args = append(args, "@"+imagePath)
 	}
-
-	args := []string{"--print", "--mode", "text", "--no-session", prompt}
+	args = append(args, prompt)
 	return execx.Command{Dir: targetDir, Args: args}, nil
 }
 
@@ -218,4 +264,40 @@ func countNonEmptyStrings(values []string) int {
 		}
 	}
 	return count
+}
+
+func validatePromptImageSupport(harness string, imagePaths []string) error {
+	if countNonEmptyStrings(imagePaths) == 0 {
+		return nil
+	}
+	if SupportsPromptImages(harness) {
+		return nil
+	}
+	return UnsupportedPromptImagesError(harness)
+}
+
+func supportedPromptImageHarnessLabels() string {
+	labels := make([]string, 0, len(promptImageHarnesses))
+	seen := make(map[string]struct{}, len(promptImageHarnesses))
+	for _, harness := range SupportedPromptImageHarnesses() {
+		label := strings.TrimSpace(DisplayName(harness))
+		if label == "" {
+			continue
+		}
+		if _, ok := seen[label]; ok {
+			continue
+		}
+		seen[label] = struct{}{}
+		labels = append(labels, label)
+	}
+	switch len(labels) {
+	case 0:
+		return ""
+	case 1:
+		return labels[0]
+	case 2:
+		return labels[0] + " or " + labels[1]
+	default:
+		return strings.Join(labels[:len(labels)-1], ", ") + ", or " + labels[len(labels)-1]
+	}
 }

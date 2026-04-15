@@ -104,6 +104,18 @@ func TestHarnessFilesystemAndPromptHelpers(t *testing.T) {
 	if got, err := resolveTargetDir("/tmp/repo", "./subdir"); err != nil || !strings.HasSuffix(got, "/tmp/repo/subdir") {
 		t.Fatalf("resolveTargetDir(valid) = (%q, %v)", got, err)
 	}
+	if got := stripSkillFrontMatter("---\nname: caveman\n---\nbody"); got != "body" {
+		t.Fatalf("stripSkillFrontMatter() = %q, want body", got)
+	}
+	if got := cavemanIntensityLabel("caveman-wenyan-ultra"); got != "wenyan-ultra" {
+		t.Fatalf("cavemanIntensityLabel() = %q, want wenyan-ultra", got)
+	}
+	if got, err := withResponseModePrompt("ship fix", "default"); err != nil || !strings.Contains(got, "Caveman response mode is enabled for this run only.") {
+		t.Fatalf("withResponseModePrompt(default) = (%q, %v), want caveman overlay", got, err)
+	}
+	if got, err := withResponseModePrompt("ship fix", "off"); err != nil || got != "ship fix" {
+		t.Fatalf("withResponseModePrompt(off) = (%q, %v), want original prompt", got, err)
+	}
 }
 
 func TestHarnessRuntimeAndCheckSnapshotHelpers(t *testing.T) {

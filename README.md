@@ -59,8 +59,9 @@ The harness owns steps 5 and 6. Agent prompts are limited to repository changes,
 When a task fails, the harness:
 
 1. Returns a failure response to the calling agent with clear error details
-2. Queues a focused remediation follow-up task in the MoltenHub code repository
-3. Passes relevant failing log paths into the follow-up prompt
+2. Re-runs the original task once
+3. Queues a focused remediation follow-up task in the MoltenHub code repository
+4. Passes relevant failing log paths into the follow-up prompt
 
 The follow-up run config looks like this:
 
@@ -80,6 +81,35 @@ Follow-up prompts also tell the agent to report failures clearly, return documen
 ---
 
 ## Configuration
+
+### Response Modes
+
+Run configs can optionally set `responseMode` to compress agent prose without changing the underlying task flow. Supported values:
+
+- `default`
+- `off`
+- `caveman-lite`
+- `caveman-full`
+- `caveman-ultra`
+- `caveman-wenyan-lite`
+- `caveman-wenyan-full`
+- `caveman-wenyan-ultra`
+
+MoltenHub Code defaults omitted or `default` `responseMode` to `caveman-full`. Set `off` for normal prose.
+
+MoltenHub Code applies the bundled Caveman skill as a prompt overlay, so the same `responseMode` works across all supported harnesses (`codex`, `claude`, `auggie`, `pi`) without depending on provider-specific plugins or hooks.
+
+Example run config fragment:
+
+```json
+{
+  "repos": ["git@github.com:owner/repo.git"],
+  "baseBranch": "main",
+  "targetSubdir": ".",
+  "prompt": "Fix the failing tests and update coverage.",
+  "responseMode": "off"
+}
+```
 
 
 **Hub OpenAPI spec:**

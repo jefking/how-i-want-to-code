@@ -14,6 +14,7 @@ import (
 	"unicode"
 
 	"github.com/jef/moltenhub-code/internal/agentruntime"
+	"github.com/jef/moltenhub-code/internal/config"
 	"github.com/jef/moltenhub-code/internal/library"
 )
 
@@ -1312,13 +1313,14 @@ func buildRuntimeSkillCatalog(skillCfg SkillConfig, libraryTasks []library.TaskS
 		"name":        normalizeSkillName(skillCfg.Name),
 		"handle":      normalizeSkillName(skillCfg.Name),
 		"mode":        "prompt",
-		"description": "Prompt-driven repository task run.",
+		"description": "Prompt-driven repository task run. Omitted or `default` `responseMode` uses bundled `caveman-full`; set `off` for normal prose.",
 		"activation": buildActivation(skillCfg.Name, map[string]any{
-			"repos":     []string{"<git@github.com:owner/repo.git>"},
-			"branch":    "main",
-			"prompt":    "<describe the requested change>",
-			"reviewers": []string{"<githubhandle>"},
-			"images":    []any{},
+			"repos":        []string{"<git@github.com:owner/repo.git>"},
+			"branch":       "main",
+			"prompt":       "<describe the requested change>",
+			"responseMode": responseModePlaceholder(),
+			"reviewers":    []string{"<githubhandle>"},
+			"images":       []any{},
 		}),
 	})
 
@@ -1327,10 +1329,11 @@ func buildRuntimeSkillCatalog(skillCfg SkillConfig, libraryTasks []library.TaskS
 		"handle":      normalizeSkillName(codeReviewSkillName),
 		"mode":        "review",
 		"displayName": "Pull Request Code Review",
-		"description": fmt.Sprintf("Runs the %s workflow using repo + either branch or prNumber context.", codeReviewLibraryTaskName),
+		"description": fmt.Sprintf("Runs the %s workflow using repo + either branch or prNumber context. Omitted or `default` `responseMode` uses bundled `caveman-full`; set `off` for normal prose.", codeReviewLibraryTaskName),
 		"activation": buildActivation(codeReviewSkillName, map[string]any{
-			"repos":  []string{"<git@github.com:owner/repo.git>"},
-			"branch": "main",
+			"repos":        []string{"<git@github.com:owner/repo.git>"},
+			"branch":       "main",
+			"responseMode": responseModePlaceholder(),
 		}),
 	})
 
@@ -1353,11 +1356,12 @@ func buildRuntimeSkillCatalog(skillCfg SkillConfig, libraryTasks []library.TaskS
 		"handle":      normalizeSkillName(libraryTaskSkillName),
 		"mode":        "library_task",
 		"displayName": "Library Task",
-		"description": libraryTaskDescription,
+		"description": libraryTaskDescription + " Omitted or `default` `responseMode` uses bundled `caveman-full`; set `off` for normal prose.",
 		"activation": buildActivation(libraryTaskSkillName, map[string]any{
 			"repos":           []string{"<git@github.com:owner/repo.git>"},
 			"branch":          "main",
 			"libraryTaskName": "<library-handle>",
+			"responseMode":    responseModePlaceholder(),
 			"reviewers":       []string{"<githubhandle>"},
 		}),
 	})
@@ -1370,17 +1374,21 @@ func buildSupportedSkillsMetadata() []map[string]any {
 	return []map[string]any{
 		{
 			"name":        normalizeSkillName(runtimeSkill.Name),
-			"description": "Prompt-driven repository task run.",
+			"description": "Prompt-driven repository task run. Defaults to `caveman-full`; set `responseMode=off` for normal prose.",
 		},
 		{
 			"name":        normalizeSkillName(codeReviewSkillName),
-			"description": "Repository code review run that targets the checked-in review workflow.",
+			"description": "Repository code review run that targets the checked-in review workflow. Defaults to `caveman-full`; set `responseMode=off` for normal prose.",
 		},
 		{
 			"name":        normalizeSkillName(libraryTaskSkillName),
-			"description": "Generic library task entrypoint that requires a library task handle.",
+			"description": "Generic library task entrypoint that requires a library task handle. Defaults to `caveman-full`; set `responseMode=off` for normal prose.",
 		},
 	}
+}
+
+func responseModePlaceholder() string {
+	return "<" + strings.Join(config.SupportedResponseModesWithDefault(), "|") + ">"
 }
 
 func cloneMetadataMap(src map[string]any) map[string]any {

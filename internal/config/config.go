@@ -17,6 +17,8 @@ import (
 const (
 	prTitlePrefix        = "moltenhub-"
 	DefaultRepositoryURL = "git@github.com:Molten-Bot/moltenhub-code.git"
+	DefaultResponseMode  = "caveman-full"
+	DisabledResponseMode = "off"
 )
 
 const prBodyFooter = "If you would like to connect agents together checkout [Molten Bot Hub](https://molten.bot/hub)."
@@ -29,6 +31,7 @@ type Config struct {
 	Repo            string        `json:"repo"`
 	Repos           []string      `json:"repos"`
 	LibraryTaskName string        `json:"libraryTaskName,omitempty"`
+	ResponseMode    string        `json:"responseMode,omitempty"`
 	AgentHarness    string        `json:"agentHarness,omitempty"`
 	AgentCommand    string        `json:"agentCommand,omitempty"`
 	BaseBranch      string        `json:"baseBranch"`
@@ -101,6 +104,7 @@ func rejectSnakeCaseRunConfigFields(raw map[string]json.RawMessage) error {
 		"pr_body":           "prBody",
 		"github_handle":     "githubHandle",
 		"library_task_name": "libraryTaskName",
+		"response_mode":     "responseMode",
 	}
 	for legacy, canonical := range forbidden {
 		if _, ok := raw[legacy]; ok {
@@ -164,6 +168,12 @@ func (c *Config) ApplyDefaults() {
 		c.Repo = repos[0]
 	}
 	c.LibraryTaskName = strings.TrimSpace(c.LibraryTaskName)
+	rawResponseMode := strings.TrimSpace(c.ResponseMode)
+	if normalized, ok := normalizeResponseMode(rawResponseMode); ok {
+		c.ResponseMode = normalized
+	} else {
+		c.ResponseMode = strings.ToLower(rawResponseMode)
+	}
 
 	c.BaseBranch = strings.TrimSpace(c.BaseBranch)
 	if c.BaseBranch == "" {
@@ -238,6 +248,13 @@ func (c Config) Validate() error {
 	if err := validateReviewConfig(c.Review, repos); err != nil {
 		return err
 	}
+	if _, ok := normalizeResponseMode(c.ResponseMode); !ok {
+		return fmt.Errorf(
+			"unsupported responseMode %q; supported values: %s",
+			c.ResponseMode,
+			strings.Join(SupportedResponseModesWithDefault(), ", "),
+		)
+	}
 	if _, err := agentruntime.Resolve(c.AgentHarness, c.AgentCommand); err != nil {
 		return err
 	}
@@ -290,6 +307,58 @@ func normalizePromptImages(images []PromptImage) []PromptImage {
 		return nil
 	}
 	return out
+}
+
+var supportedResponseModes = []string{
+	DisabledResponseMode,
+	"caveman-lite",
+	"caveman-full",
+	"caveman-ultra",
+	"caveman-wenyan-lite",
+	"caveman-wenyan-full",
+	"caveman-wenyan-ultra",
+}
+
+// SupportedResponseModes returns the canonical non-default response modes.
+func SupportedResponseModes() []string {
+	return append([]string(nil), supportedResponseModes...)
+}
+
+// SupportedResponseModesWithDefault returns canonical response modes plus the default alias.
+func SupportedResponseModesWithDefault() []string {
+	return append([]string{"default"}, supportedResponseModes...)
+}
+
+// NormalizeResponseMode returns the canonical response mode. "off" disables caveman compression.
+func NormalizeResponseMode(mode string) string {
+	normalized, ok := normalizeResponseMode(mode)
+	if !ok {
+		return ""
+	}
+	return normalized
+}
+
+func normalizeResponseMode(mode string) (string, bool) {
+	normalized := strings.ToLower(strings.TrimSpace(mode))
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	switch normalized {
+	case "", "default":
+		return DefaultResponseMode, true
+	case DisabledResponseMode, "none", "normal":
+		return DisabledResponseMode, true
+	case "caveman":
+		return DefaultResponseMode, true
+	case "caveman-lite", "caveman-full", "caveman-ultra":
+		return normalized, true
+	case "wenyan", "wenyan-full", "caveman-wenyan", "caveman-wenyan-full":
+		return "caveman-wenyan-full", true
+	case "wenyan-lite", "caveman-wenyan-lite":
+		return "caveman-wenyan-lite", true
+	case "wenyan-ultra", "caveman-wenyan-ultra":
+		return "caveman-wenyan-ultra", true
+	default:
+		return "", false
+	}
 }
 
 func normalizeReviewConfig(review *ReviewConfig) *ReviewConfig {

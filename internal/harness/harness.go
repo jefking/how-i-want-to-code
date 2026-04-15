@@ -141,6 +141,9 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	if err != nil {
 		return h.fail(ExitConfig, "config", err, "")
 	}
+	if err := validateRuntimePromptImages(runtime, cfg.Images); err != nil {
+		return h.fail(ExitConfig, "config", err, "")
+	}
 	agentStage := runtimeLogStage(runtime)
 
 	h.logf("stage=preflight status=start")
@@ -280,7 +283,7 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 
 	h.logf("stage=%s status=start target=%s", agentStage, codexTargetLabel)
 	codexStart := time.Now()
-	if err := h.runCodex(ctx, runtime, codexDir, codexBasePrompt, codexOpts, agentsPath); err != nil {
+	if err := h.runCodex(ctx, runtime, codexDir, codexBasePrompt, codexOpts, agentsPath, cfg.ResponseMode); err != nil {
 		return h.fail(ExitCodex, agentStage, err, runDir)
 	}
 	h.logf("stage=%s status=ok elapsed_s=%d", agentStage, int(time.Since(codexStart).Seconds()))
@@ -591,7 +594,7 @@ func (h Harness) processChangedRepo(
 			repo.RelDir,
 		)
 		codexStart := time.Now()
-		if err := h.runCodex(ctx, runtime, codexDir, repairPrompt, codexOpts, agentsPath); err != nil {
+		if err := h.runCodex(ctx, runtime, codexDir, repairPrompt, codexOpts, agentsPath, cfg.ResponseMode); err != nil {
 			return ExitCodex, agentStage, err
 		}
 		h.logf(
@@ -1838,6 +1841,7 @@ func (h Harness) runCodex(
 	prompt string,
 	opts codexRunOptions,
 	agentsPath string,
+	responseMode string,
 ) error {
 	finalPrompt := strings.TrimSpace(prompt)
 	cleanup := func() error { return nil }
@@ -1871,6 +1875,18 @@ func (h Harness) runCodex(
 
 		finalPrompt = withAgentsPrompt(finalPrompt, promptAgentsPath)
 		cleanup = combineCleanupFns(stagedCleanup, targetAgentsCleanup)
+	}
+	if promptWithResponseMode, err := withResponseModePrompt(finalPrompt, responseMode); err != nil {
+		if cleanupErr := cleanup(); cleanupErr != nil {
+			h.logf(
+				"stage=workspace status=warn action=cleanup_agents_for_agent target=%s err=%q",
+				targetDir,
+				cleanupErr,
+			)
+		}
+		return err
+	} else {
+		finalPrompt = promptWithResponseMode
 	}
 
 	res, err := h.runCodexWithHeartbeat(ctx, runtime, targetDir, finalPrompt, opts, "")
@@ -2479,6 +2495,13 @@ func codexImageArgs(targetDir string, imagePaths []string) ([]string, error) {
 		args = append(args, imagePath)
 	}
 	return args, nil
+}
+
+func validateRuntimePromptImages(runtime agentruntime.Runtime, images []config.PromptImage) error {
+	if len(images) == 0 || agentruntime.SupportsPromptImages(runtime.Harness) {
+		return nil
+	}
+	return agentruntime.UnsupportedPromptImagesError(runtime.Harness)
 }
 
 func materializePromptImages(baseDir string, images []config.PromptImage) ([]string, error) {
