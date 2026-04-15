@@ -32,7 +32,7 @@ func (s *stubPRMonitorRunner) Commands() []execx.Command {
 	return slices.Clone(s.commands)
 }
 
-func TestPRMergeMonitorKeepsMergedTaskVisibleUntilUserClosesIt(t *testing.T) {
+func TestPRMergeMonitorRemovesMergedTaskFromQueueAndRunsCleanup(t *testing.T) {
 	t.Parallel()
 
 	broker := NewBroker()
@@ -69,8 +69,11 @@ func TestPRMergeMonitorKeepsMergedTaskVisibleUntilUserClosesIt(t *testing.T) {
 
 	select {
 	case requestID := <-cleanupCalls:
-		t.Fatalf("cleanup requestID = %q, want no automatic cleanup", requestID)
-	case <-time.After(60 * time.Millisecond):
+		if got, want := requestID, "req-merged"; got != want {
+			t.Fatalf("cleanup requestID = %q, want %q", got, want)
+		}
+	case <-time.After(200 * time.Millisecond):
+		t.Fatal("expected automatic cleanup after merged PR observation")
 	}
 
 	cancel()
@@ -83,16 +86,13 @@ func TestPRMergeMonitorKeepsMergedTaskVisibleUntilUserClosesIt(t *testing.T) {
 		t.Fatal("timed out waiting for monitor shutdown")
 	}
 
-	if _, ok := broker.TaskRunConfig("req-merged"); !ok {
-		t.Fatal("TaskRunConfig() found = false after merged PR observation, want true")
+	if _, ok := broker.TaskRunConfig("req-merged"); ok {
+		t.Fatal("TaskRunConfig() found = true after merged PR observation, want false")
 	}
 
 	snap := broker.Snapshot()
-	if got, want := len(snap.Tasks), 1; got != want {
+	if got, want := len(snap.Tasks), 0; got != want {
 		t.Fatalf("len(tasks) after merged PR observation = %d, want %d", got, want)
-	}
-	if got, want := snap.Tasks[0].RequestID, "req-merged"; got != want {
-		t.Fatalf("task request_id = %q, want %q", got, want)
 	}
 
 	commands := runner.Commands()
