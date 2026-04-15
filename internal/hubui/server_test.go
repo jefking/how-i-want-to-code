@@ -1494,8 +1494,11 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, "--hub-panel-rgb: 255 255 255;") || !strings.Contains(css, "--hub-panel-rgb: 15 22 38;") {
 		t.Fatalf("expected stylesheet to define theme-aware rgb tokens for hub panels")
 	}
-	if !strings.Contains(css, "--body-linear: linear-gradient(180deg, #0d1424, #0a1120 58%, #09101d);") || !strings.Contains(css, "--body-linear: linear-gradient(180deg, #05070d, #070b14 55%, #090f1a);") {
-		t.Fatalf("expected stylesheet to define distinct dark and night backgrounds")
+	if !strings.Contains(css, "--brand-gradient: linear-gradient(135deg, #ff9ed1 0%, #ec4899 48%, #d946ef 100%);") || !strings.Contains(css, "--running: #ec4899;") {
+		t.Fatalf("expected stylesheet to define a pink primary palette")
+	}
+	if !strings.Contains(css, "--body-linear: linear-gradient(180deg, #26111f, #1f0d1b 58%, #180913);") || !strings.Contains(css, "--body-linear: linear-gradient(180deg, #140814, #100610 55%, #0d050d);") {
+		t.Fatalf("expected stylesheet to define distinct dark and night pink backgrounds")
 	}
 	if !strings.Contains(css, ".task.task-closing") {
 		t.Fatalf("expected stylesheet to include task closing styles")
