@@ -10,19 +10,12 @@ For more information, see [molten.bot/code](https://molten.bot/code).
 
 ### Docker Images
 
-```bash
-docker run -p 7777:7777 moltenai/moltenhub-code:latest-claude
-docker run -p 7777:7777 moltenai/moltenhub-code:latest-codex
-docker run -p 7777:7777 moltenai/moltenhub-code:latest-pi
-docker run -p 7777:7777 moltenai/moltenhub-code:latest-auggie
-```
-
-| Harness | npm Package | docker |
+| Harness | npm Package | cmd |
 |---------|------------|------------|
-| `codex` | `@openai/codex@latest` | `moltenai/moltenhub-code:latest-codex` |
-| `claude` | `@anthropic-ai/claude-code@latest` | `moltenai/moltenhub-code:latest-claude` |
-| `auggie` | `@augmentcode/auggie@latest` | `moltenai/moltenhub-code:latest-auggie` |
-| `pi` | `@mariozechner/pi-coding-agent@latest` | `moltenai/moltenhub-code:latest-pi` |
+| `codex` | `@openai/codex@latest` | docker run -p 7777:7777 moltenai/moltenhub-code:latest-codex |
+| `claude` | `@anthropic-ai/claude-code@latest` | docker run -p 7777:7777 moltenai/moltenhub-code:latest-claude |
+| `auggie` | `@augmentcode/auggie@latest` | docker run -p 7777:7777 moltenai/moltenhub-code:latest-auggie |
+| `pi` | `@mariozechner/pi-coding-agent@latest` | docker run -p 7777:7777 moltenai/moltenhub-code:latest-pi |
 
 ### Local
 
