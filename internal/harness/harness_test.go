@@ -2545,8 +2545,35 @@ func TestAgentCommandWithOptionsUsesConfiguredRuntime(t *testing.T) {
 	if _, err := agentCommandWithOptions(claudeRuntime, targetDir, prompt, codexRunOptions{ImagePaths: []string{"x.png"}}); err == nil {
 		t.Fatal("agentCommandWithOptions(claude with images) error = nil, want non-nil")
 	}
-	if _, err := agentCommandWithOptions(piRuntime, targetDir, prompt, codexRunOptions{ImagePaths: []string{"x.png"}}); err == nil {
-		t.Fatal("agentCommandWithOptions(pi with images) error = nil, want non-nil")
+	piImageCmd, err := agentCommandWithOptions(piRuntime, targetDir, prompt, codexRunOptions{ImagePaths: []string{"x.png"}})
+	if err != nil {
+		t.Fatalf("agentCommandWithOptions(pi with images) error = %v", err)
+	}
+	wantPiImageArgs := []string{"--print", "--mode", "text", "--no-session", "@x.png", withCompletionGatePrompt(prompt)}
+	if !reflect.DeepEqual(piImageCmd.Args, wantPiImageArgs) {
+		t.Fatalf("pi image args = %#v, want %#v", piImageCmd.Args, wantPiImageArgs)
+	}
+}
+
+func TestRunRejectsUnsupportedPromptImagesBeforePreflight(t *testing.T) {
+	t.Parallel()
+
+	cfg := sampleConfig()
+	cfg.AgentHarness = agentruntime.HarnessClaude
+	cfg.Images = []config.PromptImage{{Name: "shot.png", MediaType: "image/png", DataBase64: "aGVsbG8="}}
+
+	fake := &fakeRunner{t: t}
+	h := New(fake)
+
+	res := h.Run(context.Background(), cfg)
+	if res.Err == nil {
+		t.Fatal("Run() err = nil, want prompt image support error")
+	}
+	if !errors.Is(res.Err, agentruntime.ErrPromptImagesUnsupported) {
+		t.Fatalf("Run() err = %v, want ErrPromptImagesUnsupported", res.Err)
+	}
+	if got, want := res.ExitCode, ExitConfig; got != want {
+		t.Fatalf("ExitCode = %d, want %d", got, want)
 	}
 }
 

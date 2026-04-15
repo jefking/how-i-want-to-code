@@ -1,6 +1,7 @@
 package agentruntime
 
 import (
+	"errors"
 	"reflect"
 	"strings"
 	"testing"
@@ -118,6 +119,23 @@ func TestDisplayName(t *testing.T) {
 	}
 }
 
+func TestSupportsPromptImages(t *testing.T) {
+	t.Parallel()
+
+	if !SupportsPromptImages(HarnessCodex) {
+		t.Fatal("SupportsPromptImages(codex) = false, want true")
+	}
+	if !SupportsPromptImages(HarnessPi) {
+		t.Fatal("SupportsPromptImages(pi) = false, want true")
+	}
+	if SupportsPromptImages(HarnessClaude) {
+		t.Fatal("SupportsPromptImages(claude) = true, want false")
+	}
+	if SupportsPromptImages(HarnessAuggie) {
+		t.Fatal("SupportsPromptImages(auggie) = true, want false")
+	}
+}
+
 func TestBuildCommandCodex(t *testing.T) {
 	t.Parallel()
 
@@ -205,10 +223,28 @@ func TestBuildCommandPi(t *testing.T) {
 	}
 }
 
-func TestBuildCommandRejectsImagesForNonCodex(t *testing.T) {
+func TestBuildCommandPiWithImages(t *testing.T) {
 	t.Parallel()
 
-	for _, harness := range []string{HarnessClaude, HarnessAuggie, HarnessPi} {
+	rt, err := Resolve(HarnessPi, "")
+	if err != nil {
+		t.Fatalf("Resolve() error = %v", err)
+	}
+
+	cmd, err := rt.BuildCommand("/tmp/repo", "inspect screenshot", RunOptions{ImagePaths: []string{"img.png", "  ", "nested/shot.png"}})
+	if err != nil {
+		t.Fatalf("BuildCommand() error = %v", err)
+	}
+	wantArgs := []string{"--print", "--mode", "text", "--no-session", "@img.png", "@nested/shot.png", "inspect screenshot"}
+	if cmd.Name != "pi" || cmd.Dir != "/tmp/repo" || !reflect.DeepEqual(cmd.Args, wantArgs) {
+		t.Fatalf("unexpected pi image command: %+v", cmd)
+	}
+}
+
+func TestBuildCommandRejectsImagesForUnsupportedHarnesses(t *testing.T) {
+	t.Parallel()
+
+	for _, harness := range []string{HarnessClaude, HarnessAuggie} {
 		harness := harness
 		t.Run(harness, func(t *testing.T) {
 			t.Parallel()
@@ -220,6 +256,9 @@ func TestBuildCommandRejectsImagesForNonCodex(t *testing.T) {
 			_, err = rt.BuildCommand("/tmp/repo", "fix bug", RunOptions{ImagePaths: []string{"img.png"}})
 			if err == nil {
 				t.Fatal("BuildCommand() error = nil, want image support error")
+			}
+			if !errors.Is(err, ErrPromptImagesUnsupported) {
+				t.Fatalf("BuildCommand() error = %v, want ErrPromptImagesUnsupported", err)
 			}
 			if !strings.Contains(err.Error(), "does not support prompt images") {
 				t.Fatalf("BuildCommand() error = %v, want prompt images error", err)

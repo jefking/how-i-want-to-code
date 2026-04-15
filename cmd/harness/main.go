@@ -321,9 +321,9 @@ func runHub(args []string) int {
 	var queueUnexpectedNoChangesFollowUp func(requestID string, result harness.Result, runCfg config.Config)
 	var queueEscalatedNoChangesFollowUp func(requestID string, result harness.Result, runCfg config.Config)
 	var enqueueLocalRun func(reqCtx context.Context, runCfg config.Config, allowFailureFollowUp bool, source string, force bool) (string, error)
-	enqueueLocalRun = func(reqCtx context.Context, runCfg config.Config, allowFailureFollowUp bool, source string, force bool) (string, error) {
-		if authGate != nil {
-			authState, authErr := authGate.Status(reqCtx)
+		enqueueLocalRun = func(reqCtx context.Context, runCfg config.Config, allowFailureFollowUp bool, source string, force bool) (string, error) {
+			if authGate != nil {
+				authState, authErr := authGate.Status(reqCtx)
 			if authErr != nil {
 				return "", fmt.Errorf("check agent auth status: %w", authErr)
 			}
@@ -333,12 +333,15 @@ func runHub(args []string) int {
 					firstNonEmptyString(authState.Message, "complete agent authorization in the UI"),
 				)
 			}
-		}
+			}
 
-		runCfg = applyDefaultAgentRuntimeConfig(runCfg, cfg)
-		source = strings.TrimSpace(source)
-		if source == "" {
-			source = localSubmitSource
+			runCfg = applyDefaultAgentRuntimeConfig(runCfg, cfg)
+			if err := validateRunConfigPromptImages(runCfg); err != nil {
+				return "", err
+			}
+			source = strings.TrimSpace(source)
+			if source == "" {
+				source = localSubmitSource
 		}
 
 		dedupeKey := dedupeKeyForRunConfig(runCfg)
@@ -1215,6 +1218,9 @@ func shouldQueueFailureFollowUp(source string, failedResult harness.Result) (boo
 	if failedResult.Err == nil {
 		return false, "failed task did not include an error"
 	}
+	if errors.Is(failedResult.Err, agentruntime.ErrPromptImagesUnsupported) {
+		return false, "prompt images are unsupported for the configured harness"
+	}
 	if source == failureFollowUpSource || source == noChangesEscalationSource {
 		return false, "run is already a failure follow-up"
 	}
@@ -1228,6 +1234,9 @@ func shouldQueueFailureRerun(source string, failedResult harness.Result) (bool, 
 	source = strings.TrimSpace(source)
 	if failedResult.Err == nil {
 		return false, "failed task did not include an error"
+	}
+	if errors.Is(failedResult.Err, agentruntime.ErrPromptImagesUnsupported) {
+		return false, "prompt images are unsupported for the configured harness"
 	}
 	switch source {
 	case failureFollowUpSource, noChangesEscalationSource:
@@ -1929,6 +1938,20 @@ func applyDefaultAgentRuntimeConfig(runCfg config.Config, initCfg hub.InitConfig
 		runCfg.AgentCommand = strings.TrimSpace(initCfg.AgentCommand)
 	}
 	return runCfg
+}
+
+func validateRunConfigPromptImages(runCfg config.Config) error {
+	if len(runCfg.Images) == 0 {
+		return nil
+	}
+	runtime, err := agentruntime.Resolve(runCfg.AgentHarness, runCfg.AgentCommand)
+	if err != nil {
+		return err
+	}
+	if agentruntime.SupportsPromptImages(runtime.Harness) {
+		return nil
+	}
+	return agentruntime.UnsupportedPromptImagesError(runtime.Harness)
 }
 
 func maybeStartAgentAuth(ctx context.Context, runtime agentruntime.Runtime, gate agentAuthGate, logf func(string, ...any)) {

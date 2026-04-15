@@ -141,6 +141,9 @@ func (h Harness) Run(ctx context.Context, cfg config.Config) Result {
 	if err != nil {
 		return h.fail(ExitConfig, "config", err, "")
 	}
+	if err := validateRuntimePromptImages(runtime, cfg.Images); err != nil {
+		return h.fail(ExitConfig, "config", err, "")
+	}
 	agentStage := runtimeLogStage(runtime)
 
 	h.logf("stage=preflight status=start")
@@ -2492,6 +2495,13 @@ func codexImageArgs(targetDir string, imagePaths []string) ([]string, error) {
 		args = append(args, imagePath)
 	}
 	return args, nil
+}
+
+func validateRuntimePromptImages(runtime agentruntime.Runtime, images []config.PromptImage) error {
+	if len(images) == 0 || agentruntime.SupportsPromptImages(runtime.Harness) {
+		return nil
+	}
+	return agentruntime.UnsupportedPromptImagesError(runtime.Harness)
 }
 
 func materializePromptImages(baseDir string, images []config.PromptImage) ([]string, error) {
