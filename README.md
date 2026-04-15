@@ -44,6 +44,8 @@ Each run follows this sequence:
 5. Opens or updates PRs for any changed repos
 6. Waits for required checks
 
+The harness owns steps 5 and 6. Agent prompts are limited to repository changes, local validation, and clear failure/no-op reporting so tasks do not fail just because remote GitHub or CI access is unavailable inside the agent runtime.
+
 **Branch & PR rules:**
 
 - Starts from `main` → creates a new branch
@@ -73,6 +75,8 @@ The follow-up run config looks like this:
 ```
 
 > The follow-up contract also includes: issue an offline to MoltenHub → review `na.hub.molten.bot.openapi.yaml` for integration behaviours.
+
+Follow-up prompts also tell the agent to report failures clearly, return documented no-op results when nothing needs to change, and leave PR creation plus remote check monitoring to the harness.
 
 ---
 

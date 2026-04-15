@@ -289,7 +289,6 @@ func (c APIClient) MarkOpenClawOffline(ctx context.Context, token, sessionKey, r
 	if strings.TrimSpace(sessionKey) != "" {
 		normalizedSessionKey := strings.TrimSpace(sessionKey)
 		body["session_key"] = normalizedSessionKey
-		body["sessionKey"] = normalizedSessionKey
 	}
 	if strings.TrimSpace(reason) != "" {
 		body["reason"] = strings.TrimSpace(reason)
@@ -479,7 +478,6 @@ func WebsocketURL(baseURL, sessionKey string) (string, error) {
 	q := u.Query()
 	if strings.TrimSpace(sessionKey) != "" {
 		q.Set("session_key", sessionKey)
-		q.Set("sessionKey", sessionKey)
 	}
 	u.RawQuery = q.Encode()
 	return u.String(), nil
@@ -981,12 +979,10 @@ func extractAgentProfileFromAny(v any) AgentProfile {
 			),
 		}
 
-		if nested := toMap(typed["profile"]); len(nested) > 0 {
-			profile.Profile = extractProfileConfig(nested)
-		}
-		if profileConfigEmpty(profile.Profile) {
-			profile.Profile = extractProfileConfig(extractMetadataFromAny(typed))
-		}
+		profile.Profile = mergeProfileConfigFields(
+			extractProfileConfig(toMap(typed["profile"])),
+			extractProfileConfig(extractMetadataFromAny(typed)),
+		)
 		if nested, ok := typed["result"]; ok {
 			merged := mergeAgentProfiles(profile, extractAgentProfileFromAny(nested))
 			if !agentProfileEmpty(merged) {
@@ -1017,25 +1013,30 @@ func mergeAgentProfiles(primary, secondary AgentProfile) AgentProfile {
 	if strings.TrimSpace(merged.Handle) == "" {
 		merged.Handle = strings.TrimSpace(secondary.Handle)
 	}
-	if strings.TrimSpace(merged.Profile.DisplayName) == "" {
-		merged.Profile.DisplayName = strings.TrimSpace(secondary.Profile.DisplayName)
-	}
-	if strings.TrimSpace(merged.Profile.Emoji) == "" {
-		merged.Profile.Emoji = strings.TrimSpace(secondary.Profile.Emoji)
-	}
-	if strings.TrimSpace(merged.Profile.ProfileText) == "" {
-		merged.Profile.ProfileText = strings.TrimSpace(secondary.Profile.ProfileText)
-	}
-	if strings.TrimSpace(merged.Profile.LLM) == "" {
-		merged.Profile.LLM = strings.TrimSpace(secondary.Profile.LLM)
-	}
-	if strings.TrimSpace(merged.Profile.Harness) == "" {
-		merged.Profile.Harness = strings.TrimSpace(secondary.Profile.Harness)
-	}
-	if len(merged.Profile.Skills) == 0 && len(secondary.Profile.Skills) > 0 {
-		merged.Profile.Skills = append([]string(nil), secondary.Profile.Skills...)
-	}
+	merged.Profile = mergeProfileConfigFields(merged.Profile, secondary.Profile)
 	return merged
+}
+
+func mergeProfileConfigFields(primary, secondary ProfileConfig) ProfileConfig {
+	if strings.TrimSpace(primary.DisplayName) == "" {
+		primary.DisplayName = strings.TrimSpace(secondary.DisplayName)
+	}
+	if strings.TrimSpace(primary.Emoji) == "" {
+		primary.Emoji = strings.TrimSpace(secondary.Emoji)
+	}
+	if strings.TrimSpace(primary.ProfileText) == "" {
+		primary.ProfileText = strings.TrimSpace(secondary.ProfileText)
+	}
+	if strings.TrimSpace(primary.LLM) == "" {
+		primary.LLM = strings.TrimSpace(secondary.LLM)
+	}
+	if strings.TrimSpace(primary.Harness) == "" {
+		primary.Harness = strings.TrimSpace(secondary.Harness)
+	}
+	if len(primary.Skills) == 0 && len(secondary.Skills) > 0 {
+		primary.Skills = append([]string(nil), secondary.Skills...)
+	}
+	return primary
 }
 
 func extractProfileConfig(raw map[string]any) ProfileConfig {

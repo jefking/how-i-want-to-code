@@ -23,8 +23,17 @@ func TestWithExecutionContractIncludesFailureResponseInstruction(t *testing.T) {
 	t.Parallel()
 
 	got := WithExecutionContract("Base prompt")
-	if !strings.Contains(got, `When failures occur, send a response back to the calling agent that clearly states failure and includes the error details.`) {
+	if !strings.Contains(got, FailureResponseInstruction) {
 		t.Fatalf("WithExecutionContract() missing failure response instruction: %q", got)
+	}
+}
+
+func TestWithExecutionContractIncludesRemoteOperationsHandoff(t *testing.T) {
+	t.Parallel()
+
+	got := WithExecutionContract("Base prompt")
+	if !strings.Contains(got, RemoteOperationsInstruction) {
+		t.Fatalf("WithExecutionContract() missing remote-operations guidance: %q", got)
 	}
 }
 
@@ -50,7 +59,12 @@ func TestComposePromptUsesFallbackPathsAndContract(t *testing.T) {
 		".log/local/<request timestamp>/<request sequence>/term",
 		".log/local/<request timestamp>/<request sequence>/terminal.log",
 		"Observed failure context:",
-		ExecutionContract,
+		OfflineReviewInstruction,
+		FailureResponseInstruction,
+		RemoteOperationsInstruction,
+		ActionableChangeInstruction,
+		NoOpInstruction,
+		`{"repos":["git@github.com:Molten-Bot/moltenhub-code.git"],"baseBranch":"main","targetSubdir":".","prompt":"Review the failing log paths first, identify every root cause behind the failed task, fix the underlying issues in this repository, validate locally where possible, and summarize the verified results."}`,
 	} {
 		if !strings.Contains(got, want) {
 			t.Fatalf("ComposePrompt() missing %q: %q", want, got)

@@ -359,6 +359,9 @@ func TestStaticStyleIncludesSharedDockIconStyles(t *testing.T) {
 	if !strings.Contains(stylesheet, `.hub-setup-signin-logo {`) {
 		t.Fatalf("expected stylesheet to include the hub setup sign-in logo styles")
 	}
+	if !strings.Contains(stylesheet, `.hub-setup-copy {`) {
+		t.Fatalf("expected stylesheet to include hub setup supporting copy styles")
+	}
 	if !strings.Contains(stylesheet, `.hub-setup-status {`) {
 		t.Fatalf("expected stylesheet to include hub setup status line styles")
 	}
@@ -370,6 +373,18 @@ func TestStaticStyleIncludesSharedDockIconStyles(t *testing.T) {
 	}
 	if !strings.Contains(stylesheet, `.hub-emoji-picker-input {`) || !strings.Contains(stylesheet, `clip-path: inset(50%);`) {
 		t.Fatalf("expected stylesheet to hide the raw emoji input and rely on the picker button presentation")
+	}
+	if !strings.Contains(stylesheet, `.brand-login-card-shell {`) || !strings.Contains(stylesheet, `.brand-chip-action {`) {
+		t.Fatalf("expected stylesheet to expose user-portal-derived glass primitives for hub surfaces and chips")
+	}
+	if strings.Contains(stylesheet, `.prompt-hero {`) {
+		t.Fatalf("expected stylesheet to remove the Studio hero styles")
+	}
+	if !strings.Contains(stylesheet, `.prompt-field-copy {`) {
+		t.Fatalf("expected stylesheet to retain helper copy styles")
+	}
+	if !strings.Contains(stylesheet, `.task-empty {`) || !strings.Contains(stylesheet, `.task-empty-copy {`) {
+		t.Fatalf("expected stylesheet to include the richer task queue empty state styles")
 	}
 }
 
@@ -823,6 +838,40 @@ func TestAgentAuthConfigureEndpointAcceptsPiProviderAuthPayload(t *testing.T) {
 	}
 }
 
+func TestAgentAuthConfigureEndpointAcceptsPiAuthJSONPayload(t *testing.T) {
+	t.Parallel()
+
+	srv := NewServer("", NewBroker())
+	srv.ConfigureAgentAuth = func(_ context.Context, value string) (AgentAuthState, error) {
+		if got, want := strings.TrimSpace(value), `{"provider":"pi","token":"saved"}`; got != want {
+			t.Fatalf("configure value = %q, want %q", got, want)
+		}
+		return AgentAuthState{
+			Harness:  "pi",
+			Required: true,
+			Ready:    true,
+			State:    "ready",
+			Message:  "ready",
+		}, nil
+	}
+
+	ts := httptest.NewServer(srv.Handler())
+	defer ts.Close()
+
+	resp, err := http.Post(
+		ts.URL+"/api/agent-auth/configure",
+		"application/json",
+		bytes.NewBufferString(`{"pi_auth_json":"{\"provider\":\"pi\",\"token\":\"saved\"}"}`),
+	)
+	if err != nil {
+		t.Fatalf("POST /api/agent-auth/configure error = %v", err)
+	}
+	defer resp.Body.Close()
+	if resp.StatusCode != http.StatusOK {
+		t.Fatalf("POST /api/agent-auth/configure status = %d, want 200", resp.StatusCode)
+	}
+}
+
 func TestGitHubProfileEndpointReturnsResolvedPublicProfile(t *testing.T) {
 	t.Parallel()
 
@@ -1026,7 +1075,7 @@ func TestStudioStylesKeepPromptActionsVisible(t *testing.T) {
 	if !strings.Contains(css, "@media (max-width: 700px) {\n  .page-bottom-dock {\n    bottom: max(12px, env(safe-area-inset-bottom));\n    max-width: calc(100vw - 24px);\n  }\n\n  .prompt-mode-tabs-dock {\n    max-width: calc(100vw - 24px);\n    overflow-x: auto;\n    overflow-y: visible;\n  }\n\n  .theme-toggle {\n    right: 12px;\n    bottom: 12px;\n    left: auto;\n  }\n\n  :root {\n    --hub-floating-bottom: max(12px, env(safe-area-inset-bottom));\n    --hub-floating-stack-height: 128px;\n    --hub-studio-dock-gap: 12px;\n  }") {
 		t.Fatalf("expected mobile layout to coordinate the bottom dock stack and theme toggle spacing")
 	}
-	if !strings.Contains(css, "@media (max-width: 640px) {\n  .prompt-actions {\n    flex-wrap: wrap;\n    gap: 6px;\n  }\n\n  .prompt-actions-start,\n  .submit-status-inline,\n  .prompt-actions-end {\n    flex: 1 1 100%;\n    width: 100%;\n  }\n\n  .prompt-actions-end {\n    justify-content: flex-end;\n    margin-left: 0;\n  }\n\n  .prompt-action-paste {\n    max-width: none;\n  }\n\n  .submit-status-inline {\n    min-width: 0;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }") {
+	if !strings.Contains(css, "@media (max-width: 640px) {\n  .panel-section-copy {\n    max-width: none;\n  }\n\n  .prompt-actions {\n    flex-wrap: wrap;\n    gap: 6px;\n  }\n\n  .prompt-actions-start,\n  .submit-status-inline,\n  .prompt-actions-end {\n    flex: 1 1 100%;\n    width: 100%;\n  }\n\n  .prompt-actions-end {\n    justify-content: flex-end;\n    margin-left: 0;\n  }\n\n  .prompt-action-paste {\n    max-width: none;\n  }\n\n  .submit-status-inline {\n    min-width: 0;\n  }\n\n  .prompt-action-button {\n    flex: 1 1 0;\n    min-inline-size: 0;\n  }\n\n  .task-empty {\n    min-height: 0;\n    padding: 18px;\n  }") {
 		t.Fatalf("expected mobile layout to keep Studio action controls fully visible")
 	}
 	if !strings.Contains(css, ".app {\n    padding: 20px 14px var(--hub-content-bottom-padding);\n  }") {
@@ -1211,10 +1260,12 @@ func TestAuthGateVerifyButtonHidesWhileVerificationIsPending(t *testing.T) {
 	if !strings.Contains(html, "claude_auth_code: code") {
 		t.Fatalf("expected Claude browser code configure payload support in auth UI")
 	}
-	if !strings.Contains(html, `id="agent-auth-configure-option"`) ||
-		!strings.Contains(html, "pi_provider_auth: providerAuth") ||
-		!strings.Contains(html, "function isPiConfigureState(auth) {") {
-		t.Fatalf("expected PI configure dropdown support in auth UI")
+	if strings.Contains(html, `id="agent-auth-configure-option"`) ||
+		!strings.Contains(html, "pi_auth_json: authJSON") ||
+		!strings.Contains(html, "cat ~/.pi/agent/auth.json") ||
+		!strings.Contains(html, "function isPiConfigureState(auth) {") ||
+		!strings.Contains(html, `return authHarness(current) === "pi" && isManualConfigureState(current) && !isGitHubTokenConfigureState(current);`) {
+		t.Fatalf("expected PI auth.json configure support in auth UI")
 	}
 	if !strings.Contains(html, "if (isClaudePendingBrowserLoginState()) {") ||
 		!strings.Contains(html, "const code = claudeBrowserCodeValue();") ||
