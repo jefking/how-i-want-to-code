@@ -222,8 +222,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if strings.Contains(markup, `Run Studio`) || strings.Contains(markup, `Queue repository work with the same repo, branch, reviewer, and prompt contract the hub executes.`) {
 		t.Fatalf("expected index html to remove the Studio overview hero panel")
 	}
-	if !strings.Contains(markup, `>Queue Task</button>`) {
-		t.Fatalf("expected index html to rename the primary prompt submit action to Queue Task")
+	if !strings.Contains(markup, `>Run</button>`) {
+		t.Fatalf("expected index html to render the primary prompt submit action as Run")
 	}
 	if strings.Contains(markup, `id="configured-agent-subtitle"`) || strings.Contains(markup, "Configured agent: Codex") {
 		t.Fatalf("expected index html to remove the configured agent subtitle copy")
@@ -1046,8 +1046,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if strings.Contains(markup, "No screenshots attached.") {
 		t.Fatalf("expected index html to hide screenshot empty-state copy until images are attached")
 	}
-	if !strings.Contains(markup, `id="local-prompt-submit"`) || !strings.Contains(markup, `>Queue Task</button>`) {
-		t.Fatalf("expected index html to render the studio submit button with label Queue Task")
+	if !strings.Contains(markup, `id="local-prompt-submit"`) || !strings.Contains(markup, `>Run</button>`) {
+		t.Fatalf("expected index html to render the studio submit button with label Run")
 	}
 	if strings.Contains(markup, "Select a repo, branch, directory, and prompt in Builder mode. You can paste PNG screenshots before submitting.") {
 		t.Fatalf("expected index html to remove the builder mode helper sentence")
