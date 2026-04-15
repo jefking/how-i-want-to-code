@@ -121,6 +121,15 @@ func TestNormalizationAndValidationHelpers(t *testing.T) {
 	if got := NormalizeResponseMode("off"); got != DisabledResponseMode {
 		t.Fatalf("NormalizeResponseMode(off) = %q, want %q", got, DisabledResponseMode)
 	}
+	if got := NormalizeResponseMode("/caveman ultra"); got != "caveman-ultra" {
+		t.Fatalf("NormalizeResponseMode(/caveman ultra) = %q, want caveman-ultra", got)
+	}
+	if got := NormalizeResponseMode("normal mode"); got != DisabledResponseMode {
+		t.Fatalf("NormalizeResponseMode(normal mode) = %q, want %q", got, DisabledResponseMode)
+	}
+	if got := NormalizeResponseMode("talk like caveman"); got != "caveman-full" {
+		t.Fatalf("NormalizeResponseMode(talk like caveman) = %q, want caveman-full", got)
+	}
 	if modes := SupportedResponseModesWithDefault(); len(modes) != 8 || modes[0] != "default" || modes[1] != DisabledResponseMode {
 		t.Fatalf("SupportedResponseModesWithDefault() = %#v", modes)
 	}

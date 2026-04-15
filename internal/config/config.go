@@ -340,18 +340,36 @@ func NormalizeResponseMode(mode string) string {
 
 func normalizeResponseMode(mode string) (string, bool) {
 	normalized := strings.ToLower(strings.TrimSpace(mode))
-	normalized = strings.ReplaceAll(normalized, "_", "-")
-	switch normalized {
-	case "", "default":
+	if normalized == "" {
 		return DefaultResponseMode, true
-	case DisabledResponseMode, "none", "normal":
+	}
+
+	normalized = strings.ReplaceAll(normalized, "_", "-")
+	normalized = strings.Join(strings.Fields(normalized), " ")
+
+	switch normalized {
+	case "default":
+		return DefaultResponseMode, true
+	case DisabledResponseMode, "none", "normal", "normal mode", "stop caveman":
 		return DisabledResponseMode, true
-	case "caveman":
+	case "caveman", "caveman mode", "talk like caveman", "use caveman", "less tokens", "be brief", "/caveman":
 		return DefaultResponseMode, true
 	case "caveman-lite", "caveman-full", "caveman-ultra":
 		return normalized, true
+	case "caveman lite", "/caveman lite":
+		return "caveman-lite", true
+	case "caveman full", "/caveman full":
+		return "caveman-full", true
+	case "caveman ultra", "/caveman ultra":
+		return "caveman-ultra", true
 	case "wenyan", "wenyan-full", "caveman-wenyan", "caveman-wenyan-full":
 		return "caveman-wenyan-full", true
+	case "wenyan lite", "caveman-wenyan lite", "/caveman wenyan-lite", "/caveman wenyan lite":
+		return "caveman-wenyan-lite", true
+	case "wenyan full", "caveman-wenyan full", "/caveman wenyan-full", "/caveman wenyan full":
+		return "caveman-wenyan-full", true
+	case "wenyan ultra", "caveman-wenyan ultra", "/caveman wenyan-ultra", "/caveman wenyan ultra":
+		return "caveman-wenyan-ultra", true
 	case "wenyan-lite", "caveman-wenyan-lite":
 		return "caveman-wenyan-lite", true
 	case "wenyan-ultra", "caveman-wenyan-ultra":
