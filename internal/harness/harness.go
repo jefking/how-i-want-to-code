@@ -2074,6 +2074,7 @@ func (h Harness) runCodexWithHeartbeat(
 		case run := <-done:
 			if run.err == nil {
 				if failed, detail := codexReportedFailure(run.res); failed {
+					detail = codexFailureDetailWithErrorDetails(run.res, detail)
 					return run.res, fmt.Errorf("%s reported failure: %s", agentStage, detail)
 				}
 			}
@@ -2153,6 +2154,98 @@ func codexReportedFailure(res execx.Result) (bool, string) {
 		}
 	}
 	return false, ""
+}
+
+func codexFailureDetailWithErrorDetails(res execx.Result, failureDetail string) string {
+	detail := strings.TrimSpace(failureDetail)
+	if detail == "" {
+		detail = "Failure: task failed."
+	}
+	errorDetail := codexExtractErrorDetail(res.Stdout)
+	if errorDetail == "" {
+		errorDetail = codexExtractErrorDetail(res.Stderr)
+	}
+	if errorDetail == "" {
+		return detail
+	}
+	lowerDetail := strings.ToLower(detail)
+	lowerError := strings.ToLower(errorDetail)
+	if strings.Contains(lowerDetail, lowerError) {
+		return detail
+	}
+	return strings.TrimSpace(detail + " " + errorDetail)
+}
+
+func codexExtractErrorDetail(output string) string {
+	lines := splitOutputLines(output)
+	if len(lines) == 0 {
+		return ""
+	}
+
+	nonEmpty := make([]string, 0, len(lines))
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		nonEmpty = append(nonEmpty, trimmed)
+	}
+	if len(nonEmpty) == 0 {
+		return ""
+	}
+
+	for i, line := range nonEmpty {
+		lower := strings.ToLower(line)
+		if strings.HasPrefix(lower, "error details:") {
+			suffix := strings.TrimSpace(line[len("error details:"):])
+			if suffix != "" {
+				return "Error details: " + suffix
+			}
+			extra := codexJoinErrorDetailLines(nonEmpty[i+1:])
+			if extra != "" {
+				return "Error details: " + extra
+			}
+			return "Error details: unknown error."
+		}
+		if isStructuredFailureErrorLine(line) {
+			return line
+		}
+	}
+
+	fallback := codexJoinErrorDetailLines(nonEmpty)
+	if fallback == "" {
+		return ""
+	}
+	return "Error details: " + fallback
+}
+
+func codexJoinErrorDetailLines(lines []string) string {
+	const maxDetailsLines = 3
+	const maxDetailChars = 320
+
+	details := make([]string, 0, maxDetailsLines)
+	for _, line := range lines {
+		trimmed := strings.TrimSpace(line)
+		if trimmed == "" {
+			continue
+		}
+		lower := strings.ToLower(trimmed)
+		if strings.HasPrefix(lower, "failure:") || strings.HasPrefix(lower, "task failed") {
+			continue
+		}
+		details = append(details, trimmed)
+		if len(details) >= maxDetailsLines {
+			break
+		}
+	}
+	if len(details) == 0 {
+		return ""
+	}
+	joined := strings.Join(details, " | ")
+	if len(joined) <= maxDetailChars {
+		return joined
+	}
+	return strings.TrimSpace(joined[:maxDetailChars-3]) + "..."
 }
 
 func codexReportedFailureInOutput(output string, allowStructured bool) (bool, string) {
