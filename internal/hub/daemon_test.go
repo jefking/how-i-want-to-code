@@ -743,6 +743,79 @@ func TestDispatchResultPayloadIncludesTopLevelFailureMessage(t *testing.T) {
 	}
 }
 
+func TestDuplicateDispatchResultPayloadIncludesDuplicateMetadataAndFailureDetails(t *testing.T) {
+	t.Parallel()
+
+	cfg := InitConfig{
+		Skill: SkillConfig{
+			Name:       "code_for_me",
+			ResultType: "skill_result",
+		},
+	}
+	dispatch := SkillDispatch{
+		RequestID: "req-dup",
+		Skill:     "code_for_me",
+		ReplyTo:   "agent-123",
+	}
+
+	payload := duplicateDispatchResultPayload(cfg, dispatch, "in_flight", "req-existing")
+	if got := payload["status"]; got != "duplicate" {
+		t.Fatalf("status = %#v, want duplicate", got)
+	}
+	if got := payload["failed"]; got != true {
+		t.Fatalf("failed = %#v, want true", got)
+	}
+	if got := payload["reply_to"]; got != "agent-123" {
+		t.Fatalf("reply_to = %#v, want agent-123", got)
+	}
+	if got := payload["error"]; got != "duplicate submission ignored (request_id=req-existing state=in_flight)" {
+		t.Fatalf("error = %#v", got)
+	}
+	if got := payload["duplicate"]; got != true {
+		t.Fatalf("duplicate = %#v, want true", got)
+	}
+	if got := payload["state"]; got != "in_flight" {
+		t.Fatalf("state = %#v, want in_flight", got)
+	}
+	if got := payload["duplicate_of"]; got != "req-existing" {
+		t.Fatalf("duplicate_of = %#v, want req-existing", got)
+	}
+	if got := payload["message"]; got != "Failure: task failed. Error details: duplicate submission ignored (request_id=req-existing state=in_flight)" {
+		t.Fatalf("message = %#v", got)
+	}
+
+	result, _ := payload["result"].(map[string]any)
+	if result == nil {
+		t.Fatal("result payload missing")
+	}
+	if got := result["status"]; got != "duplicate" {
+		t.Fatalf("result.status = %#v, want duplicate", got)
+	}
+	if got := result["duplicate"]; got != true {
+		t.Fatalf("result.duplicate = %#v, want true", got)
+	}
+	if got := result["state"]; got != "in_flight" {
+		t.Fatalf("result.state = %#v, want in_flight", got)
+	}
+	if got := result["duplicate_of"]; got != "req-existing" {
+		t.Fatalf("result.duplicate_of = %#v, want req-existing", got)
+	}
+
+	failure, _ := payload["failure"].(map[string]any)
+	if failure == nil {
+		t.Fatal("failure payload missing")
+	}
+	if got := failure["duplicate"]; got != true {
+		t.Fatalf("failure.duplicate = %#v, want true", got)
+	}
+	if got := failure["state"]; got != "in_flight" {
+		t.Fatalf("failure.state = %#v, want in_flight", got)
+	}
+	if got := failure["duplicate_of"]; got != "req-existing" {
+		t.Fatalf("failure.duplicate_of = %#v, want req-existing", got)
+	}
+}
+
 func TestHandleDispatchInvokesOnDispatchFailed(t *testing.T) {
 	t.Parallel()
 

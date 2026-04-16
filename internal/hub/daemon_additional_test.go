@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/jef/moltenhub-code/internal/config"
+	"github.com/jef/moltenhub-code/internal/execx"
 	"github.com/jef/moltenhub-code/internal/harness"
 	"github.com/jef/moltenhub-code/internal/library"
 )
@@ -32,6 +33,32 @@ type stubMoltenHubAPI struct {
 		SessionKey string
 		Reason     string
 	}
+}
+
+type blockedRunner struct {
+	started chan struct{}
+	unblock chan struct{}
+	err     error
+	once    sync.Once
+}
+
+func (r *blockedRunner) Run(ctx context.Context, _ execx.Command) (execx.Result, error) {
+	if r.started != nil {
+		r.once.Do(func() {
+			close(r.started)
+		})
+	}
+	if r.unblock != nil {
+		select {
+		case <-r.unblock:
+		case <-ctx.Done():
+			return execx.Result{}, ctx.Err()
+		}
+	}
+	if r.err == nil {
+		r.err = errors.New("runner failed")
+	}
+	return execx.Result{}, r.err
 }
 
 func (s *stubMoltenHubAPI) BaseURL() string { return "" }
@@ -172,7 +199,7 @@ func TestProcessInboundMessageAcksIgnoredAndPublishesParseErrors(t *testing.T) {
 	}
 }
 
-func TestProcessInboundMessageDuplicateDeliveryIsAckedWithoutDispatch(t *testing.T) {
+func TestProcessInboundMessageDuplicateDeliveryPublishesFailureToCallerAndAcks(t *testing.T) {
 	t.Parallel()
 
 	d := NewDaemon(nil)
@@ -186,15 +213,25 @@ func TestProcessInboundMessageDuplicateDeliveryIsAckedWithoutDispatch(t *testing
 	}
 	var workers sync.WaitGroup
 
+	dupCfg := config.Config{
+		Repo:   "git@github.com:acme/repo.git",
+		Prompt: "fix tests",
+	}
+	dupCfg.ApplyDefaults()
+	dupKey := dedupeKeyForRunConfig(dupCfg)
+	if strings.TrimSpace(dupKey) == "" {
+		t.Fatal("dedupe key is empty, want non-empty")
+	}
 	deduper := newDispatchDeduper(time.Hour)
-	if ok, state := deduper.Begin("req-dup"); !ok || state != "accepted" {
-		t.Fatalf("deduper.Begin(req-dup) = (%v, %q), want (true, accepted)", ok, state)
+	if ok, state, duplicateOf := deduper.Begin(dupKey, "req-dup"); !ok || state != "accepted" || duplicateOf != "" {
+		t.Fatalf("deduper.Begin(dupKey) = (%v, %q, %q), want (true, accepted, empty)", ok, state, duplicateOf)
 	}
 
 	msg := map[string]any{
-		"type":       "skill_request",
-		"skill":      "code_for_me",
-		"request_id": "req-dup",
+		"type":            "skill_request",
+		"skill":           "code_for_me",
+		"request_id":      "req-dup",
+		"from_agent_uuid": "caller-agent-uuid",
 		"config": map[string]any{
 			"repo":   "git@github.com:acme/repo.git",
 			"prompt": "fix tests",
@@ -207,8 +244,30 @@ func TestProcessInboundMessageDuplicateDeliveryIsAckedWithoutDispatch(t *testing
 	if len(api.acked) != 1 || api.acked[0] != "delivery-dup" {
 		t.Fatalf("acked deliveries = %v, want [delivery-dup]", api.acked)
 	}
-	if len(api.published) != 0 {
-		t.Fatalf("published results = %d, want 0 for duplicate dispatch", len(api.published))
+	if len(api.published) != 1 {
+		t.Fatalf("published results = %d, want 1 for duplicate dispatch", len(api.published))
+	}
+	resultPayload := api.published[0]
+	if got := resultPayload["status"]; got != "duplicate" {
+		t.Fatalf("result status = %#v, want duplicate", got)
+	}
+	if got := resultPayload["failed"]; got != true {
+		t.Fatalf("result failed = %#v, want true", got)
+	}
+	if got := resultPayload["reply_to"]; got != "caller-agent-uuid" {
+		t.Fatalf("result reply_to = %#v, want caller-agent-uuid", got)
+	}
+	if got := resultPayload["duplicate"]; got != true {
+		t.Fatalf("result duplicate = %#v, want true", got)
+	}
+	if got := resultPayload["state"]; got != "in_flight" {
+		t.Fatalf("result state = %#v, want in_flight", got)
+	}
+	if got := resultPayload["duplicate_of"]; got != "req-dup" {
+		t.Fatalf("result duplicate_of = %#v, want req-dup", got)
+	}
+	if got := fmt.Sprint(resultPayload["message"]); !strings.Contains(got, "Failure: task failed. Error details: duplicate submission ignored (request_id=req-dup state=in_flight)") {
+		t.Fatalf("result message = %q", got)
 	}
 }
 
@@ -277,6 +336,83 @@ func TestProcessInboundMessageDoesNotDedupeDistinctClientMsgIDWithSharedEnvelope
 		if !gotRequestIDs[expected] {
 			t.Fatalf("missing request_id %q in published payloads: %#v", expected, gotRequestIDs)
 		}
+	}
+}
+
+func TestProcessInboundMessageDedupesIdenticalConfigAcrossRequestIDs(t *testing.T) {
+	t.Parallel()
+
+	runner := &blockedRunner{
+		started: make(chan struct{}),
+		unblock: make(chan struct{}),
+		err:     errors.New("runner exploded"),
+	}
+	d := NewDaemon(runner)
+	api := &stubMoltenHubAPI{token: "t"}
+	cfg := InitConfig{
+		Skill: SkillConfig{
+			Name:         "code_for_me",
+			DispatchType: "skill_request",
+			ResultType:   "skill_result",
+		},
+	}
+	var workers sync.WaitGroup
+	deduper := newDispatchDeduper(time.Hour)
+
+	msgA := map[string]any{
+		"type":       "skill_request",
+		"skill":      "code_for_me",
+		"request_id": "req-a",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "fix same task",
+		},
+	}
+	msgB := map[string]any{
+		"type":       "skill_request",
+		"skill":      "code_for_me",
+		"request_id": "req-b",
+		"config": map[string]any{
+			"repo":   "git@github.com:acme/repo.git",
+			"prompt": "fix same task",
+		},
+	}
+
+	d.processInboundMessage(context.Background(), api, cfg, msgA, "", "", nil, &workers, deduper)
+	<-runner.started
+	d.processInboundMessage(context.Background(), api, cfg, msgB, "", "", nil, &workers, deduper)
+	close(runner.unblock)
+	workers.Wait()
+
+	api.mu.Lock()
+	defer api.mu.Unlock()
+	if got, want := len(api.published), 4; got != want {
+		t.Fatalf("published payload count = %d, want %d", got, want)
+	}
+	gotRequestIDs := map[string]map[string]any{}
+	for _, payload := range api.published {
+		requestID, _ := payload["request_id"].(string)
+		if requestID != "" {
+			gotRequestIDs[requestID] = payload
+		}
+	}
+	for _, expected := range []string{"req-a", "req-a-rerun", "req-a-failure-review"} {
+		if gotRequestIDs[expected] == nil {
+			t.Fatalf("missing request_id %q in published payloads: %#v", expected, gotRequestIDs)
+		}
+	}
+	duplicatePayload := gotRequestIDs["req-b"]
+	if duplicatePayload == nil {
+		t.Fatalf("missing duplicate payload for req-b: %#v", gotRequestIDs)
+	}
+	if got := duplicatePayload["status"]; got != "duplicate" {
+		t.Fatalf("duplicate payload status = %#v, want duplicate", got)
+	}
+	if got := duplicatePayload["duplicate_of"]; got != "req-a" {
+		t.Fatalf("duplicate payload duplicate_of = %#v, want req-a", got)
+	}
+	if gotRequestIDs["req-b-rerun"] != nil || gotRequestIDs["req-b-failure-review"] != nil {
+		t.Fatalf("duplicate request unexpectedly executed: %#v", gotRequestIDs)
 	}
 }
 

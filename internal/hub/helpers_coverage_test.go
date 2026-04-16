@@ -16,6 +16,18 @@ func TestFailureFollowUpHelperBranches(t *testing.T) {
 	if got := failureResponseMessage(""); got != "Failure: task failed. Error details: unknown error." {
 		t.Fatalf("failureResponseMessage(empty) = %q", got)
 	}
+	if got := duplicateDispatchErrorText("", ""); got != "duplicate submission ignored" {
+		t.Fatalf("duplicateDispatchErrorText(empty) = %q", got)
+	}
+	if got := duplicateDispatchErrorText("", "completed"); got != "duplicate submission ignored (state=completed)" {
+		t.Fatalf("duplicateDispatchErrorText(state) = %q", got)
+	}
+	if got := duplicateDispatchErrorText("req-2", ""); got != "duplicate submission ignored (request_id=req-2)" {
+		t.Fatalf("duplicateDispatchErrorText(request) = %q", got)
+	}
+	if got := duplicateDispatchErrorText("req-2", "in_flight"); got != "duplicate submission ignored (request_id=req-2 state=in_flight)" {
+		t.Fatalf("duplicateDispatchErrorText(full) = %q", got)
+	}
 
 	dispatch := SkillDispatch{RequestID: "req-1"}
 	if ok, reason := shouldQueueFailureFollowUp(dispatch, harness.Result{}); ok || !strings.Contains(reason, "did not include an error") {
