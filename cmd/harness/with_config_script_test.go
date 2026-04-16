@@ -11,8 +11,8 @@ import (
 )
 
 func TestWithConfigScriptPrefersRunConfig(t *testing.T) {
-	t.Parallel()
-
+	// Keep with-config script tests serial: parallel execution intermittently
+	// triggers ETXTBSY ("Text file busy") when invoking the stub harness.
 	env := newWithConfigTestEnv(t)
 	configPath := filepath.Join(env.configDir, "config.json")
 	if err := os.WriteFile(configPath, []byte(`{"repo":"git@github.com:acme/repo.git","prompt":"x"}`), 0o644); err != nil {
@@ -31,8 +31,6 @@ func TestWithConfigScriptPrefersRunConfig(t *testing.T) {
 }
 
 func TestWithConfigScriptUsesHubConfigWhenConfigJSONMatchesHubSchema(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	configPath := filepath.Join(env.configDir, "config.json")
 	if err := os.WriteFile(configPath, []byte(`{"base_url":"https://na.hub.molten.bot/v1","agent_token":"tok"}`), 0o644); err != nil {
@@ -51,8 +49,6 @@ func TestWithConfigScriptUsesHubConfigWhenConfigJSONMatchesHubSchema(t *testing.
 }
 
 func TestWithConfigScriptFallsBackToInitConfig(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	initPath := filepath.Join(env.configDir, "init.json")
 	if err := os.WriteFile(initPath, []byte(`{"base_url":"https://na.hub.molten.bot/v1","agent_token":"tok"}`), 0o644); err != nil {
@@ -71,8 +67,6 @@ func TestWithConfigScriptFallsBackToInitConfig(t *testing.T) {
 }
 
 func TestWithConfigScriptBuildsInitFromEnvTokenAndRegion(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	generatedInitPath := filepath.Join(env.root, "generated", "init.json")
 	output, err := runWithConfigScript(t, env, map[string]string{
@@ -107,8 +101,6 @@ func TestWithConfigScriptBuildsInitFromEnvTokenAndRegion(t *testing.T) {
 }
 
 func TestWithConfigScriptBuildsInitFromExplicitHubURL(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	generatedInitPath := filepath.Join(env.root, "generated", "init.json")
 	output, err := runWithConfigScript(t, env, map[string]string{
@@ -136,8 +128,6 @@ func TestWithConfigScriptBuildsInitFromExplicitHubURL(t *testing.T) {
 }
 
 func TestWithConfigScriptRejectsInvalidHubURLEnvValue(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	output, err := runWithConfigScript(t, env, map[string]string{
 		"MOLTEN_HUB_TOKEN": "hub_token_123",
@@ -157,8 +147,6 @@ func TestWithConfigScriptRejectsInvalidHubURLEnvValue(t *testing.T) {
 }
 
 func TestWithConfigScriptMissingConfigStartsHubOnboardingMode(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	output, err := runWithConfigScript(t, env, nil)
 	if err != nil {
@@ -183,8 +171,6 @@ func TestWithConfigScriptMissingConfigStartsHubOnboardingMode(t *testing.T) {
 }
 
 func TestWithConfigScriptAllowsHubUIListenOverride(t *testing.T) {
-	t.Parallel()
-
 	env := newWithConfigTestEnv(t)
 	output, err := runWithConfigScript(t, env, map[string]string{
 		"HARNESS_HUB_UI_LISTEN": ":8088",
