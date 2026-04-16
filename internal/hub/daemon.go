@@ -384,12 +384,29 @@ func (d Daemon) processInboundMessage(
 	}
 
 	dupKey := dedupeKeyForDispatch(dispatch, messageID, deliveryID)
+	fallbackRequestID := dedupeKeyForDispatchFallback(dispatch, messageID, deliveryID)
 	if strings.TrimSpace(dispatch.RequestID) == "" {
-		dispatch.RequestID = strings.TrimSpace(dupKey)
+		dispatch.RequestID = firstNonEmpty(strings.TrimSpace(fallbackRequestID), strings.TrimSpace(dupKey))
 	}
 	if deduper != nil && dupKey != "" {
-		if accepted, state := deduper.Begin(dupKey); !accepted {
-			d.logf("dispatch status=duplicate request_id=%s state=%s", firstNonEmpty(dispatch.RequestID, dupKey), state)
+		if accepted, state, duplicateOf := deduper.Begin(dupKey, dispatch.RequestID); !accepted {
+			requestID := firstNonEmpty(dispatch.RequestID, duplicateOf, fallbackRequestID, strings.TrimSpace(dupKey))
+			d.logf(
+				"dispatch status=duplicate request_id=%s state=%s duplicate_of=%s",
+				requestID,
+				state,
+				duplicateOf,
+			)
+			payload := duplicateDispatchResultPayload(cfg, dispatch, state, duplicateOf)
+			if err := api.PublishResult(ctx, payload); err != nil {
+				d.logf("dispatch status=publish_error request_id=%s err=%q", requestID, err)
+				if strings.TrimSpace(deliveryID) != "" {
+					if nackErr := api.NackOpenClawDelivery(ctx, deliveryID); nackErr != nil {
+						d.logf("dispatch status=nack_error delivery_id=%s err=%q", deliveryID, nackErr)
+					}
+				}
+				return
+			}
 			if strings.TrimSpace(deliveryID) != "" {
 				if err := api.AckOpenClawDelivery(ctx, deliveryID); err != nil {
 					d.logf("dispatch status=ack_error delivery_id=%s err=%q", deliveryID, err)
@@ -437,11 +454,16 @@ func (d Daemon) processInboundMessage(
 		if d.CompleteTaskControl != nil {
 			defer d.CompleteTaskControl(dispatch.RequestID)
 		}
+
+		finalState := "completed"
 		if deduper != nil {
-			defer deduper.Done(dedupeKey)
+			defer func() {
+				deduper.Done(dedupeKey, dispatch.RequestID, finalState)
+			}()
 		}
 
 		publishFailure := func(status, stage string, err error, triggerFollowUps bool) {
+			finalState = "error"
 			if err == nil {
 				err = errors.New("unknown error")
 			}
@@ -548,7 +570,7 @@ func (d Daemon) processInboundMessage(
 			if taskControl != nil {
 				taskControl.SetRunning(true)
 			}
-			d.handleDispatch(runCtx, api, cfg, dispatch, deliveryID, ackedEarly)
+			finalState = d.handleDispatch(runCtx, api, cfg, dispatch, deliveryID, ackedEarly)
 			if taskControl != nil {
 				taskControl.SetRunning(false)
 			}
@@ -596,6 +618,13 @@ func isStoppedByOperatorErr(err error) bool {
 }
 
 func dedupeKeyForDispatch(dispatch SkillDispatch, messageID, deliveryID string) string {
+	if key := dedupeKeyForRunConfig(dispatch.Config); key != "" {
+		return key
+	}
+	return dedupeKeyForDispatchFallback(dispatch, messageID, deliveryID)
+}
+
+func dedupeKeyForDispatchFallback(dispatch SkillDispatch, messageID, deliveryID string) string {
 	return firstNonEmpty(
 		dispatch.RequestID,
 		strings.TrimSpace(messageID),
@@ -605,9 +634,14 @@ func dedupeKeyForDispatch(dispatch SkillDispatch, messageID, deliveryID string) 
 
 type dispatchDeduper struct {
 	mu        sync.Mutex
-	inFlight  map[string]struct{}
-	completed map[string]time.Time
+	inFlight  map[string]string
+	completed map[string]dispatchDedupeRecord
 	ttl       time.Duration
+}
+
+type dispatchDedupeRecord struct {
+	requestID   string
+	completedAt time.Time
 }
 
 func newDispatchDeduper(ttl time.Duration) *dispatchDeduper {
@@ -615,37 +649,38 @@ func newDispatchDeduper(ttl time.Duration) *dispatchDeduper {
 		ttl = 30 * time.Minute
 	}
 	return &dispatchDeduper{
-		inFlight:  map[string]struct{}{},
-		completed: map[string]time.Time{},
+		inFlight:  map[string]string{},
+		completed: map[string]dispatchDedupeRecord{},
 		ttl:       ttl,
 	}
 }
 
-func (d *dispatchDeduper) Begin(key string) (bool, string) {
+func (d *dispatchDeduper) Begin(key, requestID string) (bool, string, string) {
 	if d == nil {
-		return true, ""
+		return true, "accepted", ""
 	}
 	key = strings.TrimSpace(key)
 	if key == "" {
-		return true, ""
+		return true, "accepted", ""
 	}
+	requestID = strings.TrimSpace(requestID)
 
 	now := time.Now()
 	d.mu.Lock()
 	defer d.mu.Unlock()
 	d.gcLocked(now)
 
-	if _, exists := d.inFlight[key]; exists {
-		return false, "in_flight"
+	if existingRequestID, exists := d.inFlight[key]; exists {
+		return false, "in_flight", existingRequestID
 	}
-	if _, exists := d.completed[key]; exists {
-		return false, "completed"
+	if existingRecord, exists := d.completed[key]; exists {
+		return false, "completed", existingRecord.requestID
 	}
-	d.inFlight[key] = struct{}{}
-	return true, "accepted"
+	d.inFlight[key] = requestID
+	return true, "accepted", ""
 }
 
-func (d *dispatchDeduper) Done(key string) {
+func (d *dispatchDeduper) Done(key, requestID, finalState string) {
 	if d == nil {
 		return
 	}
@@ -653,12 +688,29 @@ func (d *dispatchDeduper) Done(key string) {
 	if key == "" {
 		return
 	}
+	requestID = strings.TrimSpace(requestID)
+	finalState = strings.TrimSpace(finalState)
 
 	now := time.Now()
 	d.mu.Lock()
 	defer d.mu.Unlock()
-	delete(d.inFlight, key)
-	d.completed[key] = now
+
+	if existingRequestID, exists := d.inFlight[key]; exists {
+		delete(d.inFlight, key)
+		if existingRequestID != "" {
+			requestID = existingRequestID
+		}
+	}
+	if finalState == "error" {
+		d.gcLocked(now)
+		return
+	}
+	if requestID != "" {
+		d.completed[key] = dispatchDedupeRecord{
+			requestID:   requestID,
+			completedAt: now,
+		}
+	}
 	d.gcLocked(now)
 }
 
@@ -666,8 +718,8 @@ func (d *dispatchDeduper) gcLocked(now time.Time) {
 	if d == nil || d.ttl <= 0 {
 		return
 	}
-	for key, ts := range d.completed {
-		if now.Sub(ts) > d.ttl {
+	for key, record := range d.completed {
+		if now.Sub(record.completedAt) > d.ttl {
 			delete(d.completed, key)
 		}
 	}
@@ -680,7 +732,7 @@ func (d Daemon) handleDispatch(
 	dispatch SkillDispatch,
 	deliveryID string,
 	ackedEarly bool,
-) {
+) string {
 	d.logf(
 		"dispatch status=start request_id=%s skill=%s repo=%s repos=%s",
 		dispatch.RequestID,
@@ -724,7 +776,13 @@ func (d Daemon) handleDispatch(
 				d.logf("dispatch status=nack_error delivery_id=%s err=%q", deliveryID, nackErr)
 			}
 		}
-		return
+		if res.Err != nil {
+			return "error"
+		}
+		if res.NoChanges && !resultHasPR(res) {
+			return "no_changes"
+		}
+		return "completed"
 	}
 	if res.Err != nil && !stoppedByOperator {
 		d.handleFailedDispatchAfterPublish(ctx, api, cfg, dispatch, res)
@@ -750,7 +808,7 @@ func (d Daemon) handleDispatch(
 			res.PRURL,
 			res.Err,
 		)
-		return
+		return "error"
 	}
 	d.recordGitHubTaskCompleteActivity(ctx, api, dispatch.RequestID)
 	if res.NoChanges && !resultHasPR(res) {
@@ -762,7 +820,7 @@ func (d Daemon) handleDispatch(
 			res.PRURL,
 			joinAllRepoPRURLs(res.RepoResults),
 		)
-		return
+		return "no_changes"
 	}
 	d.logf(
 		"dispatch status=completed request_id=%s workspace=%s branch=%s pr_url=%s pr_urls=%s changed_repos=%d",
@@ -773,6 +831,7 @@ func (d Daemon) handleDispatch(
 		completedPRURLs(res),
 		countChangedRepoResults(res.RepoResults),
 	)
+	return "completed"
 }
 
 func (d Daemon) recordGitHubTaskCompleteActivity(ctx context.Context, api MoltenHubAPI, requestID string) {
@@ -862,6 +921,71 @@ func failureResponseMessage(errText string) string {
 		return "Failure: task failed. Error details: unknown error."
 	}
 	return "Failure: task failed. Error details: " + errText
+}
+
+func duplicateDispatchResultPayload(cfg InitConfig, dispatch SkillDispatch, state, duplicateOf string) map[string]any {
+	state = strings.TrimSpace(state)
+	duplicateOf = strings.TrimSpace(duplicateOf)
+
+	payload := dispatchResultPayload(cfg, dispatch, harness.Result{
+		ExitCode: harness.ExitPreflight,
+		Err:      errors.New(duplicateDispatchErrorText(duplicateOf, state)),
+	})
+	payload["status"] = "duplicate"
+	payload["duplicate"] = true
+	if state != "" {
+		payload["state"] = state
+	}
+	if duplicateOf != "" {
+		payload["duplicate_of"] = duplicateOf
+	}
+
+	if result, ok := payload["result"].(map[string]any); ok {
+		result["status"] = "duplicate"
+		result["duplicate"] = true
+		if state != "" {
+			result["state"] = state
+		}
+		if duplicateOf != "" {
+			result["duplicate_of"] = duplicateOf
+		}
+	}
+	if failure, ok := payload["failure"].(map[string]any); ok {
+		failure["duplicate"] = true
+		if state != "" {
+			failure["state"] = state
+		}
+		if duplicateOf != "" {
+			failure["duplicate_of"] = duplicateOf
+		}
+		if details, ok := failure["details"].(map[string]any); ok {
+			details["status"] = "duplicate"
+			details["duplicate"] = true
+			if state != "" {
+				details["state"] = state
+			}
+			if duplicateOf != "" {
+				details["duplicate_of"] = duplicateOf
+			}
+		}
+	}
+
+	return payload
+}
+
+func duplicateDispatchErrorText(duplicateOf, state string) string {
+	duplicateOf = strings.TrimSpace(duplicateOf)
+	state = strings.TrimSpace(state)
+	if duplicateOf == "" && state == "" {
+		return "duplicate submission ignored"
+	}
+	if duplicateOf == "" {
+		return fmt.Sprintf("duplicate submission ignored (state=%s)", state)
+	}
+	if state == "" {
+		return fmt.Sprintf("duplicate submission ignored (request_id=%s)", duplicateOf)
+	}
+	return fmt.Sprintf("duplicate submission ignored (request_id=%s state=%s)", duplicateOf, state)
 }
 
 func (d Daemon) handleFailedDispatchAfterPublish(
