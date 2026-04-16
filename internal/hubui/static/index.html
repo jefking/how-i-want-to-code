@@ -140,22 +140,19 @@
               <span id="task-panel-title" class="panel-section-title">Current Work</span>
             </div>
             <div class="task-panel-actions">
-              <div class="task-status-filter" role="group" aria-label="Task status filter">
-                <button
-                  id="task-filter-running"
-                  class="task-status-filter-button"
-                  type="button"
-                  aria-pressed="true"
-                  aria-label="Show running tasks"
-                  title="Show running tasks">Running</button>
-                <button
-                  id="task-filter-completed"
-                  class="task-status-filter-button"
-                  type="button"
-                  aria-pressed="false"
-                  aria-label="Show completed tasks"
-                  title="Show completed tasks">Completed</button>
-              </div>
+              <button
+                id="task-history-toggle"
+                class="task-history-toggle"
+                type="button"
+                aria-pressed="false"
+                aria-label="Show completed task history"
+                title="Show completed task history">
+                <svg class="task-history-toggle-icon" viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                  <path d="M8 2.2a5.8 5.8 0 1 1-4.1 1.7"></path>
+                  <path d="M2.2 2.8v2.9h2.9"></path>
+                  <path d="M8 4.8v3.5l2.4 1.4"></path>
+                </svg>
+              </button>
               <button
                 id="task-view-toggle"
                 class="task-view-toggle"
@@ -1264,8 +1261,7 @@
     const taskList = document.getElementById("task-list");
     const taskPanel = document.getElementById("task-panel");
     const taskPanelTitle = document.getElementById("task-panel-title");
-    const taskFilterRunning = document.getElementById("task-filter-running");
-    const taskFilterCompleted = document.getElementById("task-filter-completed");
+    const taskHistoryToggle = document.getElementById("task-history-toggle");
     const taskViewToggle = document.getElementById("task-view-toggle");
     const taskFullscreenToggle = document.getElementById("task-fullscreen-toggle");
     const taskFullscreen = document.getElementById("task-fullscreen");
@@ -4531,13 +4527,14 @@
         taskFullscreenPanelTitle.textContent = "Current Work";
       }
       const statusFilter = normalizeTaskStatusFilter(state.taskStatusFilter);
-      if (taskFilterRunning) {
-        const active = statusFilter === "running";
-        taskFilterRunning.setAttribute("aria-pressed", active ? "true" : "false");
-      }
-      if (taskFilterCompleted) {
-        const active = statusFilter === "completed";
-        taskFilterCompleted.setAttribute("aria-pressed", active ? "true" : "false");
+      if (taskHistoryToggle) {
+        const showingHistory = statusFilter === "completed";
+        const toggleLabel = showingHistory
+          ? "Show current running work"
+          : "Show completed task history";
+        taskHistoryToggle.setAttribute("aria-pressed", showingHistory ? "true" : "false");
+        taskHistoryToggle.setAttribute("aria-label", toggleLabel);
+        taskHistoryToggle.setAttribute("title", toggleLabel);
       }
       if (taskViewToggle) {
         taskViewToggle.setAttribute("aria-label", meta.toggleLabel);
@@ -6412,11 +6409,11 @@
       return false;
     };
     promptVisibilityToggle.addEventListener("click", togglePromptVisibility);
-    taskFilterRunning.addEventListener("click", () => {
-      setTaskStatusFilter("running");
-    });
-    taskFilterCompleted.addEventListener("click", () => {
-      setTaskStatusFilter("completed");
+    taskHistoryToggle.addEventListener("click", () => {
+      const nextFilter = normalizeTaskStatusFilter(state.taskStatusFilter) === "completed"
+        ? "running"
+        : "completed";
+      setTaskStatusFilter(nextFilter);
     });
     taskViewToggle.addEventListener("click", () => {
       const nextView = normalizeTaskPanelView(state.taskPanelView) === "prompt" ? "main" : "prompt";

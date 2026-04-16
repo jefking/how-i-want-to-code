@@ -3033,6 +3033,39 @@ func TestRunCodexReturnsErrorWhenCodexReportsFailure(t *testing.T) {
 	if !strings.Contains(strings.ToLower(err.Error()), "codex reported failure") {
 		t.Fatalf("runCodex() error = %v, want codex reported failure marker", err)
 	}
+	if !strings.Contains(err.Error(), "Error details: - Something went wrong") {
+		t.Fatalf("runCodex() error = %v, want explicit error details from codex output", err)
+	}
+}
+
+func TestRunCodexReturnsErrorWhenCodexFailureOnlyHasStderrDetail(t *testing.T) {
+	t.Parallel()
+
+	targetDir := t.TempDir()
+	prompt := "fix compile error"
+	firstCmd := codexCommand(targetDir, prompt)
+
+	fake := &fakeRunner{t: t, exps: []expectedRun{
+		{
+			cmd: firstCmd,
+			res: execx.Result{
+				Stdout: "Failure: I could not update repository files.",
+				Stderr: "permission denied writing /tmp/worktree",
+			},
+		},
+	}}
+
+	h := New(fake)
+	err := h.runCodex(context.Background(), agentruntime.Default(), targetDir, prompt, codexRunOptions{}, "", "")
+	if err == nil {
+		t.Fatal("runCodex() error = nil, want codex reported failure error")
+	}
+	if !strings.Contains(strings.ToLower(err.Error()), "codex reported failure") {
+		t.Fatalf("runCodex() error = %v, want codex reported failure marker", err)
+	}
+	if !strings.Contains(err.Error(), "Error details: permission denied writing /tmp/worktree") {
+		t.Fatalf("runCodex() error = %v, want fallback error details from stderr", err)
+	}
 }
 
 func TestRunCodexReturnsTimeoutWhenAgentStageRunsTooLong(t *testing.T) {

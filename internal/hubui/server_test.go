@@ -587,8 +587,8 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "taskViewToggle.addEventListener(\"click\", () => {") {
 		t.Fatalf("expected index html to wire task view toggle interactions")
 	}
-	if !strings.Contains(markup, `id="task-filter-running"`) || !strings.Contains(markup, `id="task-filter-completed"`) {
-		t.Fatalf("expected index html to include running and completed task filter controls")
+	if !strings.Contains(markup, `id="task-history-toggle"`) {
+		t.Fatalf("expected index html to include history icon toggle for running/completed task views")
 	}
 	if !strings.Contains(markup, `const TASK_STATUS_FILTER_KEY = "hubui.taskStatusFilter";`) {
 		t.Fatalf("expected index html to define a dedicated persisted task status filter storage key")
@@ -599,12 +599,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, "function setTaskStatusFilter(filter, options = {})") {
 		t.Fatalf("expected index html to include task status filter switching")
 	}
-	if !strings.Contains(markup, "taskFilterRunning.addEventListener(\"click\", () => {") ||
-		!strings.Contains(markup, "taskFilterCompleted.addEventListener(\"click\", () => {") {
-		t.Fatalf("expected index html to wire running/completed task filter interactions")
+	if !strings.Contains(markup, "taskHistoryToggle.addEventListener(\"click\", () => {") ||
+		!strings.Contains(markup, "const nextFilter = normalizeTaskStatusFilter(state.taskStatusFilter) === \"completed\"") {
+		t.Fatalf("expected index html to wire history icon toggle interactions for running/completed task views")
 	}
-	if !strings.Contains(markup, "setTaskStatusFilter(\"running\");") || !strings.Contains(markup, "setTaskStatusFilter(\"completed\");") {
-		t.Fatalf("expected index html to switch task filter between running and completed")
+	if !strings.Contains(markup, "setTaskStatusFilter(nextFilter);") {
+		t.Fatalf("expected index html history toggle to switch task filter between running and completed")
 	}
 	if !strings.Contains(markup, "function runningTasks(snapshot)") || !strings.Contains(markup, "function completedTasks(snapshot)") {
 		t.Fatalf("expected index html to derive running and completed task lists independently")
@@ -653,6 +653,12 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, `id="task-view-toggle"`) {
 		t.Fatalf("expected index html to include a task-view icon toggle in Current Work header")
+	}
+	if !strings.Contains(markup, `id="task-history-toggle"`) {
+		t.Fatalf("expected index html to include a task-history icon toggle in Current Work header")
+	}
+	if !strings.Contains(markup, `class="task-history-toggle-icon"`) {
+		t.Fatalf("expected index html to render the task-history toggle with an icon affordance")
 	}
 	if !strings.Contains(markup, `class="task-view-toggle-icon"`) {
 		t.Fatalf("expected index html to render the task-view toggle with an icon affordance")
@@ -1649,11 +1655,14 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-panel-actions {\n  display: inline-flex;\n  align-items: center;\n  gap: 6px;\n}") {
 		t.Fatalf("expected stylesheet to group task header action icons on the right side")
 	}
-	if !strings.Contains(css, ".task-status-filter {") || !strings.Contains(css, ".task-status-filter-button") {
-		t.Fatalf("expected stylesheet to include running/completed task status filter pill styles")
+	if !strings.Contains(css, ".task-history-toggle,\n.task-view-toggle {") {
+		t.Fatalf("expected stylesheet to include compact icon button styles for history and task-view toggles")
 	}
-	if !strings.Contains(css, ".task-status-filter-button[aria-pressed=\"true\"]") {
-		t.Fatalf("expected stylesheet to include active-state treatment for task status filters")
+	if !strings.Contains(css, ".task-history-toggle-icon") {
+		t.Fatalf("expected stylesheet to include task-history icon styles")
+	}
+	if !strings.Contains(css, ".task-history-toggle[aria-pressed=\"true\"]") {
+		t.Fatalf("expected stylesheet to include active-state treatment for task-history mode")
 	}
 	if !strings.Contains(css, ".task-view-toggle {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 32px;\n  height: 32px;") {
 		t.Fatalf("expected stylesheet to size the task-view toggle as a compact icon affordance")
@@ -1780,9 +1789,6 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".task.task-collapsed") {
 		t.Fatalf("expected stylesheet to include collapsed task styles")
-	}
-	if strings.Contains(css, ".task-history") {
-		t.Fatalf("expected stylesheet to remove prompt history section styles")
 	}
 	if strings.Contains(css, ".task-history-list") {
 		t.Fatalf("expected stylesheet to remove prompt history list styles")
