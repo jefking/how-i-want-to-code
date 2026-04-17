@@ -596,14 +596,26 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	if !strings.Contains(markup, `id="task-history-toggle"`) {
 		t.Fatalf("expected index html to include history icon toggle for running/completed task views")
 	}
+	if !strings.Contains(markup, `id="task-history-toggle-plus" class="task-history-toggle-plus hidden"`) {
+		t.Fatalf("expected index html to include hidden plus badge for unseen completed task history")
+	}
 	if !strings.Contains(markup, `const TASK_STATUS_FILTER_KEY = "hubui.taskStatusFilter";`) {
 		t.Fatalf("expected index html to define a dedicated persisted task status filter storage key")
+	}
+	if !strings.Contains(markup, `const TASK_HISTORY_UNSEEN_KEY = "hubui.taskHistoryUnseen.v1";`) {
+		t.Fatalf("expected index html to define a dedicated unseen completed-task history storage key")
 	}
 	if !strings.Contains(markup, "taskStatusFilter: loadTaskStatusFilter(),") {
 		t.Fatalf("expected index html to hydrate task status filter from local storage on startup")
 	}
+	if !strings.Contains(markup, "taskHistoryUnseenIDs: loadTaskHistoryUnseenIDs(),") {
+		t.Fatalf("expected index html to hydrate unseen completed task history ids from local storage on startup")
+	}
 	if !strings.Contains(markup, "function setTaskStatusFilter(filter, options = {})") {
 		t.Fatalf("expected index html to include task status filter switching")
+	}
+	if !strings.Contains(markup, "function rememberTaskHistoryUnseen(requestID)") || !strings.Contains(markup, "function clearTaskHistoryUnseen()") {
+		t.Fatalf("expected index html to include unseen completed-task history tracking helpers")
 	}
 	if !strings.Contains(markup, "taskHistoryToggle.addEventListener(\"click\", () => {") ||
 		!strings.Contains(markup, "const nextFilter = normalizeTaskStatusFilter(state.taskStatusFilter) === \"completed\"") {
@@ -611,6 +623,10 @@ func TestHandlerIndexServesHTML(t *testing.T) {
 	}
 	if !strings.Contains(markup, "setTaskStatusFilter(nextFilter);") {
 		t.Fatalf("expected index html history toggle to switch task filter between running and completed")
+	}
+	if !strings.Contains(markup, "taskHistoryToggle.classList.toggle(\"task-history-toggle-unseen\", hasUnseenHistory);") ||
+		!strings.Contains(markup, "taskHistoryTogglePlus.classList.toggle(\"hidden\", !hasUnseenHistory);") {
+		t.Fatalf("expected index html to surface unseen completed history with highlighted history toggle plus badge")
 	}
 	if !strings.Contains(markup, "function runningTasks(snapshot)") || !strings.Contains(markup, "function completedTasks(snapshot)") {
 		t.Fatalf("expected index html to derive running and completed task lists independently")
@@ -1697,6 +1713,15 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	}
 	if !strings.Contains(css, ".task-history-toggle[aria-pressed=\"true\"]") {
 		t.Fatalf("expected stylesheet to include active-state treatment for task-history mode")
+	}
+	if !strings.Contains(css, ".task-history-toggle {\n  position: relative;\n}") {
+		t.Fatalf("expected stylesheet to anchor the unseen-history plus badge to the history toggle")
+	}
+	if !strings.Contains(css, ".task-history-toggle-unseen") {
+		t.Fatalf("expected stylesheet to highlight history toggle when unseen completed tasks exist")
+	}
+	if !strings.Contains(css, ".task-history-toggle-plus") {
+		t.Fatalf("expected stylesheet to include plus badge styles for unseen completed task history")
 	}
 	if !strings.Contains(css, ".task-view-toggle {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 32px;\n  height: 32px;") {
 		t.Fatalf("expected stylesheet to size the task-view toggle as a compact icon affordance")
