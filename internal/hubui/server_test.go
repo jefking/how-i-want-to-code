@@ -1556,6 +1556,8 @@ func TestHandlerIndexIncludesClaudeBrowserCodeFlow(t *testing.T) {
 		`return configuredHarnessName();`,
 		`function isClaudeBrowserCodeAwaitingSubmission(auth) {`,
 		`const showBrowserCode = isClaudePendingBrowserLoginState();`,
+		`id="agent-auth-copy"`,
+		`aria-label="Copy device code"`,
 		`id="agent-auth-browser-command-primary"`,
 		`class="agent-auth-command-box agent-auth-command-box-inline"`,
 		`aria-label="Copy claude setup-token command"`,
@@ -1564,12 +1566,16 @@ func TestHandlerIndexIncludesClaudeBrowserCodeFlow(t *testing.T) {
 		`class="agent-auth-command-box"`,
 		`aria-label="Copy Claude credentials command"`,
 		`id="agent-auth-browser-command-secondary-copy"`,
+		`id="agent-auth-configure-copy"`,
+		`aria-label="Copy configure command"`,
 		`cat ~/.pi/agent/auth.json`,
 		`Paste ~/.pi/agent/auth.json contents...`,
 		`agent-auth-configure-input-single-line`,
 		`const useClaudeLogoLink = authHarness(state.agentAuth) === "claude" && authURL !== "" && !useClaudeCommandFlow;`,
 		`const code = claudeBrowserCodeValue();`,
 		`agentAuthURL.addEventListener("click", markAgentAuthInteraction);`,
+		`copiedLabel: "Copied device code"`,
+		`copiedLabel: "Copied configure command"`,
 	}
 	for _, needle := range required {
 		if !strings.Contains(markup, needle) {
