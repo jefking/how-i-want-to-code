@@ -1443,7 +1443,6 @@ select.prompt-control {
 
 .task-history-toggle,
 .task-view-toggle {
-  position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -1458,6 +1457,10 @@ select.prompt-control {
   background: transparent;
   box-shadow: none;
   transition: border-color 0.14s ease, color 0.14s ease, transform 0.14s ease, box-shadow 0.14s ease, background-color 0.14s ease;
+}
+
+.task-history-toggle {
+  position: relative;
 }
 
 .task-fullscreen-toggle {
