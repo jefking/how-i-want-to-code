@@ -4677,6 +4677,7 @@
               }
             }
             trackAnalyticsEvent("task_rerun_duplicate", { request_id: requestID, forced: force });
+            setTaskStatusFilter("running");
             setLocalPromptStatus("warn", duplicateNotice(body));
             return;
           }
@@ -4684,6 +4685,7 @@
         }
 
         const newRequestID = body?.request_id || "(unknown)";
+        setTaskStatusFilter("running");
         trackAnalyticsEvent("task_rerun_succeeded", { request_id: requestID, forced: force, rerun_request_id: newRequestID });
         setLocalPromptStatus("ok", force ? `Queued forced request ${newRequestID} (re-run of ${requestID})` : `Queued request ${newRequestID} (re-run of ${requestID})`);
       } catch (err) {
@@ -6109,6 +6111,7 @@
         if (!response.ok) {
           if (response.status === 409 && body?.duplicate) {
             trackAnalyticsEvent("prompt_submit_duplicate", { prompt_mode: state.promptMode });
+            setTaskStatusFilter("running");
             setLocalPromptStatus("warn", duplicateNotice(body));
             return;
           }
@@ -6124,6 +6127,7 @@
           // Ignore local history extraction failures.
         }
         clearSubmittedPromptState();
+        setTaskStatusFilter("running");
         trackAnalyticsEvent("prompt_submit_succeeded", { prompt_mode: state.promptMode, request_id: requestID });
         setLocalPromptStatus("ok", `Queued request ${requestID}`);
       } catch (err) {
