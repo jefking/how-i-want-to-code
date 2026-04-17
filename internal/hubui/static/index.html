@@ -367,9 +367,20 @@
       <p id="agent-auth-message" class="mt-3 max-w-lg text-base leading-7 text-hub-text/85"></p>
 
       <div id="agent-auth-details" class="mt-5 hidden space-y-3">
-        <div class="flex flex-wrap items-center gap-2.5">
-          <div id="agent-auth-code" class="font-mono text-[1.15rem] tracking-[0.22em] text-hub-text"></div>
-          <button id="agent-auth-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
+        <div class="agent-auth-command-box agent-auth-command-box-inline">
+          <code id="agent-auth-code" class="agent-auth-command-text agent-auth-command-text-inline font-mono text-[1.15rem] tracking-[0.22em] text-hub-text"></code>
+          <button
+            id="agent-auth-copy"
+            class="agent-auth-copy agent-auth-command-copy rounded-md p-2"
+            type="button"
+            aria-label="Copy device code"
+            title="Copy device code">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 9h11v11H9z"></path>
+              <path d="M4 15H3V4h11v1"></path>
+            </svg>
+            <span class="sr-only">Copy device code</span>
+          </button>
         </div>
         <a id="agent-auth-url" class="agent-auth-url block break-all text-[1.05rem] underline decoration-dotted underline-offset-2" href="" target="_blank" rel="noopener noreferrer">
           <img
@@ -424,9 +435,20 @@
       </div>
 
       <div id="agent-auth-configure" class="mt-5 hidden space-y-3">
-        <div id="agent-auth-configure-command-row" class="flex flex-wrap items-center gap-2.5">
-          <div id="agent-auth-configure-command" class="font-mono text-[1rem] tracking-[0.04em] text-hub-text">auggie token print</div>
-          <button id="agent-auth-configure-copy" class="agent-auth-copy rounded-md px-2.5 py-1.5 text-xs font-medium" type="button">Copy</button>
+        <div id="agent-auth-configure-command-row" class="agent-auth-command-box agent-auth-command-box-inline">
+          <code id="agent-auth-configure-command" class="agent-auth-command-text agent-auth-command-text-inline font-mono text-[1rem] tracking-[0.04em] text-hub-text">auggie token print</code>
+          <button
+            id="agent-auth-configure-copy"
+            class="agent-auth-copy agent-auth-command-copy rounded-md p-2"
+            type="button"
+            aria-label="Copy configure command"
+            title="Copy configure command">
+            <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+              <path d="M9 9h11v11H9z"></path>
+              <path d="M4 15H3V4h11v1"></path>
+            </svg>
+            <span class="sr-only">Copy configure command</span>
+          </button>
         </div>
         <label id="agent-auth-configure-label" class="text-sm font-medium text-hub-text/85" for="agent-auth-configure-input">Paste configuration value</label>
         <textarea id="agent-auth-configure-input" class="prompt-text font-mono text-[0.9rem]" placeholder='{"accessToken":"XXX","tenantURL":"https://YYY/","scopes":["email"]}' spellcheck="false" rows="5" wrap="off"></textarea>
@@ -2700,12 +2722,18 @@
       const code = String(state.agentAuth.deviceCode || "").trim();
       const url = String(state.agentAuth.authURL || "").trim();
       const value = code || url;
-      await copyTextToClipboard(value, agentAuthCopy);
+      await copyTextToClipboard(value, agentAuthCopy, {
+        preserveContents: true,
+        copiedLabel: "Copied device code",
+      });
     }
 
     async function copyAuggieConfigureCommand() {
       const command = String(state.agentAuth.configureCommand || "").trim() || "auggie token print";
-      await copyTextToClipboard(command, agentAuthConfigureCopy);
+      await copyTextToClipboard(command, agentAuthConfigureCopy, {
+        preserveContents: true,
+        copiedLabel: "Copied configure command",
+      });
     }
 
     async function copyClaudeBrowserPrimaryCommand() {
