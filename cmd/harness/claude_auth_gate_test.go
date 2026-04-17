@@ -386,6 +386,19 @@ func TestClaudeAuthGateConfigureRejectsInvalidCredentialsJSONInPendingState(t *t
 	}
 }
 
+func TestClaudeAuthGatePendingBrowserLoginFailureNilGate(t *testing.T) {
+	var g *claudeAuthGate
+
+	wantErr := context.DeadlineExceeded
+	status, err := g.pendingBrowserLoginFailure("ignored", wantErr)
+	if err != wantErr {
+		t.Fatalf("pendingBrowserLoginFailure() error = %v, want %v", err, wantErr)
+	}
+	if !status.Ready || status.State != "ready" {
+		t.Fatalf("pendingBrowserLoginFailure() status = %+v", status)
+	}
+}
+
 func TestClaudeAuthGateStartDeviceAuthRunsLoginAndCapturesURL(t *testing.T) {
 	t.Setenv("HOME", t.TempDir())
 	t.Setenv("CLAUDE_CONFIG_DIR", "")

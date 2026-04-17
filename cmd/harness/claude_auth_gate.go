@@ -1300,7 +1300,7 @@ func saveClaudeCredentialsJSON(raw string) (string, error) {
 
 func (g *claudeAuthGate) pendingBrowserLoginFailure(message string, err error) (hubui.AgentAuthState, error) {
 	if g == nil {
-		return defaultAgentAuthState(), err
+		return readyAgentAuthState(), err
 	}
 	g.mu.Lock()
 	if !g.ready {
