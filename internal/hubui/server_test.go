@@ -1695,6 +1695,9 @@ func TestHandlerServesStaticCSS(t *testing.T) {
 	if !strings.Contains(css, ".task-history-toggle-plus") {
 		t.Fatalf("expected stylesheet to include plus badge styles for unseen completed task history")
 	}
+	if !strings.Contains(css, ".hub-dock-plus,\n.task-history-toggle-plus {") {
+		t.Fatalf("expected stylesheet to share plus badge styling between dock logo and history toggle")
+	}
 	if !strings.Contains(css, ".task-view-toggle {\n  display: inline-flex;\n  align-items: center;\n  justify-content: center;\n  width: 32px;\n  height: 32px;") {
 		t.Fatalf("expected stylesheet to size the task-view toggle as a compact icon affordance")
 	}
